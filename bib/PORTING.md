@@ -107,7 +107,6 @@ bib/cases/match/non_exhaustive_union.expect.toml
 ```
 
 ```toml
-rung = 4
 about = "Missing arm in a match over a union is an error."
 # rust_differs = "reason the Rust compiler is expected to disagree"
 
@@ -122,6 +121,8 @@ message = "non-exhaustive match: `Square` not covered"
 area_of_circle = "pass"
 ```
 
+- The folder is the case's feature slug (`match`, `generics`, `closures`, ...).
+  There is no number or level field.
 - No `[[diagnostics]]`: the file must check clean.
 - `[tests]`: the case's `test` blocks are compiled by our compiler and run;
   each must end as listed.
@@ -137,23 +138,18 @@ sidecar from the Rust compiler's output, review it, commit. Fixing a case:
 edit the sidecar, plus `rust_differs` if Rust now disagrees. `bless` never
 overwrites a sidecar that has `rust_differs` set.
 
-**Ladder.** The corpus (`baml_tests/baml_src` 311 namespaces,
-`baml_tests/projects` ~165 projects) is sorted into rungs by the syntax each
-program uses:
+**Feature slugs.** Upstream corpus programs and our cases are grouped by
+feature slug, the order we expect a stage to start passing them:
 
-1. literals, lets, arithmetic, calls, returns
-2. `if`, loops, `break`/`continue`
-3. classes, fields, arrays, maps
-4. enums, unions, type tests, `match`
-5. lambdas, closures
-6. `throws`, `catch`, `defer`
-7. generics, interfaces, impls
-8. globals, multiple files and namespaces, packages
-9. LLM functions, clients, templates, tests
-10. everything else, the stdlib sources, and our own compiler
+`basics` (literals, lets, arithmetic, calls) → `control` (if, loops) →
+`classes` (fields, arrays, maps) → `match` (enums, unions, type tests) →
+`closures` → `errors` (throws, catch, defer) → `generics` (interfaces, impls) →
+`modules` (globals, files, namespaces, packages) → `llm` (functions, clients,
+templates, tests) → `stdlib` → `self` (our own compiler).
 
-A rung is one `testset` per stage, covering both the upstream corpus and
-`bib/cases/` files tagged with that rung. `baml test` output is the scoreboard.
+Upstream programs get their slug from the syntax they use; our cases from
+their folder. Each slug is one `testset` per stage, so `baml test` output
+reads as "the type checker passes `basics` through `match`".
 
 ### 4. One BAML idiom per Rust idiom
 
