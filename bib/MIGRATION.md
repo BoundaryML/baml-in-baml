@@ -127,6 +127,9 @@ Rules:
 
 ### Phase 1 in detail
 
+The micro-level method (pinned baseline, generated types, per-function
+diffs, the work graph, spikes) is in `bib/EMITTER_PORT.md`.
+
 1. **`bib_lower_export`** (fork-owned Rust crate, in `bib/crates/`): runs the
    Rust frontend through `baml_db` and writes `LoweredPackage` JSON. It answers
    every question Rust emit asks; the list of emit's frontend imports is its
