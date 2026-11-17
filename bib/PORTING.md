@@ -97,6 +97,40 @@ compiled by `reflect.Package.compile`.
 The upstream printers (`debug_tree`, `render_hir`, `display_function`,
 `display_program`) can be ported later as debugging aids. They are not the gate.
 
+**Our own test cases.** Besides the upstream corpus, `bib/cases/` holds cases
+we write: good and bad BAML plus what should happen. One case is one `.baml`
+file (or a folder for multi-file cases), with expectations inline so a case
+reads top to bottom:
+
+```baml
+// bib-case: rung 4
+// Missing arm in a match over a union is an error.
+
+type Shape = Circle | Square
+
+function area(s: Shape) -> float {
+  match (s) {            //~ error[E0150] non-exhaustive match: `Square` not covered
+    Circle c => 3.14 * c.r * c.r,
+  }
+}
+```
+
+- `//~ <severity>[<code>] <message>` on a line: that diagnostic, on that line.
+  Message match is prefix, so wording tweaks don't break unrelated cases.
+- No `//~` lines: the file must check clean.
+- `test` blocks in the case: compiled by our compiler and run, so behavior is
+  asserted with ordinary BAML `assert`s.
+- `// bib-case: rust-differs <reason>`: the Rust compiler disagrees with the
+  expectation on purpose (an upstream bug, or behavior we chose differently).
+  The case still runs against Rust, and the test fails if Rust starts agreeing,
+  so the note never goes stale.
+
+Every case runs against both compilers. Adding a case: write the code, then
+run `bless` (a function in `bib/compiler`, run with `baml run`) to fill in the
+`//~` lines from the Rust compiler's diagnostics; review them; commit. Fixing a
+case means editing its `//~` lines by hand, plus a `rust-differs` note if Rust
+now disagrees.
+
 **Ladder.** The corpus (`baml_tests/baml_src` 311 namespaces,
 `baml_tests/projects` ~165 projects) is sorted into rungs by the syntax each
 program uses:
@@ -112,7 +146,8 @@ program uses:
 9. LLM functions, clients, templates, tests
 10. everything else, the stdlib sources, and our own compiler
 
-A rung is one `testset` per stage. `baml test` output is the scoreboard.
+A rung is one `testset` per stage, covering both the upstream corpus and
+`bib/cases/` files tagged with that rung. `baml test` output is the scoreboard.
 
 ### 4. One BAML idiom per Rust idiom
 
