@@ -151,11 +151,6 @@ class Tokens {
     kinds: TokenKind[],
     starts: int[],
 
-    // port: Tokens::len
-    function len(self) -> int throws never {
-        self.kinds.length()
-    }
-
     // port: Tokens::text. `utf8` is the source text's bytes.
     function text(self, utf8: uint8array, idx: int) -> string throws never {
         string.from_utf8(utf8.slice(self.starts[idx], self.starts[idx + 1])) catch (e) {

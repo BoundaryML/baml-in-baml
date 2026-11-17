@@ -15,7 +15,7 @@ function lex_dir(dir: string) -> LexBench throws baml.errors.Io | baml.errors.Pa
     let started = baml.time.Instant.now();
     let tokens = sources
         .map((text) -> {
-            root.syntax.lex(text).len()
+            root.syntax.lex(text).kinds.length()
         })
         .reduce(
             (a, b) -> {
