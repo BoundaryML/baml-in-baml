@@ -98,38 +98,44 @@ The upstream printers (`debug_tree`, `render_hir`, `display_function`,
 `display_program`) can be ported later as debugging aids. They are not the gate.
 
 **Our own test cases.** Besides the upstream corpus, `bib/cases/` holds cases
-we write: good and bad BAML plus what should happen. One case is one `.baml`
-file (or a folder for multi-file cases), with expectations inline so a case
-reads top to bottom:
+we write: good and bad BAML plus what should happen. The `.baml` file is plain
+code; everything expected lives in a sidecar next to it:
 
-```baml
-// bib-case: rung 4
-// Missing arm in a match over a union is an error.
-
-type Shape = Circle | Square
-
-function area(s: Shape) -> float {
-  match (s) {            //~ error[E0150] non-exhaustive match: `Square` not covered
-    Circle c => 3.14 * c.r * c.r,
-  }
-}
+```
+bib/cases/match/non_exhaustive_union.baml
+bib/cases/match/non_exhaustive_union.expect.toml
 ```
 
-- `//~ <severity>[<code>] <message>` on a line: that diagnostic, on that line.
-  Message match is prefix, so wording tweaks don't break unrelated cases.
-- No `//~` lines: the file must check clean.
-- `test` blocks in the case: compiled by our compiler and run, so behavior is
-  asserted with ordinary BAML `assert`s.
-- `// bib-case: rust-differs <reason>`: the Rust compiler disagrees with the
-  expectation on purpose (an upstream bug, or behavior we chose differently).
-  The case still runs against Rust, and the test fails if Rust starts agreeing,
-  so the note never goes stale.
+```toml
+rung = 4
+about = "Missing arm in a match over a union is an error."
+# rust_differs = "reason the Rust compiler is expected to disagree"
 
-Every case runs against both compilers. Adding a case: write the code, then
-run `bless` (a function in `bib/compiler`, run with `baml run`) to fill in the
-`//~` lines from the Rust compiler's diagnostics; review them; commit. Fixing a
-case means editing its `//~` lines by hand, plus a `rust-differs` note if Rust
-now disagrees.
+[[diagnostics]]
+severity = "error"
+code = "E0150"
+line = 5
+col = 3
+message = "non-exhaustive match: `Square` not covered"
+
+[tests]                 # expected outcome of each test block, when run
+area_of_circle = "pass"
+```
+
+- No `[[diagnostics]]`: the file must check clean.
+- `[tests]`: the case's `test` blocks are compiled by our compiler and run;
+  each must end as listed.
+- A multi-file case is a folder with one `expect.toml` at its root, and each
+  diagnostic also names its `file`.
+- `rust_differs`: the Rust compiler disagrees with the sidecar on purpose (an
+  upstream bug, or behavior we chose differently). The case still runs against
+  Rust, and fails if Rust starts agreeing, so the note never goes stale.
+
+Every case runs against both compilers. Adding a case: write the `.baml`, run
+`bless` (a function in `bib/compiler`, run with `baml run`) to write the
+sidecar from the Rust compiler's output, review it, commit. Fixing a case:
+edit the sidecar, plus `rust_differs` if Rust now disagrees. `bless` never
+overwrites a sidecar that has `rust_differs` set.
 
 **Ladder.** The corpus (`baml_tests/baml_src` 311 namespaces,
 `baml_tests/projects` ~165 projects) is sorted into rungs by the syntax each
