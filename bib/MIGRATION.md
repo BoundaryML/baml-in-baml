@@ -33,21 +33,22 @@ borsh bytes directly (writers generated from the Rust types).
 
 ## The Rust compiler is the oracle
 
-It stays in the tree, mirrored from upstream. For every stage, the BAML
-compiler's printer output must equal the Rust printer's on the corpus
-(`PORTING.md`, rules 2 and 3). End to end, the runtime test suite must pass on
+It stays in the tree, mirrored from upstream, and BAML code can call it
+(`reflect.Package.compile`). Our compiler's diagnostics must equal its
+diagnostics on the corpus, checked by ordinary `baml test` tests (`PORTING.md`,
+rule 3), and our compiler must agree with `baml check` about its own source. End to end, the runtime test suite must pass on
 BAML-compiled bytecode, and generated SDK files must be byte-equal.
 
 ## Phases
 
 | # | Phase | Gate |
 |---|---|---|
-| 0 | Spikes, `bib_typegen`, `bib_dump`, `bib diff`, `IDIOMS.md`, ladder, `BASE` | spikes pass; Rust dumps for the corpus exist |
-| 1 | Lex + parse | tokens and CST (`debug_tree`) + syntax diagnostics equal |
-| 2 | AST + HIR | `render_hir` output + name diagnostics equal |
-| 3 | TIR | TIR dumps + all diagnostics equal; `PackageInterface` equal |
-| 4 | MIR | `display_function` output equal |
-| 5 | Bytecode | `display_program` output and `EmittedPackage` bytes equal; runtime suite passes |
+| 0 | Spikes, `bib_typegen`, `IDIOMS.md`, `bib/compiler` project + oracle tests, ladder, `BASE` | spikes pass |
+| 1 | Lex + parse | syntax diagnostics equal |
+| 2 | AST + HIR | name diagnostics equal |
+| 3 | TIR | all diagnostics equal; our compiler `check`s itself like `baml check` |
+| 4 | MIR | (internal; tested through phase 5) |
+| 5 | Bytecode | corpus programs compiled by us run like the Rust-compiled ones; runtime suite passes |
 | 6 | `baml generate` | generated SDK files byte-equal |
 | 7 | Self-host + stdlib | stage1 bytecode == stage2; stdlib compiled by the BAML compiler |
 | 8 | Default flip | `baml check` exit latency within budget |
@@ -75,8 +76,8 @@ layers whose BAML version passed its gate.
   gate passes (`PORTING.md`, rule 5).
 - **Layer ported:** the port agent reads the PR's intent, finds the BAML file
   that mirrors the touched Rust file, re-plans the change there, and is done
-  when the stage diffs match again on the full corpus.
-- **Rust-only change** with no printer diff: `not-applicable`.
+  when `baml test bib/compiler` passes again on the full corpus.
+- **Rust-only change** with no diagnostic or behavior change: `not-applicable`.
 
 ## Risks
 
