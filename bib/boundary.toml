@@ -9,18 +9,41 @@
 #
 # Globs are fnmatch-style against repo-relative paths.
 
+# Frontend rules also carry a `layer` (see bib/MIGRATION.md, "How upstream PRs flow").
+
 [[rule]]
 class = "frontend"
+layer = "parse"
 globs = [
   "baml_language/crates/baml_syntax/**",
   "baml_language/crates/baml_syntax_macros/**",
   "baml_language/crates/baml_parser/**",
-  "baml_language/crates/baml_compiler2_ast/**",
-  "baml_language/crates/baml_compiler2_hir/**",
-  "baml_language/crates/baml_compiler2_hir_ty/**",
-  "baml_language/crates/baml_compiler2_mir/**",
-  "baml_language/crates/baml_compiler_diagnostics/**",
 ]
+
+[[rule]]
+class = "frontend"
+layer = "ast"
+globs = ["baml_language/crates/baml_compiler2_ast/**"]
+
+[[rule]]
+class = "frontend"
+layer = "hir"
+globs = ["baml_language/crates/baml_compiler2_hir/**"]
+
+[[rule]]
+class = "frontend"
+layer = "tir"
+globs = ["baml_language/crates/baml_compiler2_hir_ty/**"]
+
+[[rule]]
+class = "frontend"
+layer = "mir"
+globs = ["baml_language/crates/baml_compiler2_mir/**"]
+
+[[rule]]
+class = "frontend"
+layer = "diag"
+globs = ["baml_language/crates/baml_compiler_diagnostics/**"]
 
 [[rule]]
 class = "spec"

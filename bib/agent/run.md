@@ -25,6 +25,9 @@ report the upstream commit and conflicting paths. Do not resolve it yourself.
 
 ## 3. Intent (when `[ports] intent_enabled = true` in `bib/config.toml`)
 
+Tasks whose `layers` are all unported are written straight to `bib/ports/done/`
+with `status: absorbed` by sync; leave them alone. See `bib/MIGRATION.md`.
+
 For each file in `bib/ports/pending/` with `status: needs-intent`, oldest
 `merged_at` first, at most 10 per run:
 
@@ -54,8 +57,8 @@ Take the single oldest `needs-port` task. Skip this step if a fork PR from a
 2. Plan from the Intent, not from the Rust diff. Re-design for the BAML
    frontend's own structure; the Rust code is a reference for behavior only.
 3. Implement in the BAML frontend. Do not edit the runtime (see `bib/CLAUDE.md`).
-4. Verify against the Acceptance section: the Rust frontend is the oracle while
-   it exists; MIR and diagnostics for the acceptance inputs must match.
+4. Verify: BAML frontend output (FO) must equal the Rust oracle's FO on the
+   whole corpus, not just the acceptance inputs (`bib/MIGRATION.md`, "The oracle").
 5. Set `status: done`, `git mv` the task to `bib/ports/done/`, open a PR into
    `main` of `BoundaryML/baml-in-baml` titled `port #<pr>: <title>` with the
    intent and verification results in the body.

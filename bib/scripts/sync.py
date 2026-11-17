@@ -40,11 +40,16 @@ def load_toml(name: str) -> dict:
         return tomllib.load(f)
 
 
-def classify(path: str, rules: list[dict]) -> str:
+def match_rule(path: str, rules: list[dict]) -> dict | None:
     for rule in rules:
         if any(fnmatch.fnmatchcase(path, g) for g in rule["globs"]):
-            return rule["class"]
-    return "mirror"
+            return rule
+    return None
+
+
+def classify(path: str, rules: list[dict]) -> str:
+    rule = match_rule(path, rules)
+    return rule["class"] if rule else "mirror"
 
 
 def last_mirrored(upstream_ref: str) -> str:
@@ -65,9 +70,12 @@ def pr_number(subject: str) -> int | None:
 
 
 def write_port_task(entry: dict, by_class: dict[str, list[str]], upstream_repo: str) -> Path:
-    PENDING.mkdir(parents=True, exist_ok=True)
+    absorbed = entry["status"] == "absorbed"
+    folder = DONE if absorbed else PENDING
+    folder.mkdir(parents=True, exist_ok=True)
     key = f"pr{entry['pr']}" if entry["pr"] else entry["sha"][:12]
-    path = PENDING / f"{key}.md"
+    path = folder / f"{key}.md"
+    status = "absorbed       # touched only unported layers; picked up when that layer is written against the oracle" if absorbed else "needs-intent   # needs-intent -> needs-port -> in-progress -> done | not-applicable"
     url = f"https://github.com/{upstream_repo}/pull/{entry['pr']}" if entry["pr"] else f"https://github.com/{upstream_repo}/commit/{entry['sha']}"
 
     def section(cls: str) -> str:
@@ -81,7 +89,8 @@ upstream_pr: {entry['pr'] or ''}
 title: {json.dumps(entry['title'])}
 url: {url}
 merged_at: {entry['date']}
-status: needs-intent   # needs-intent -> needs-port -> in-progress -> done | not-applicable
+layers: [{', '.join(entry['layers'])}]
+status: {status}
 ---
 
 # {entry['title']}
@@ -141,6 +150,7 @@ def main() -> int:
     up = cfg["upstream"]
     upstream_ref = f"{up['remote']}/{up['branch']}"
     limit = args.limit or cfg["sync"]["max_commits_per_run"]
+    ported = set(cfg["ports"].get("ported_layers", []))
 
     with Lock():
         if git("rev-parse", "--abbrev-ref", "HEAD") != cfg["fork"]["branch"]:
@@ -159,8 +169,12 @@ def main() -> int:
             subject, date = git("log", "-1", "--format=%s%x00%cI", sha).split("\x00")
             paths = changed_paths(sha)
             by_class: dict[str, list[str]] = {}
+            layers: set[str] = set()
             for p in paths:
-                by_class.setdefault(classify(p, rules), []).append(p)
+                rule = match_rule(p, rules)
+                by_class.setdefault(rule["class"] if rule else "mirror", []).append(p)
+                if rule and rule.get("layer"):
+                    layers.add(rule["layer"])
             entry = {
                 "sha": sha,
                 "pr": pr_number(subject),
@@ -168,9 +182,11 @@ def main() -> int:
                 "date": date,
                 "classes": {k: len(v) for k, v in sorted(by_class.items())},
                 "port": "frontend" in by_class,
+                "layers": sorted(layers),
                 "mirrored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
-            tag = "PORT  " if entry["port"] else "mirror"
+            needs_port = bool(layers & ported)
+            tag = ("PORT  " if needs_port else "absorb") if entry["port"] else "mirror"
             print(f"  {tag} {sha[:10]} {subject}  {entry['classes']}")
             if args.dry_run:
                 continue
@@ -199,7 +215,7 @@ def main() -> int:
                     print("    resolve by hand: git merge --no-ff " + sha, file=sys.stderr)
                     return 2
 
-            entry["status"] = "port-pending" if entry["port"] else "mirrored"
+            entry["status"] = ("port-pending" if needs_port else "absorbed") if entry["port"] else "mirrored"
             with LEDGER.open("a") as f:
                 f.write(json.dumps(entry) + "\n")
             git("add", str(LEDGER))

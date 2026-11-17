@@ -25,6 +25,7 @@ BAML compiler frontend written in BAML.
 | `bib/scripts/sync.py` | Mirrors new upstream commits, one merge per upstream PR, and queues ports. |
 | `bib/agent/` | Prompts for the scheduled agent (sync, intent extraction, porting). |
 | `bib/CLAUDE.md` | Rules for agents working in this fork. |
+| `bib/MIGRATION.md` | The plan: FO seam, Rust oracle, facade, phases. |
 
 ## Branches and remotes
 
