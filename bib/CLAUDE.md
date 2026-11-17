@@ -4,7 +4,7 @@ This repo is upstream BAML plus its compiler rewritten in BAML. See `bib/README.
 
 - **Compiler** = everything from source text to `EmittedPackage` plus `baml generate`:
   the crates with `class = "frontend"` in `bib/boundary.toml`. This is what gets
-  rebuilt in BAML, under `bib/compiler/`. Emit is built first (`bib/MIGRATION.md`).
+  rebuilt in BAML, under `bib/compiler/`. Ported front to back, file by file (`bib/PORTING.md`).
 - **Runtime is frozen.** Do not change the linker, the VM (`bex_*`), sys_*,
   bridges or SDK runtimes. The contracts are upstream's `EmittedPackage` and
   `PackageInterface`; fork-owned Rust glue lives in `bib/crates/`.

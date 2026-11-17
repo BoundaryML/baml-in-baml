@@ -6,7 +6,7 @@ BAML compiler written in BAML, on the unchanged Rust runtime.
 ## Goals
 
 1. **Compiler in BAML.** Lexer, parser, types, MIR, the bytecode emitter and
-   `baml generate` are rewritten in pure BAML, emitter first.
+   `baml generate` are ported to pure BAML, front to back.
 2. **Runtime unchanged.** The linker, the VM, the engine, SDK runtimes and
    everything else stay exactly as upstream ships them.
 3. **Track upstream by intent.** Every PR merged into upstream `canary` is
@@ -25,7 +25,8 @@ BAML compiler written in BAML, on the unchanged Rust runtime.
 | `bib/scripts/sync.py` | Mirrors new upstream commits, one merge per upstream PR, and queues ports. |
 | `bib/agent/` | Prompts for the scheduled agent (sync, intent extraction, porting). |
 | `bib/CLAUDE.md` | Rules for agents working in this fork. |
-| `bib/MIGRATION.md` | The plan: contracts, Rust oracle, `LoweredPackage`, phases. |
+| `bib/MIGRATION.md` | The plan: scope, contracts, oracle, phases. |
+| `bib/PORTING.md` | How each stage is ported, function by function. |
 
 ## Branches and remotes
 
