@@ -29,7 +29,7 @@ already defines and serializes. No upstream crate needs editing.
 
 `baml_linker` depends only on `baml_linker_types`, `bex_vm_types` and `baml_type`,
 so "`EmittedPackage` in, run it" is a clean seam. The BAML emitter writes
-borsh bytes directly (writers generated from the Rust types).
+borsh bytes directly (a borsh writer written in BAML).
 
 ## The Rust compiler is the oracle
 
@@ -43,7 +43,7 @@ BAML-compiled bytecode, and generated SDK files must be byte-equal.
 
 | # | Phase | Gate |
 |---|---|---|
-| 0 | Spikes, `bib_typegen`, `IDIOMS.md`, `bib/compiler` project + oracle tests, ladder, `BASE` | spikes pass |
+| 0 | Spikes, `IDIOMS.md`, `bib/compiler` project + oracle tests, feature slugs, `BASE` | spikes pass |
 | 1 | Lex + parse | syntax diagnostics equal |
 | 2 | AST + HIR | name diagnostics equal |
 | 3 | TIR | all diagnostics equal; our compiler `check`s itself like `baml check` |
