@@ -1,0 +1,18 @@
+[upstream]
+remote = "upstream"
+branch = "canary"
+repo = "BoundaryML/baml"
+
+[fork]
+branch = "main"
+repo = "BoundaryML/baml-in-baml"
+push = true            # push main to origin after each sync run
+
+[sync]
+max_commits_per_run = 50
+
+[ports]
+# Write the Intent section of each pending port (reads the upstream PR, writes no code).
+intent_enabled = true
+# Re-build pending ports in the BAML frontend. Off until the BAML frontend is bootstrapped.
+port_enabled = false

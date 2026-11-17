@@ -1,0 +1,47 @@
+# Classifies upstream paths. First matching rule wins; unmatched paths are "mirror".
+#
+#   frontend  source text -> MIR. Changes here need a BAML port.
+#   spec      tests and fixtures that pin frontend behavior. Mirrored; when they
+#             change alongside frontend code they are the port's acceptance tests.
+#   shared    used by both frontend and runtime. Mirrored; listed in the port task
+#             so the port agent checks whether the BAML frontend must follow.
+#   mirror    everything else (runtime, emit, VM, SDKs, docs, website, CI).
+#
+# Globs are fnmatch-style against repo-relative paths.
+
+[[rule]]
+class = "frontend"
+globs = [
+  "baml_language/crates/baml_syntax/**",
+  "baml_language/crates/baml_syntax_macros/**",
+  "baml_language/crates/baml_parser/**",
+  "baml_language/crates/baml_compiler2_ast/**",
+  "baml_language/crates/baml_compiler2_hir/**",
+  "baml_language/crates/baml_compiler2_hir_ty/**",
+  "baml_language/crates/baml_compiler2_mir/**",
+  "baml_language/crates/baml_compiler_diagnostics/**",
+]
+
+[[rule]]
+class = "spec"
+globs = [
+  "baml_language/crates/baml_tests/**",
+  "baml_language/ARCHITECTURE.md",
+  "baml_language/TYPE_SYSTEM.md",
+]
+
+[[rule]]
+class = "shared"
+globs = [
+  "baml_language/crates/baml_base/**",
+  "baml_language/crates/baml_type/**",
+  "baml_language/crates/baml_type_macros/**",
+  "baml_language/crates/baml_type_runtime/**",
+  "baml_language/crates/baml_builtins2/**",
+  "baml_language/crates/baml_builtins2_codegen/**",
+  "baml_language/crates/baml_db/**",
+  "baml_language/crates/baml_compiler2_emit/**",
+  "baml_language/crates/baml_compiler2_rust/**",
+  "baml_language/crates/baml_linker/**",
+  "baml_language/crates/baml_linker_types/**",
+]
