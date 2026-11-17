@@ -56,9 +56,9 @@ Take the single oldest `needs-port` task. Skip this step if a fork PR from a
 1. `git worktree add ../baml-in-baml-port-<pr> -b port/pr<pr> main`; set `status: in-progress`.
 2. Plan from the Intent, not from the Rust diff. Re-design for the BAML
    frontend's own structure; the Rust code is a reference for behavior only.
-3. Implement in the BAML frontend. Do not edit the runtime (see `bib/CLAUDE.md`).
-4. Verify: BAML frontend output (FO) must equal the Rust oracle's FO on the
-   whole corpus, not just the acceptance inputs (`bib/MIGRATION.md`, "The oracle").
+3. Implement in the BAML compiler (`bib/compiler/`). Do not edit the runtime (see `bib/CLAUDE.md`).
+4. Verify with the oracle comparisons for the touched layers on the whole corpus
+   (`bib/MIGRATION.md`, "The Rust oracle"), not just the acceptance inputs.
 5. Set `status: done`, `git mv` the task to `bib/ports/done/`, open a PR into
    `main` of `BoundaryML/baml-in-baml` titled `port #<pr>: <title>` with the
    intent and verification results in the body.

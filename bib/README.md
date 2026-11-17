@@ -1,14 +1,14 @@
 # baml-in-baml
 
-A fork of [BoundaryML/baml](https://github.com/BoundaryML/baml) whose goal is a
-BAML compiler frontend written in BAML.
+A fork of [BoundaryML/baml](https://github.com/BoundaryML/baml) whose goal is the
+BAML compiler written in BAML, on the unchanged Rust runtime.
 
 ## Goals
 
-1. **Frontend in BAML.** Everything from source text to MIR (lexer, parser,
-   AST, HIR, TIR, MIR lowering, diagnostics) is rewritten in pure BAML.
-2. **Runtime unchanged.** MIR → bytecode (`baml_compiler2_emit`), the VM, the
-   engine, SDKs and everything else stay exactly as upstream ships them.
+1. **Compiler in BAML.** Lexer, parser, types, MIR, the bytecode emitter and
+   `baml generate` are rewritten in pure BAML, emitter first.
+2. **Runtime unchanged.** The linker, the VM, the engine, SDK runtimes and
+   everything else stay exactly as upstream ships them.
 3. **Track upstream by intent.** Every PR merged into upstream `canary` is
    mirrored here. If it touches the frontend, its *intent* is re-planned and
    re-built in the BAML frontend, not copied line by line.
@@ -25,7 +25,7 @@ BAML compiler frontend written in BAML.
 | `bib/scripts/sync.py` | Mirrors new upstream commits, one merge per upstream PR, and queues ports. |
 | `bib/agent/` | Prompts for the scheduled agent (sync, intent extraction, porting). |
 | `bib/CLAUDE.md` | Rules for agents working in this fork. |
-| `bib/MIGRATION.md` | The plan: FO seam, Rust oracle, facade, phases. |
+| `bib/MIGRATION.md` | The plan: contracts, Rust oracle, `LoweredPackage`, phases. |
 
 ## Branches and remotes
 

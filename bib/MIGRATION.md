@@ -1,226 +1,187 @@
-# Migration plan: the BAML frontend in BAML
+# Migration plan: the BAML compiler in BAML
 
 Status: draft, 2026-11-17. Nothing below is built yet except the sync infra in `bib/`.
 
-## The short version
+## Scope
 
-1. Define a **frontend output** (FO): plain, serializable data holding everything
-   downstream crates read from the frontend (declarations, layouts, signatures,
-   MIR bodies, diagnostics). Today that seam does not exist.
-2. Write a Rust **extractor** that produces FO from the existing Rust frontend.
-   This is the oracle, forever.
-3. Write the frontend in BAML, layer by layer, until it produces the same FO
-   for every program in the test corpus.
-4. Put a **facade** in front of the Rust frontend crates, switched by one root
-   `Cargo.toml` change, so emit, the VM and every other consumer read FO instead
-   of salsa queries, with zero edits to runtime crates.
-5. Self-host, then flip the default.
+BAML owns the whole compiler. Rust keeps the runtime.
 
-The Rust frontend is never deleted. Upstream keeps changing it, the fork mirrors
-those changes for free, and each change becomes a mechanical acceptance test
-for the BAML port: the oracle's FO moved, so the BAML frontend's FO must move
-the same way.
-
-## What we learned about the codebase
-
-### There is no MIR seam
-
-`baml_compiler2_emit` does not consume a MIR value. `emit_package(db, root, opt)`
-takes the salsa db, calls `lower_function(db, loc)` itself, and makes roughly
-40 hir_ty queries while emitting (`layout`, `function_signature`,
-`resolve_class_fields`, `impl_facts`, `runtime_throw_facts`, `plan_global_init`,
-...). MIR (`baml_compiler2_mir/src/ir.rs`, ~30 types, ~120 variants) carries
-`'db` lifetimes and salsa-interned ids (`FunctionLoc`, `ClassRef`, ...) and is not
-serializable. Its pretty printer needs the db.
-
-So "source to MIR in BAML, runtime unchanged" really means "source to
-*everything emit asks the frontend*", and we have to build that contract.
-
-### Who else reads the frontend
-
-| Consumer | Reads | Plan |
+| Piece | Language | Notes |
 |---|---|---|
-| `baml_compiler2_emit` | MIR + ~40 HIR/TIR queries | FO via facade (phase 5) |
-| `baml_compiler2_rust` (AOT) | MIR via `lower_program` | FO via facade (phase 5) |
-| `baml_db` | drives check/compile, collects diagnostics | facade-aware driver (phase 5) |
-| `bex_project` | parser, `infer_body`, `package_interface`; `build.rs` compiles stdlib | phase 6 |
-| `bex_vm` | `runtime_type`, `hir_ty::interfaces` | stays on Rust frontend crates (types only) |
-| `baml_builtins2_codegen` | parser + AST at build time for `$rust_function` stubs | stays on Rust parser |
-| `baml_cli generate` | `baml_ide::build_symbol_pool` (HIR/TIR) | FO declarations (phase 5) |
-| `baml_fmt` | syntax tree only | stays on Rust parser |
-| `baml_ide` / LSP | ~215 HIR uses, incremental | phase 8, last |
+| Lexer, parser, AST, names, types, MIR lowering | BAML | MIR is ours to design |
+| Bytecode emitter (MIR → `EmittedPackage`) | BAML | **built first** |
+| `baml generate` (SDK codegen) | BAML | from the compiler's own declarations |
+| Linker, bex VM, engine, sys_*, bridges, SDK runtimes | Rust | unchanged, mirrored from upstream |
+| LSP / IDE | Rust | out of scope for now; keeps using the Rust frontend |
+| `baml_fmt`, `baml_builtins2_codegen` | Rust | build tooling, keeps the Rust parser |
 
-Build-time tools (`builtins2_codegen`, `fmt`) keep using the Rust parser. They
-are tooling around the runtime, not the compile path, and rewriting them buys
-nothing.
+## Contracts
 
-### What BAML can express today
+The compiler talks to the outside world only through artifacts upstream already
+defines and serializes. These are the stable interface; everything inside the
+compiler, MIR included, is ours.
 
-Enough for a compiler. The gaps and their workarounds:
+| Output | Upstream type | Consumer |
+|---|---|---|
+| Code | `EmittedPackage` (borsh, `baml_linker_types`) | `baml_linker` → bex VM |
+| Public surface | `PackageInterface` (borsh, `hir_ty::package_interface`) | dependent packages, precompiled stdlib |
+| Diagnostics | code, severity, file, byte span, message | CLI |
+| SDK | generated client files | user projects |
 
-| Gap | Workaround |
+`baml_linker` depends only on `baml_linker_types`, `bex_vm_types` and `baml_type`,
+so "`EmittedPackage` in, run it" is already a clean seam. No upstream crate
+needs editing.
+
+## The Rust oracle
+
+The Rust compiler stays in the tree, mirrored from upstream. Upstream keeps
+improving it and it keeps answering "what is the right output for this
+program". Each phase gate compares against it on the corpus
+(`baml_tests/baml_src`, 311 namespaces; `baml_tests/projects`, ~165 projects).
+
+| Output | Comparison |
 |---|---|
-| No data-carrying enums | Unions of classes, `type Expr = Binary \| Call \| Lit`, narrowed with exhaustive `match` |
-| No string builder | Push pieces to `string[]`, `join` once |
-| `at(i)` is O(n) after the first non-ASCII char | Lexer indexes `to_code_points()` (`int[]`) once |
-| No `Set` | `map<K, bool>` |
-| 10 MiB VM stack | Explicit work-stacks for deep expression nesting |
-| No visibility | Convention (`_name`) |
+| `EmittedPackage` from the BAML emitter fed upstream MIR | byte-equal |
+| Diagnostics | exact |
+| `PackageInterface` | exact (the type checker's whole public verdict) |
+| Generated SDK files | byte-equal |
+| `EmittedPackage` from the full BAML compiler | behavioral: runtime test suite passes |
 
-Calling BAML from Rust works (`bex_project::new` + `Bex::call_function`,
-returning `BexExternalValue`). `reflect.Package.compile` already lets BAML call
-the Rust compiler, which is handy for in-BAML differential tests.
+Byte-equal bytecode is required only while the emitter consumes upstream MIR.
+Once the BAML frontend produces its own MIR, bytecode is checked by behavior,
+so we are free to lower differently.
 
-## Architecture
+## The internal interface: `LoweredPackage`
 
-```
-                 ┌──────────────── oracle (Rust, mirrored from upstream) ──────────┐
- .baml sources ──┤ baml_parser → ast → hir → hir_ty → mir   ──bib_fo_extract──→ FO  ├─┐
-                 └──────────────────────────────────────────────────────────────────┘ │ diff
-                 ┌──────────────── frontend (BAML, ours) ──────────────────────────┐ │
- .baml sources ──┤ lex → parse → ast → resolve → check → lower        ─────────→ FO  ├─┘
-                 └──────────────────────────────────────────┬──────────────────────┘
-                                                             │ FO (bytes)
-                          facade crates (Cargo rename) ◄─────┘
-                                     │  same Rust API as hir/hir_ty/mir
-                                     ▼
-                emit, compiler2_rust, linker, VM, SDKs (unchanged)
-```
+The emitter's input is the one boundary *inside* the compiler worth designing
+carefully: it separates "understand the program" from "encode it for the VM",
+and it is what the Rust exporter writes in phase 1.
 
-### FO: the frontend output
+Today Rust emit has no such input. It takes a salsa db and makes ~70 distinct
+frontend calls, including frontend work that leaked downstream (it lowers type
+expressions itself via `lower_ctx_for_file` / `reject_holes`, recomputes function
+metadata from TIR, runs escape analysis). `LoweredPackage` draws the line where
+it should be:
 
-- One file per compiled world: packages, then per package a declarations
-  table (classes, fields, enums, interfaces, impls, type aliases, globals and
-  their init plan, function signatures and metadata, throw facts, layouts),
-  MIR bodies, and diagnostics (code, severity, file, span, message).
-- Ids are stable qualified paths (`root.ns.Foo.bar`) and dense indices, never
-  salsa ids. Spans are `(file, start, end)` byte offsets.
-- Encoding: JSON first (BAML has `json` in the stdlib, diffs are readable).
-  Switch to a binary encoding once the schema settles, if size or speed matters.
-- **Schema source of truth is BAML.** The FO classes are declared in the BAML
-  frontend package. Rust gets its types from BAML's own Rust SDK codegen
-  (`baml_sdk`), so the contract cannot drift. If the Rust SDK cannot express
-  something, fall back to hand-written serde types plus a schema-equality test.
-- The FO's normal form is defined by the extractor: field order, sorting of
-  declarations, how MIR temporaries are numbered. Both sides must canonicalize
-  the same way or the diff is noise.
+**Frontend's job (in `LoweredPackage`):** anything that needs BAML semantics.
+Resolved names, runtime types with no holes or aliases left, generic frames,
+impl facts, throw sets, parameter defaults, global init order, MIR bodies.
 
-### The oracle: `bib_fo_extract`
+**Emitter's job (not in it):** anything that is an encoding choice. Slot and
+bucket numbering, import tables, operand layout, stack carrying, escape
+analysis on MIR, verification.
 
-A fork-owned crate that runs the Rust frontend through `baml_db` and walks the
-same queries emit uses, writing FO. It is a pure reader: it does not change the
-Rust frontend. Exposed as `baml bib dump-fo <project>` and as a test harness
-over the corpus (`baml_tests/baml_src` 311 namespaces, `projects/` ~165).
+Shape (BAML; written in `bib/compiler/baml_src/lowered/`):
 
-The extractor only reads what emit and the other consumers read. A script
-(`bib/scripts/facade_surface.py`) lists every frontend item imported by
-non-frontend crates. Sync reruns it per upstream commit; if the surface grows,
-the port task says so, because the FO schema and extractor must grow too.
+```baml
+class LoweredPackage {
+  package PackageId
+  deps PackageRef[]          // every package a ref may point into
+  classes ClassDecl[]        // declaration order = file order
+  enums EnumDecl[]
+  interfaces InterfaceDecl[]
+  aliases AliasDecl[]
+  impls ImplDecl[]
+  functions FunctionDecl[]   // signature, generic frame, defaults, origin, throws, body
+  globals GlobalDecl[]       // top-level lets
+  init_order string[]        // global paths, dependency order
+  interface PackageInterface // the public surface, as upstream defines it
+}
 
-### The facade
-
-Every consumer depends on frontend crates through `[workspace.dependencies]` in
-`baml_language/Cargo.toml`. The fork redirects those entries:
-
-```toml
-# baml_language/Cargo.toml (fork-only lines)
-baml_compiler2_mir    = { path = "../bib/facade/mir",    package = "bib_facade_mir" }
-baml_compiler2_hir_ty = { path = "../bib/facade/hir_ty", package = "bib_facade_hir_ty" }
+class FunctionDecl {
+  path DeclPath
+  signature RuntimeSignature
+  generics GenericFrame
+  defaults map<string, MirBody>
+  origin FunctionOrigin
+  throws RuntimeTy[]
+  body MirBody?              // null for $rust_function
+}
 ```
 
-Each facade crate does `pub use baml_compiler2_mir_real::*;` and shadows only the
-query functions consumers call, choosing per world: FO-backed when the world
-was compiled by the BAML frontend, delegate to Rust otherwise. Types (`FunctionLoc`,
-`MirFunction`, ...) are the real crate's types, so emit compiles unchanged.
+Rules:
 
-This is the only edit to an upstream file the plan needs, a handful of lines in
-one `Cargo.toml`. Emit, the VM and the SDKs stay byte-identical to upstream.
+- **Closed.** Every reference is a `DeclPath` (`package`, namespace, name). No
+  salsa ids, no indices into tables the reader doesn't have.
+- **Fully lowered types.** The emitter never sees a type expression.
+- **Ordered.** Declaration lists are in the order emit numbers them (file order
+  within a package), so numbering is a pure function of the input.
+- **MIR starts as upstream's MIR**, with ids replaced by paths. That gives the
+  byte-equal oracle in phase 1. We diverge deliberately in phase 4, when our
+  frontend lowers its own way.
+- **JSON** on disk at first (BAML's `json.decode<T>` reads it into these
+  classes; diffs are readable). Binary later if size or speed matters.
 
 ## Phases
 
-Each phase ends with a measurable gate on the whole corpus. A phase is
-"ported" in `bib/config.toml` (`ported_layers`) once its gate is green on `main`.
+| # | Phase | Gate |
+|---|---|---|
+| 1 | **Emitter.** Rust exporter (Rust frontend → `LoweredPackage`), BAML emitter (`LoweredPackage` → `EmittedPackage`), `bib` runner | byte-equal `EmittedPackage` on the corpus; runtime suite passes on BAML-emitted bytecode |
+| 2 | **Lex + parse** | tokens, CST and syntax diagnostics match `test_02_cst` / `broken_syntax` |
+| 3 | **AST + names** | HIR dumps (`hir.snap`) and name diagnostics match |
+| 4 | **Types** | all diagnostics + `PackageInterface` match |
+| 5 | **MIR lowering** (our MIR) → our emitter | runtime suite passes end to end on the BAML compiler |
+| 6 | **`baml generate`** | generated SDK files byte-equal |
+| 7 | **Self-host + stdlib** | stage1 bytecode == stage2; stdlib interfaces built by the BAML compiler |
+| 8 | **Default flip** | `baml check` exit latency within budget |
 
-| # | Phase | Output compared | Gate |
-|---|---|---|---|
-| 0 | **Seam.** FO schema, `bib_fo_extract`, `dump-fo`, facade surface script, corpus FO goldens | n/a | extractor runs on every corpus project; goldens checked in |
-| 1 | **Lex + parse** in BAML; error-tolerant CST | token stream + CST + syntax diagnostics vs `test_02_cst` / `broken_syntax` | 100% corpus match |
-| 2 | **AST + HIR**: desugaring, packages, scopes, name resolution | HIR dump vs `hir.snap`, name diagnostics | 100% |
-| 3 | **TIR**: bidirectional checking, unions, generics, freshness, exhaustiveness | FO declarations + all diagnostics vs oracle | 100% of `diagnostics.snap` |
-| 4 | **MIR lowering** + MIR optimize passes | FO MIR bodies vs oracle | 100% FO equality |
-| 5 | **Flip behind a flag.** Facade crates, `BAML_FRONTEND=baml` for check/run/pack/generate | bytecode + runtime tests | full `baml_tests` suite green with the flag |
-| 6 | **Self-host + stdlib.** BAML frontend compiles itself; stdlib interfaces built by it; seed artifact | stage1 bytecode == stage2 | fixpoint; `bex_project/build.rs` works from seed |
-| 7 | **Default flip.** CLI uses BAML frontend by default; Rust frontend is oracle-only | latency budget | `baml check` exit latency within budget (see Risks) |
-| 8 | **IDE.** LSP queries (hover, goto, completion) served from FO or BAML queries | LSP tests | LSP suite green |
+### Phase 1 in detail
 
-Phases 1 to 4 run in production nowhere. They are validated against the oracle
-only, which keeps the fork shippable at every commit.
+1. **`bib_lower_export`** (fork-owned Rust crate, in `bib/crates/`): runs the
+   Rust frontend through `baml_db` and writes `LoweredPackage` JSON. It answers
+   every question Rust emit asks; the list of emit's frontend imports is its
+   checklist.
+2. **BAML emitter** (`bib/compiler/baml_src/emit/`): port of
+   `baml_compiler2_emit` (~16k lines: `emit.rs`, `analysis.rs`, `stack_carry.rs`,
+   `items.rs`, `refs.rs`, `pull_semantics.rs`, `package/*`, `verifier.rs`).
+   Output is `EmittedPackage` as JSON.
+3. **Glue** (`bib/crates/bib_glue`): JSON → borsh `EmittedPackage`. Pure
+   schema conversion, no semantics.
+4. **`bib` runner** (`bib/crates/bib_cli`): `bib emit <project>` runs the BAML
+   emitter on the VM (compiled by the Rust compiler: stage 0), links, and runs.
+   `bib diff <project>` compares against Rust emit.
+
+Phase 1 proves the whole loop (BAML compiler code running on the VM, producing
+bytecode the Rust runtime executes) before any parser work, and its byte-equal
+oracle is the strongest check we will ever have.
 
 ### Bootstrap
 
-- Stage 0: the Rust frontend compiles the BAML frontend package to bytecode.
-- Stage 1: that bytecode, running on the VM, compiles the BAML frontend again.
+- Stage 0: the Rust compiler compiles the BAML compiler to bytecode.
+- Stage 1: that bytecode, on the VM, compiles the BAML compiler again.
 - Stage 2: stage 1 compiles it once more; stage1 bytecode must equal stage2.
-- Because the Rust frontend stays in the tree, stage 0 is always available and
-  no checked-in seed binary is needed until we choose to drop the Rust path
-  from release builds.
+- The Rust compiler stays in the tree, so stage 0 is always available.
 
 ### Speed
 
-The frontend will run on the VM, which upstream is making faster every week
-(fast paths, superinstructions). The second lever is `baml_compiler2_rust`:
-AOT-compile the BAML frontend to native Rust. A compiler in BAML that is
-compiled to Rust by BAML is the long-term fast path, and it dogfoods the AOT
-backend on a large, real program.
+The compiler runs on the VM, which upstream keeps making faster. The long-term
+fast path is `baml_compiler2_rust`: AOT-compile the BAML compiler to native code.
 
 ## How upstream PRs flow through this
 
-Sync tags each port task with the frontend **layers** it touched (`parse`, `ast`,
-`hir`, `tir`, `mir`, `diag`).
+Sync tags port tasks with the layers they touch (`parse`, `ast`, `hir`, `tir`,
+`mir`, `emit`, `codegen`, `diag`). `ported_layers` in `bib/config.toml` lists the
+layers whose BAML version passed its gate.
 
-- **Layer not yet ported:** the task is `absorbed`. The BAML layer will be
-  written against the oracle as it stands when we get there, so the change is
-  picked up for free. No work.
-- **Layer ported:** the oracle's FO for the corpus changes with the upstream
-  commit. The port agent reads the PR's intent, re-plans the change in the BAML
-  frontend, and is done when BAML FO equals oracle FO again on the full corpus.
-  Upstream's new tests arrive with the mirror, so they are in the corpus too.
-- **Facade surface grew** (emit started reading something new): the FO schema,
-  extractor and facade grow first, then the port.
-- **Rust-only change** (perf, salsa plumbing) with no FO diff: `not-applicable`,
-  verified mechanically by "oracle FO unchanged".
-
-The FO diff turns "did we capture the intent" from a judgment call into a test.
-The intent doc is still written first, because the port should be designed for
-the BAML frontend's own structure, not translated from Rust.
+- **Layer not ported yet:** `absorbed`. It will be written against the oracle
+  as it stands when we get there.
+- **Layer ported:** the port agent reads the PR's intent, re-plans it for the
+  BAML compiler, and is done when the oracle comparisons pass again on the full
+  corpus. Upstream's new tests arrive with the mirror.
+- **Emit after phase 1:** upstream VM work that changes the instruction set
+  touches emit (in one 40-commit window: #5678, #5681, #5699). Those become
+  emitter ports. This is the main ongoing cost of owning the emitter.
+- **Rust-only change** with no oracle diff: `not-applicable`.
 
 ## Risks and open questions
 
-1. **MIR churn.** Upstream changes MIR shape (e.g. #5678 changed `==` on null
-   and enums). Every such PR needs a port once phase 4 lands. Expected and fine,
-   but it sets the ongoing cost.
-2. **Exact-match strictness.** Requiring byte-equal FO forces the BAML frontend
-   to reproduce incidental choices (temp numbering, block order, diagnostic
-   wording). Proposal: exact match on declarations and diagnostics; MIR compared
-   after canonicalization (renumber locals and blocks in traversal order). Loosen
-   further only with a written reason.
-3. **Latency.** Agents iterate on `baml check` exit time. The VM-run frontend
-   will start slower than Rust. Phase 7 needs a budget (proposed: within 2x of
-   the Rust frontend on the corpus and a large real project) and the AOT path
-   above.
-4. **No incrementality.** The BAML frontend recompiles whole worlds. Fine for
-   the CLI; a real problem for the LSP, which is why the IDE is last.
-5. **FO schema via BAML Rust SDK** depends on that SDK expressing recursive
-   unions well. Check in phase 0 before committing to it.
-6. **Diagnostics with spans into desugared code** need the same span rules as
-   ARCHITECTURE.md section 11, or diagnostic diffs will never converge.
-
-## Phase 0 task list
-
-- [ ] FO schema as BAML classes in `bib/frontend/baml_src/fo/`.
-- [ ] Rust types from that schema (BAML Rust SDK, or serde fallback).
-- [ ] `bib_fo_extract` crate + `baml bib dump-fo` (fork-only CLI hook, outside upstream crates if possible).
-- [ ] FO goldens for the corpus under `bib/goldens/`, regenerated by sync after each mirrored commit; the golden diff goes into the port task.
-- [ ] `bib/scripts/facade_surface.py` and its output `bib/facade_surface.txt`.
-- [ ] Layer tagging in `sync.py` and `ported_layers` in `config.toml` (done with this plan).
-- [ ] CI for the fork: a fork-owned workflow that runs only `bib/` checks, after re-enabling Actions with every inherited workflow disabled by name.
+1. **Emit churn.** Upstream VM perf work changes emit often. Watch the
+   emit-port rate after phase 1; it sets the ongoing cost.
+2. **Exporter completeness.** The exporter must answer everything emit asks.
+   Byte-equality catches gaps, but only on inputs the corpus covers.
+3. **Latency.** Agents iterate on `baml check` exit time. Phase 8 needs a
+   budget (proposed: within 2x of the Rust compiler) and the AOT path.
+4. **Stack depth.** 10 MiB VM stack; recursive passes over deep MIR or deep
+   expressions need explicit work-stacks.
+5. **Spans in desugared code** must follow ARCHITECTURE.md section 11, or
+   diagnostic diffs never converge.

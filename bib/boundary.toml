@@ -46,6 +46,20 @@ layer = "diag"
 globs = ["baml_language/crates/baml_compiler_diagnostics/**"]
 
 [[rule]]
+class = "frontend"
+layer = "emit"
+globs = ["baml_language/crates/baml_compiler2_emit/**"]
+
+[[rule]]
+class = "frontend"
+layer = "codegen"
+globs = [
+  "baml_language/crates/baml_sdkgen_types/**",
+  "baml_language/crates/baml_cli/src/generate.rs",
+  "baml_language/crates/baml_cli/src/generate/**",
+]
+
+[[rule]]
 class = "spec"
 globs = [
   "baml_language/crates/baml_tests/**",
@@ -63,7 +77,6 @@ globs = [
   "baml_language/crates/baml_builtins2/**",
   "baml_language/crates/baml_builtins2_codegen/**",
   "baml_language/crates/baml_db/**",
-  "baml_language/crates/baml_compiler2_emit/**",
   "baml_language/crates/baml_compiler2_rust/**",
   "baml_language/crates/baml_linker/**",
   "baml_language/crates/baml_linker_types/**",
