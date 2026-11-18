@@ -62,12 +62,11 @@ function callable_throws(db: root.hir.Db, function_: int) -> CallableThrows thro
                 },
                 DeclaredThrowsPartial | DeclaredThrowsOmitted => {},
             }
-            // NOT PORTED YET (K4): Rust answers
-            // `infer_body(db, BodyOwnerId::Function(function_)).throws` here,
-            // the named members of a partial clause unioned with the body's
-            // inferred effect. Body inference is not ported, so an open
-            // clause answers the fixpoint's seed (`never`) instead.
-            callable_throws_cycle_initial(db, function_)
+            // A partial or omitted clause keeps inferring: the body run's
+            // finalize unions any named members with the inferred set.
+            CallableThrows {
+                value: infer_body(db, root.hir.BodyOwnerIdFunction { value: function_ }).throws_,
+            }
         },
     )
 }
