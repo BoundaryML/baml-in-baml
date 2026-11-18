@@ -7,8 +7,8 @@
 // item's name: every kind view is a class at the root namespace of the
 // `reflect` package, which is the rest of the item.
 //
-// Not ported: `BuiltinCompanion`, `builtin_companion_of_decl`,
-// `builtin_companion_of` and `companion`. They read the registry's
+// Not ported: `builtin_companion_of_decl`, `builtin_companion_of` and
+// `companion` (the `BuiltinCompanion` struct is). They read the registry's
 // `Construction` (origin, carries_methods) and `by_definition` /
 // `by_type_name` lookups, and members_reachable_without_carrier, none of
 // which compiler_aliases.baml ports yet.
@@ -146,4 +146,20 @@ function is_type_kind_class_path(namespace: string[], name: string) -> bool thro
         && TYPE_KINDS.some((kind) -> {
             type_kind_class(kind) == name
         })
+}
+
+// port: baml_type/src/type_kind.rs::BuiltinCompanion @ d9be6853b
+// A builtin companion carrier (`baml.Int`, `baml.Map`, ...): the builtin it
+// stands for and how that builtin's values are produced instead.
+class BuiltinCompanion {
+    // The builtin type this class is the companion of.
+    builtin: string,
+    // How a value of that builtin is produced instead.
+    origin: string,
+    // Whether the class actually declares methods (`baml.Bool` and
+    // `baml.Null` have empty bodies).
+    carries_methods: bool,
+    // Whether source reaches this builtin's members without naming the
+    // carrier class (`int.max_value()` does; the containers do not).
+    members_reachable_without_carrier: bool,
 }
