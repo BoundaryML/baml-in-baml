@@ -637,3 +637,43 @@ Every kept iteration: type_spec 173/173, 355/355, 5/5. Lessons:
 - Phases on the sample: parse 6 s, AST 4 s (+ parse), semantic index 5 s,
   type checking ~35 s. `check_file` re-parses its file for parse errors
   (Rust reads the memoized parse): to fix.
+
+## MIR plan (2026-11-18)
+
+`baml_compiler2_mir` (26.5k: lower.rs 15.3k, optimize* 4.0k, escape 2.2k,
+ir 1.6k, pretty 0.9k, memory 0.8k, builder 0.8k) -> namespace `mir`
+(`ns_mir/`). Entry: `lower_function(db, function, opt)` (memoized per
+(function, opt level): one memo per level) and `lower_let_body`; emit also
+calls `escape::analyze`, `escape::array_walks`, `memory::spawn_shared_cells`.
+`LoweringContext` methods are free functions taking `ctx` (as in K4).
+
+Oracles (all text from `pretty.rs`, byte for byte):
+- `baml_tests/src/compiler2_mir/mod.rs`: 28 tests, `render_mir` at O2 in
+  span order; 11 snapshot (`snapshots/compiler2_mir/`), ~9 substring checks.
+  2 also need bytecode (after emit), 3 need package mounting (deferred).
+- `compiler2_mir/escape.rs`: 60 escape-analysis tests (no snapshots).
+- Corpus `mir.snap` (8, `corpus.rs::render_selected_mir`, `=== MIR2 ===`).
+Every printed MIR is post-optimization: the snapshot gates open only once
+lowering AND `optimize` are in.
+
+Order: unit 0 alone (ir.rs, builder.rs, inference_provider.rs,
+iteration.rs, lib.rs, lower.rs 1-104, 1682-1917, 2381-2538, and one stub
+file per unit), then in parallel:
+
+| Unit | Owns | ~lines |
+|---|---|---|
+| U1 context, names, pretty, entries | lower.rs 105-1681, 1918-2279, 2539-3275, 4317-4529, 15053-15318; pretty.rs | 4.2k |
+| U2 calls, dispatch | lower.rs 3276-4316, 8091-10164, 10906-11903 | 4.1k |
+| U3 expressions | lower.rs 4530-8090, 10165-10905 | 4.3k |
+| U4 statements, patterns, catch | lower.rs 2280-2380, 11904-15052 | 3.25k |
+| U5 optimize | optimize.rs, optimize/{effects,values}.rs, reducible.rs | 4.2k |
+| U6 escape, memory | escape.rs, memory.rs | 3.1k |
+
+Ordering is output: printed `_n` locals keep allocation order (dead ones
+removed) and `bbN` follow `reorder_blocks_rpo` over creation order, so
+every `temp`/`declare_local`/`create_block` call happens in Rust's order.
+Risks: 25 `mem::take`/`replace` and 215 `.clone()` in lower.rs (BAML values
+are shared references: swap in fresh values, copy explicitly); huge
+functions (`lower_call_with_callee` 747 lines, ...) split into `_arm`
+helpers with side effects in order; `escape_summary` cycle returns null
+(fallback, not fixpoint); `component_summaries` sorts by salsa id.
