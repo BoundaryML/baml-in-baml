@@ -81,6 +81,19 @@ class TyMemos {
     callable_throws: root.hir.TrackedMemo<CallableThrows>,
     // callable.rs::function_signature_ty (key: function loc)
     function_signature_ty: root.hir.TrackedMemo<FunctionSignatureTy>,
+    // infer.rs::infer_function_body (key: function loc; `cycle_initial`)
+    infer_function_body: root.hir.TrackedMemo<InferenceResult<root.types.Ty>>,
+    // infer.rs::infer_let_body (key: let loc; `cycle_initial`)
+    infer_let_body: root.hir.TrackedMemo<InferenceResult<root.types.Ty>>,
+    // infer.rs::infer_parameter_defaults (key: function loc)
+    infer_parameter_defaults: root.hir.TrackedMemo<InferenceResult<root.types.Ty>>,
+    // infer.rs::IN_FLIGHT_LET_OWNERS (Rust's thread-local): the top-level
+    // lets whose initializer is being inferred now, by `LetOwnerKey`
+    // (file path, then item id; tuples are not map keys).
+    in_flight_let_owners: map<string, map<int, bool>>,
+    // infer.rs::BODY_INFERENCES (Rust's process-wide counter): body
+    // inferences executed in this compile.
+    body_inferences: int,
     // The compile's interned-type pool (Rust's global `pool()`).
     pool: root.types.InferPool,
 
@@ -110,6 +123,11 @@ class TyMemos {
             impl_type_keys: ImplTypeKeys.new(),
             callable_throws: root.hir.TrackedMemo.new("callable_throws"),
             function_signature_ty: root.hir.TrackedMemo.new("function_signature_ty"),
+            infer_function_body: root.hir.TrackedMemo.new("infer_function_body"),
+            infer_let_body: root.hir.TrackedMemo.new("infer_let_body"),
+            infer_parameter_defaults: root.hir.TrackedMemo.new("infer_parameter_defaults"),
+            in_flight_let_owners: {},
+            body_inferences: 0,
             pool: root.types.InferPool.new(),
         }
     }
