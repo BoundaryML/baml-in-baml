@@ -586,3 +586,20 @@ panics over `baml_src`), `pattern_corpus` 4/4, `coherence` 9/9 (+5
 test` 541/541 (10 min with `--test-timeout`; the sweep alone is ~8 min),
 type_spec 173/173 fixtures, 355/355 annotations, 5/5 snapshots, Type gate 0
 mismatches on every corpus.
+
+## Speed: profiling recipe
+
+The compiler is BAML, so BAML telemetry profiles it: the `profiler` relation
+has total and self time and call counts per calling-context node.
+
+    cd bib/compiler
+    BOUNDARY_API_KEY=local baml run bench.check_dir -- --dir ../../baml_language/crates/baml_tests/baml_src
+    BOUNDARY_API_KEY=local baml query "SELECT function_name, sum(self_time)/1000000 AS self_ms, sum(invocation_count) AS calls FROM profiler GROUP BY function_name ORDER BY self_ms DESC" --max-rows 40
+
+`BOUNDARY_API_KEY=local` records to and queries the project's local store
+(`.baml/btel/recordings`). Do not record long runs to the cloud: delivery
+has a fixed 5 s shutdown deadline (btel_bcs/src/delivery.rs), so a large
+profile is dropped (`cloud recording delivery: ShutdownTimeout`), and cloud
+recording roughly doubled a small check's time (16.7 s vs 6.9 s).
+`BAML_TELEMETRY` sets the detail level (off, low, medium, high), not the
+destination.

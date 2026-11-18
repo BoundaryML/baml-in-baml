@@ -1,2 +1,5 @@
 [package]
 name = "bib-compiler"
+
+[boundary]
+project = "boundary/going-rogue"
