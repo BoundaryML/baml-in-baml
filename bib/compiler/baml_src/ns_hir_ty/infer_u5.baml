@@ -268,11 +268,11 @@ function judge_catch_coverage(
     };
     let caught = throws_clause_union(widened(received)) ?? root.types.TyNever {};
     let missing = widened(unhandled).map((leaf) -> {
-        ty_spell(leaf, infer_ctx_viewpoint(ctx))
+        ty_spell(leaf, root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file))
     });
     if (root.ast.catch_clause_kind_requires_panic_coverage(kind) && !traps_every_panic) {
         for (let panic in panics_not_trapped(ctx, trapped_panics)) {
-            missing.push(ty_spell(plain_finalized(ctx, panic), infer_ctx_viewpoint(ctx)));
+            missing.push(ty_spell(plain_finalized(ctx, panic), root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file)));
         }
     }
     if (missing.length() == 0) {
@@ -315,7 +315,7 @@ function panics_not_trapped(ctx: InferenceContext, trapped: int[]) -> int[] thro
     let pool = ctx.table.pool;
     let alias = every_panic(ctx)
         ?? return [];
-    let every = expand_alias_ty(ctx, alias);
+    let every = root.hir_ty.expand_alias_head(ctx.table.pool, alias, ctx.facts);
     let members = match (pool.kinds[every]) {
         let u: root.types.InferTyUnion => u.members,
         root.types.InferTyClass => [every],
@@ -336,10 +336,10 @@ function panics_not_trapped(ctx: InferenceContext, trapped: int[]) -> int[] thro
 // The `baml.panics.*` component of a catch claim (alias-aware, union
 // members collected): the types an arm may always trap.
 function panic_subset(ctx: InferenceContext, claim: int) -> int? throws never {
-    let expanded = expand_alias_ty(ctx, claim);
+    let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, claim, ctx.facts);
     match (ctx.table.pool.kinds[expanded]) {
         let c: root.types.InferTyClass
-            if root.types.decl_name_is_panic_type(c.name, infer_ctx_lang(ctx)) => {
+            if root.types.decl_name_is_panic_type(c.name, root.hir.lang_roots(ctx.db)) => {
             expanded
         },
         let u: root.types.InferTyUnion => {
@@ -361,10 +361,10 @@ function panic_subset(ctx: InferenceContext, claim: int) -> int? throws never {
 // actually contributes to the channel, the complement of `panic_subset`.
 // Null means the type was panics all the way down.
 function non_panic_subset(ctx: InferenceContext, ty: int) -> int? throws never {
-    let expanded = expand_alias_ty(ctx, ty);
+    let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, ty, ctx.facts);
     match (ctx.table.pool.kinds[expanded]) {
         let c: root.types.InferTyClass
-            if root.types.decl_name_is_panic_type(c.name, infer_ctx_lang(ctx)) => {
+            if root.types.decl_name_is_panic_type(c.name, root.hir.lang_roots(ctx.db)) => {
             null
         },
         let u: root.types.InferTyUnion => {
@@ -576,12 +576,12 @@ function holds_role_marker(ctx: InferenceContext, ty: int, fuel: int) -> bool th
     if (fuel == 0) {
         return false;
     }
-    let expanded = expand_alias_ty(ctx, ty);
+    let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, ty, ctx.facts);
     match (ctx.table.pool.kinds[expanded]) {
         let c: root.types.InferTyClass => {
             root.types.decl_name_is_lang_root_type(
                 c.name,
-                infer_ctx_lang(ctx),
+                root.hir.lang_roots(ctx.db),
                 root.base.LangPackage.Ai,
                 "Role",
             )
@@ -688,7 +688,7 @@ function judge_throws_contract_coverage(
             !is_open_contract || !is_open_throws_contract(ctx.db, pool.from_plain(ty))
         })
         .map((ty) -> {
-            ty_spell(ty, infer_ctx_viewpoint(ctx))
+            ty_spell(ty, root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file))
         })
         .sort_by_key((text) -> {
             text

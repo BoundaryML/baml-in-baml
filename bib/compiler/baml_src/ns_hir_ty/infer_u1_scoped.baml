@@ -82,7 +82,7 @@ function scoped_type_bounds(
             if (
                 root.types.decl_name_is_lang_root_type(
                     bound.name,
-                    infer_ctx_lang(ctx),
+                    root.hir.lang_roots(ctx.db),
                     root.base.LangPackage.Reflect,
                     "AnyFunction",
                 )

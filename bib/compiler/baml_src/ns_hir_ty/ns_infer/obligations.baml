@@ -439,7 +439,7 @@ function attempt(
             // An alias is a spelling device and a literal implements what
             // its base primitive does, so the goal is JUDGED for the type the
             // alias denotes, widened; a report names the type as written.
-            let written = root.hir_ty.expand_alias_ty(ctx, subject);
+            let written = root.hir_ty.expand_alias_head(ctx.table.pool, subject, ctx.facts);
             // A bound judges its argument as written: a fresh literal widens
             // to its base and is one concrete type, while a literal type
             // written as the argument stays a literal, which
@@ -457,7 +457,7 @@ function attempt(
                     // The canonical form of a recursive alias's unfolding is
                     // the alias again.
                     ty = root.hir_ty.canonicalize_unions(ctx, root.types.ClosedTy { ty: ty }).ty;
-                    ty = root.hir_ty.expand_alias_ty(ctx, ty);
+                    ty = root.hir_ty.expand_alias_head(ctx.table.pool, ty, ctx.facts);
                 } else if (purpose != GoalPurpose.Coercion) {
                     return AttemptStalled { value: Stall.Unresolved };
                 }
@@ -471,7 +471,7 @@ function attempt(
                     = root.hir_ty
                         .canonicalize_unions(ctx, root.types.ClosedTy { ty: bound_subject })
                         .ty;
-                bound_subject = root.hir_ty.expand_alias_ty(ctx, bound_subject);
+                bound_subject = root.hir_ty.expand_alias_head(ctx.table.pool, bound_subject, ctx.facts);
             }
             if (purpose == GoalPurpose.Coercion) {
                 match (pool.kinds[ty]) {
@@ -700,7 +700,7 @@ function implemented_instantiation(
     if (pool.has_infer(resolved) || pool.has_error(resolved)) {
         return null;
     }
-    let widened = widen_literal(pool, root.hir_ty.expand_alias_ty(ctx, resolved));
+    let widened = widen_literal(pool, root.hir_ty.expand_alias_head(ctx.table.pool, resolved, ctx.facts));
     let probe = root.hir_ty.probe(ctx);
     let generics: int[] = [];
     for (let i = 0; i < arity; i += 1) {
@@ -1193,7 +1193,7 @@ function probe_impl_member(
     }
     let lang = root.hir.lang_roots(ctx.db);
     let applicable: root.hir_ty.ImplFacts? = null;
-    for (let facts in root.hir_ty.all_impl_facts(ctx.db, root.hir_ty.viewer(ctx))) {
+    for (let facts in root.hir_ty.all_impl_facts(ctx.db, root.hir.file_package(ctx.db, ctx.owner_file).root_id)) {
         let interface_name = facts.interface_.reference.name;
         if (
             root.hir_ty.provides_concrete_members(lang, interface_name)

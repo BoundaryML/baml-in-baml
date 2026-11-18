@@ -294,7 +294,7 @@ function infer_lambda_body(
         infer_expr(ctx, body, lambda_body, ExpectationNone {})
     };
     // `std::mem::take` of the frame's return slot.
-    let return_frame = match (root.hir_ty.infer.control_frame_mut(ctx).kind) {
+    let return_frame = match (root.hir_ty.infer.control_frame(ctx).kind) {
         let callable: root.hir_ty.infer.FrameKindCallable => {
             let taken = callable.returns;
             callable.returns

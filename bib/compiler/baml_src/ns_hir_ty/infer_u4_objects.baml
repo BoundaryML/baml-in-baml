@@ -188,7 +188,7 @@ function infer_source_object(
         report(ctx, PendingDiagTraceOpaqueValue { expr: object });
         return pool.add(root.types.TyError {});
     }
-    if (root.types.is_type_kind_class_decl(infer_ctx_lang(ctx), class_name)) {
+    if (root.types.is_type_kind_class_decl(root.hir.lang_roots(ctx.db), class_name)) {
         for (let field in fields) {
             infer_expr(ctx, body, field.value, ExpectationNone {});
         }
@@ -198,7 +198,7 @@ function infer_source_object(
         report(ctx, PendingDiagCannotConstructReflectionKind { expr: object, class_name: class_name });
         return pool.add(root.types.TyError {});
     }
-    let companion = builtin_companion_of_decl(infer_ctx_lang(ctx), class_name);
+    let companion = builtin_companion_of_decl(root.hir.lang_roots(ctx.db), class_name);
     if (companion != null) {
         for (let field in fields) {
             infer_expr(ctx, body, field.value, ExpectationNone {});
@@ -229,7 +229,7 @@ function infer_source_object(
     let instantiation = if (pinned != null) {
         pinned
     } else {
-        instantiation_args(ctx, object, generic_names, null)
+        instantiation_args_at(ctx, object, generic_names, null)
     };
     root.syntax.truncate(instantiation, generic_count);
     while (instantiation.length() < generic_count) {
@@ -352,7 +352,7 @@ function field_access(
 ) -> int throws never {
     let (let ty, let resolution) = field_access_resolved(ctx, at, base_ty, member);
     if (resolution != null) {
-        write_member_resolution(ctx, at, resolution);
+        ctx.result.member_resolutions[at] = resolution;
     }
     ty
 }
@@ -366,7 +366,7 @@ function report_bare_output_format_reference(
     let class_ = callable_owner_type(ctx.db, function_)
         ?? return;
     let is_output_format = root.hir.function_data(ctx.db, function_).name == "output_format"
-        && infer_ctx_lang(ctx).is_(root.base.LangPackage.Ai, class_.pkg)
+        && root.hir.lang_roots(ctx.db).is_(root.base.LangPackage.Ai, class_.pkg)
         && match (class_.name) {
             "Context" => class_.namespace.length() == 0,
             "SpecCtx" => class_.namespace.length() == 1 && class_.namespace[0] == "internal",
@@ -382,7 +382,7 @@ function is_opaque_trace_type(
     ctx: InferenceContext,
     name: root.types.DeclName,
 ) -> bool throws never {
-    infer_ctx_lang(ctx).is_(root.base.LangPackage.Trace, name.pkg)
+    root.hir.lang_roots(ctx.db).is_(root.base.LangPackage.Trace, name.pkg)
         && name.namespace.length() == 0
         && ["Options", "ReservedSpan", "SpanId"].includes(name.name)
 }
@@ -485,7 +485,7 @@ function field_access_resolved(
     if (candidate != null) {
         return field_access_method(ctx, at, resolved, member, candidate);
     }
-    match (lookup_interface_member(ctx.db, viewer(ctx), ctx.facts, resolved, member)) {
+    match (lookup_interface_member(ctx.db, root.hir.file_package(ctx.db, ctx.owner_file).root_id, ctx.facts, resolved, member)) {
         let found: InterfaceMemberLookupFound => {
             let interface_member = found.value;
             if (reject_selfless_instance_member(ctx, interface_member, member, at)) {
@@ -572,7 +572,7 @@ function field_access_method(
     let pool = ctx.table.pool;
     // An own method does not arbitrate an interface clash (E0121): see the
     // callee road's twin check.
-    let ambiguity = concrete_member_ambiguity(ctx.db, viewer(ctx), ctx.facts, resolved, member);
+    let ambiguity = concrete_member_ambiguity(ctx.db, root.hir.file_package(ctx.db, ctx.owner_file).root_id, ctx.facts, resolved, member);
     if (ambiguity != null) {
         if (!suppressed(ctx, Suppress.MemberProbe)) {
             report(
@@ -636,7 +636,7 @@ function union_member_access(
 ) -> (int, WorkingMemberResolution?) throws never {
     let pool = ctx.table.pool;
     let error = pool.add(root.types.TyError {});
-    match (lookup_union_member(ctx.db, viewer(ctx), ctx.facts, union_ty, members, member)) {
+    match (lookup_union_member(ctx.db, root.hir.file_package(ctx.db, ctx.owner_file).root_id, ctx.facts, union_ty, members, member)) {
         let found: UnionMemberLookupFound => {
             let interface_member = found.value;
             if (reject_selfless_instance_member(ctx, interface_member, member, at)) {

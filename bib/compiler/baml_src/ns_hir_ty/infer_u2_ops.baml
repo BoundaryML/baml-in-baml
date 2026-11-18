@@ -118,7 +118,7 @@ function infer_binary(
                     && !pool.has_error(rhs_ty)
             ) {
                 let widen = (ty: int) -> root.types.Ty {
-                    let expanded = expand_alias_ty(ctx, ty);
+                    let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, ty, ctx.facts);
                     let plain = materialize_ty(ctx, expanded);
                     match (plain) {
                         let l: root.types.TyLiteral => {
@@ -540,9 +540,9 @@ function dispatch_operator(
         return pool.add(root.types.TyError {});
     }
     let outputs: int[] = [];
-    for (let lhs_member in operand_members(pool, infer_ctx_lang(ctx), lhs_resolved)) {
+    for (let lhs_member in operand_members(pool, root.hir.lang_roots(ctx.db), lhs_resolved)) {
         if (rhs_resolved != null) {
-            for (let rhs_member in operand_members(pool, infer_ctx_lang(ctx), rhs_resolved)) {
+            for (let rhs_member in operand_members(pool, root.hir.lang_roots(ctx.db), rhs_resolved)) {
                 let output = member_operator_output(ctx, interface_, lhs_member, rhs_member)
                     ?? return pool.add(root.types.TyError {});
                 outputs.push(output);
@@ -569,7 +569,7 @@ function member_operator_output(
     rhs: int?,
 ) -> int? throws never {
     let pool = ctx.table.pool;
-    let lang = infer_ctx_lang(ctx);
+    let lang = root.hir.lang_roots(ctx.db);
     if let v: root.types.TyTypeVar = pool.kinds[lhs] {
         let bounds = ctx.facts.type_var_bound(v.param);
         let bound = bounds.find((bound) -> {

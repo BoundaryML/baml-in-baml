@@ -119,7 +119,8 @@ function infer_expr(
             let callee_ty = with_suppressed(ctx, Suppress.OptionalCallee, (this) -> int {
                 infer_expr(this, body, e.callee, ExpectationNone {})
             });
-            report_mounted_reserved_call(ctx, expr, e.callee);
+            // Rust's `report_mounted_reserved_call` here reports only for a
+            // callee from a package served as an interface; none is (U3).
             check_needless_chain(ctx, body, expr, e.callee, callee_ty);
             let nonnull = peel_chain_null(ctx, callee_ty);
             check_call_args(ctx, body, expr, e.callee, nonnull, false, e.args)
@@ -298,7 +299,7 @@ function infer_expr_upcast(
     };
     // The interface-view gate is a STRUCTURE demand: an alias naming an
     // interface answers as the interface.
-    let target = expand_alias_ty(ctx, written);
+    let target = root.hir_ty.expand_alias_head(ctx.table.pool, written, ctx.facts);
     if (pool.has_error(target)) {
         return pool.add(root.types.TyError {});
     }
@@ -467,7 +468,7 @@ function body_lambda_params(
         let class_: root.types.InferTyClass
             if root.types.decl_name_is_lang_root_type(
             class_.name,
-            infer_ctx_lang(ctx),
+            root.hir.lang_roots(ctx.db),
             root.base.LangPackage.Baml,
             "TaggedString",
         ) => {

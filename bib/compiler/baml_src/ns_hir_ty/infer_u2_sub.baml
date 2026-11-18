@@ -33,13 +33,13 @@ function sub(ctx: InferenceContext, actual: int, expected: int) -> bool throws n
         pool.kinds[actual] is root.types.InferTyFunction
             && pool.kinds[expected] is root.types.TyTypeAlias
     ) {
-        expected = expand_alias_ty(ctx, expected);
+        expected = root.hir_ty.expand_alias_head(ctx.table.pool, expected, ctx.facts);
     }
     if (
         pool.kinds[actual] is root.types.TyTypeAlias
             && pool.kinds[expected] is root.types.InferTyFunction
     ) {
-        actual = expand_alias_ty(ctx, actual);
+        actual = root.hir_ty.expand_alias_head(ctx.table.pool, actual, ctx.facts);
     }
     // Normalize-then-relate: a GROUND projection the oracle can already
     // determine reduces before the pair is related, so
@@ -136,7 +136,7 @@ function sub(ctx: InferenceContext, actual: int, expected: int) -> bool throws n
             if pool.has_infer(actual) && !pool.has_infer(expected) => {
             let targets = u.members
                 .map((member) -> {
-                    expand_alias_ty(ctx, member)
+                    root.hir_ty.expand_alias_head(ctx.table.pool, member, ctx.facts)
                 })
                 .filter((member) -> {
                     same_head_constructor(pool, actual, member)
@@ -225,7 +225,7 @@ function sub(ctx: InferenceContext, actual: int, expected: int) -> bool throws n
         // parameter lists pair by the spec's rule; a pair of lists that does
         // not fit it is the oracle's verdict.
         (let a: root.types.InferTyFunction, let b: root.types.InferTyFunction) => {
-            let param_pairs = function_param_pairs(pool, a.params, b.params)
+            let param_pairs = function_param_pairs(a.params, b.params)
                 ?? return sub_residue(ctx, actual, expected);
             let ok = true;
             for (let pair in param_pairs) {
@@ -243,7 +243,7 @@ function sub(ctx: InferenceContext, actual: int, expected: int) -> bool throws n
         (let a: root.types.InferTyFunction, let b: root.types.InferTyInterface)
             if root.types.decl_name_is_lang_root_type(
             b.name,
-            infer_ctx_lang(ctx),
+            root.hir.lang_roots(ctx.db),
             root.base.LangPackage.Reflect,
             "AnyFunction",
         ) => {
@@ -287,7 +287,7 @@ function sub_residue(ctx: InferenceContext, actual: int, expected: int) -> bool 
                     && (
                         root.types.decl_name_is_lang_root_type(
                             a.name,
-                            infer_ctx_lang(ctx),
+                            root.hir.lang_roots(ctx.db),
                             root.base.LangPackage.Reflect,
                             "AnyFunction",
                         )

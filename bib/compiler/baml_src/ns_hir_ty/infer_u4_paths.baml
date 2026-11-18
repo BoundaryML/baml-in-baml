@@ -205,7 +205,7 @@ function resolve_value_path_function(
                 function_shape: if (has_phantom_param) {
                     null
                 } else {
-                    generic_function_value_shape(infer_ctx_viewpoint(ctx), db, function_, user_params, false, false)
+                    generic_function_value_shape(root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file), db, function_, user_params, false, false)
                 },
                 annotation_ty: if (specialization_example_is_safe && !has_phantom_param) {
                     instantiate_callable_signature(db, function_, instantiation)
@@ -223,7 +223,7 @@ function resolve_value_path_function(
         write_call_type_args(ctx, expr, instantiation, 0);
         register_callable_instantiation(ctx, function_, instantiation, expr);
     }
-    write_member_resolution(ctx, expr, MemberResolutionFree { func: function_ });
+    ctx.result.member_resolutions[expr] = MemberResolutionFree { func: function_ };
     instantiate_callable_signature(db, function_, instantiation)
 }
 
@@ -300,7 +300,7 @@ function own_instantiation_with_bounds(
     position: TypePosition,
 ) -> int[] throws never {
     match (own) {
-        let call: OwnArgsCall => instantiation_args_at(ctx, call.value, params, callee, position),
+        let call: OwnArgsCall => instantiation_args_at(ctx, call.value, params, callee, position = position),
         OwnArgsFresh => {
             params.map((param) -> {
                 fresh_required_arg(ctx, param, anchor)
@@ -460,14 +460,10 @@ function item_projection_value(
         // recorded for default and required methods alike, and UNBOUND:
         // every spelling of this tier is type-rooted. Resolving the slot to a
         // concrete impl is downstream's job.
-        write_member_resolution(
-            ctx,
-            record_at,
-            MemberResolutionMethod<int> {
+        ctx.result.member_resolutions[record_at] = MemberResolutionMethod<int> {
                 callee: MethodCalleeVirtual<int> { interface_: interface_, view: view, method: member },
                 receiver: Receiver.Unbound,
-            },
-        );
+            };
     }
     instantiate_callable_signature(db, method, instantiation)
 }
@@ -507,7 +503,7 @@ function qualified_path_value(
     }
     // The interface-view gate is a STRUCTURE demand, as it is for `.as<I>`:
     // an alias naming an interface answers as the interface.
-    let interface_ = expand_alias_ty(ctx, lowered_interface);
+    let interface_ = root.hir_ty.expand_alias_head(ctx.table.pool, lowered_interface, ctx.facts);
     let qualifier = root.types.infer_interface_of_ty(pool, interface_);
     if (qualifier == null) {
         report(ctx, PendingDiagQualifierNotInterface { expr: expr, target: interface_ });
@@ -528,7 +524,7 @@ function qualified_path_value(
     let interface_plain = materialize_ty(ctx, interface_);
     let (let determination, let diagnostics) = root.hir_ty.interfaces.determine_member_interface_with_facts(
         ctx.db,
-        viewer(ctx),
+        root.hir.file_package(ctx.db, ctx.owner_file).root_id,
         ctx.facts,
         qself_plain,
         interface_plain,
@@ -718,7 +714,7 @@ function class_impl_static_value(
             });
         channel_consumed = true;
     }
-    let qself = class_ty_interned(ctx.table.pool, infer_ctx_lang(ctx), class_qualified_name(ctx.db, class_), args);
+    let qself = class_ty_interned(ctx.table.pool, root.hir.lang_roots(ctx.db), class_qualified_name(ctx.db, class_), args);
     let effective_own: OwnArgs = if (channel_consumed) {
         OwnArgsFresh {}
     } else {
@@ -742,7 +738,7 @@ function impl_static_value(
     }
     let (let determination, _) = root.hir_ty.interfaces.determine_member_interface_with_facts(
         ctx.db,
-        viewer(ctx),
+        root.hir.file_package(ctx.db, ctx.owner_file).root_id,
         ctx.facts,
         rendered_plain(pool, qself),
         null,
@@ -836,7 +832,7 @@ function source_class_static_value(
         let written = write_call_type_args(ctx, call.value, instantiation, own_offset);
         register_callable_instantiation(ctx, method, written, anchor);
         if (record_at != null) {
-            write_member_resolution(ctx, record_at, resolution);
+            ctx.result.member_resolutions[record_at] = resolution;
         }
         return instantiate_callable_signature(db, method, written);
     }
@@ -847,7 +843,7 @@ function source_class_static_value(
         write_call_type_args(ctx, anchor, instantiation, 0);
     }
     if (record_at != null) {
-        write_member_resolution(ctx, record_at, resolution);
+        ctx.result.member_resolutions[record_at] = resolution;
     }
     instantiate_callable_signature(db, method, instantiation)
 }
@@ -875,11 +871,7 @@ function enum_variant_value(
     let ty = ctx.table.pool.from_plain(reject_holes(lowered));
     if (record_at != null) {
         if let enum_loc: root.hir.DefinitionEnum = definition_of(ctx.db, variant.name) {
-            write_member_resolution(
-                ctx,
-                record_at,
-                MemberResolutionVariant { enum_loc: enum_loc.value, variant: variant.variant },
-            );
+            ctx.result.member_resolutions[record_at] = MemberResolutionVariant { enum_loc: enum_loc.value, variant: variant.variant };
         }
     }
     ty

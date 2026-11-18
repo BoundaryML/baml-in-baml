@@ -382,6 +382,9 @@ Open items:
   witness on a non-literal type; no corpus case reaches it so far. If one
   does, decide between matching Rust's `Int`-style output and spelling it
   (`int`).
+- `register_class_bounds` (infer, U3) walks a class's generic bounds in
+  frame order; Rust walks an FxHashMap. Obligation registration order, and
+  so diagnostic push order, could differ. Same kind as the next item.
 - `InferenceTable::take_solved_class_bounds` walks roots in index order;
   Rust walks its FxHashMap's order. Its one consumer (infer.rs ~15528)
   replays bounds; check the order does not leak into diagnostics.

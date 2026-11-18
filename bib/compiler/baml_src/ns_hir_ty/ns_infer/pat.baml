@@ -245,7 +245,7 @@ function infer_match(
         // Non-exhaustive: the match can fall through, which the type system
         // rejects; E0062 carries the witnesses.
         let missing = usefulness.missing.map((w) -> {
-            root.hir_ty.render_witness_pat(ctx.db, root.hir_ty.infer_ctx_viewpoint(ctx), w)
+            root.hir_ty.render_witness_pat(ctx.db, root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file), w)
         });
         root.hir_ty.report(
             ctx,
@@ -932,16 +932,16 @@ function tuple_type_test_never_matches(
     pat_ty: int,
 ) -> bool throws never {
     let pool = ctx.table.pool;
-    if (!(pool.kinds[root.hir_ty.expand_alias_ty(ctx, pat_ty)] is root.types.InferTyTuple)) {
+    if (!(pool.kinds[root.hir_ty.expand_alias_head(ctx.table.pool, pat_ty, ctx.facts)] is root.types.InferTyTuple)) {
         return false;
     }
-    let expanded = root.hir_ty.expand_alias_ty(ctx, scrut);
+    let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, scrut, ctx.facts);
     let members = match (pool.kinds[expanded]) {
         let u: root.types.InferTyUnion => u.members,
         _ => [expanded],
     };
     members.some((member) -> {
-        pool.kinds[root.hir_ty.expand_alias_ty(ctx, member)] is root.types.InferTyTuple
+        pool.kinds[root.hir_ty.expand_alias_head(ctx.table.pool, member, ctx.facts)] is root.types.InferTyTuple
     })
         && provably_disjoint(ctx, scrut, pat_ty)
 }
@@ -1379,7 +1379,7 @@ function lower_class_pattern(
         }
     };
 
-    let head_ty = root.hir_ty.class_ty_interned(pool, root.hir_ty.infer_ctx_lang(ctx), qtn, args);
+    let head_ty = root.hir_ty.class_ty_interned(pool, root.hir.lang_roots(ctx.db), qtn, args);
     let declared: (string, root.types.Ty)[] = if (root.hir_ty.is_opaque_trace_type(ctx, qtn)) {
         []
     } else {
@@ -1846,7 +1846,7 @@ function collect_list_holders(
         if (unfolding.includes(ty)) {
             return true;
         }
-        let expanded = root.hir_ty.expand_alias_ty(ctx, ty);
+        let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, ty, ctx.facts);
         if (expanded != ty) {
             unfolding.push(ty);
             let only_lists = collect_list_holders(ctx, expanded, unfolding, holders);
@@ -1888,7 +1888,7 @@ function pattern_fits(
     ty: int,
 ) -> bool throws never {
     let pool = ctx.table.pool;
-    let expanded = root.hir_ty.expand_alias_ty(ctx, ty);
+    let expanded = root.hir_ty.expand_alias_head(ctx.table.pool, ty, ctx.facts);
     // A type whose values may be of any shape, or of any of several, is
     // never a provable misfit as a whole.
     match (pool.kinds[expanded]) {
