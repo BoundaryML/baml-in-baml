@@ -1,28 +1,45 @@
-// Writes the type family's BAML source from FAMILY (spec.baml).
+// port: baml_type_macros @ d9be6853b (the `ty_family!` expansion)
+//
+// Writes the type family's BAML source from FAMILY (spec.baml). From the
+// bib/compiler directory:
 //
 //   baml run types.family_gen.main -- --out baml_src/ns_types/family.baml
 //
 // The output is checked in and used like hand-written code; regenerate it
 // after any change to spec.baml.
 
-// How a nested position is converted while a variant is rebuilt into another
-// member: `fn(args..., child)`. `args` are leading arguments (the pool).
+// How a nested position is converted while a value is rebuilt into another
+// member: `fn(args..., child)`, or left as is when `identity`.
 class Conv {
     fn: string,
     args: string,
+    identity: bool,
 
     function call(self, e: string) -> string {
-        `${self.fn}(${self.args}${e})`
+        if (self.identity) {
+            e
+        } else {
+            `${self.fn}(${self.args}${e})`
+        }
     }
 
-    function call_each(self, e: string) -> string {
-        if (self.args) {
-            `${e}.map((c) -> { ${self.call("c")} })`
+    // `e` is a list; `depth` keeps nested lambda parameters distinct.
+    function call_each(self, e: string, depth: int) -> string {
+        if (self.identity) {
+            e
+        } else if (self.args) {
+            `${e}.map((c${depth}) -> { ${self.call(`c${depth}`)} })`
         } else {
             `${e}.map(${self.fn})`
         }
     }
 }
+
+function via(fn: string) -> Conv {
+    Conv { fn: fn, args: "", identity: false }
+}
+
+const IDENTITY: Conv = Conv { fn: "", args: "", identity: true };
 
 function has(m: Member, v: Variant) -> bool {
     m.axes.includes(v.axis)
@@ -34,7 +51,22 @@ function variants_of(m: Member) -> Variant[] {
     })
 }
 
-function deep_members() -> Member[] {
+function member_named(name: string) -> Member {
+    FAMILY.members.find((m) -> {
+        m.name == name
+    })
+        ?? baml.sys.panic(`no family member \`${name}\``)
+}
+
+function satellite_named(name: string) -> Satellite {
+    FAMILY.satellites.find((s) -> {
+        s.name == name
+    })
+        ?? baml.sys.panic(`no satellite \`${name}\``)
+}
+
+// The members that are plain trees: everything but the interned member.
+function plain_members() -> Member[] {
     FAMILY.members.filter((m) -> {
         !m.interned
     })
@@ -47,10 +79,24 @@ function interned_member() -> Member {
         ?? baml.sys.panic("the family has no interned member")
 }
 
+function deep(m: Member) -> bool {
+    m.child == m.name
+}
+
+function child_of(m: Member) -> Member {
+    member_named(m.child)
+}
+
 function subset(a: Member, b: Member) -> bool {
     a.axes.every((x) -> {
         b.axes.includes(x)
     })
+}
+
+// port: convert.rs::is_le. `a <= b` in the product order over the top-level
+// variant set and the child member, at one head (Rust converts at one `N`).
+function le(a: Member, b: Member) -> bool {
+    a.head == b.head && subset(a, b) && subset(child_of(a), child_of(b))
 }
 
 // The distinct heads of the members that include `v`.
@@ -66,16 +112,9 @@ function heads_of(v: Variant) -> string[] {
 
 // A variant with no nested positions, and no head or one head across its
 // members, is one class shared by every member, so it needs no conversion.
-// Any other variant is a class per member: child fields are typed as that
-// member, a head field as its head.
+// Any other variant is a class per member.
 function per_member(v: Variant) -> bool {
     v.nests() || (v.has_head() && heads_of(v).length() > 1)
-}
-
-// Members are comparable (convertible) only at the same head, as in Rust,
-// where the conversion matrix is between members at one `N`.
-function comparable(a: Member, b: Member) -> bool {
-    a.head == b.head && (subset(a, b) || subset(b, a))
 }
 
 function class_name(v: Variant, m: Member) -> string {
@@ -86,46 +125,68 @@ function class_name(v: Variant, m: Member) -> string {
     }
 }
 
-function field_type(f: Field, m: Member) -> string {
-    let child_ty = if (m.interned) {
-        "int"
+// Satellites are declared for deep and interned members; a shallow member
+// reuses its child's (port: emit.rs, "satellites are generated only for deep
+// members").
+function satellite_owner(m: Member) -> Member {
+    if (m.interned || deep(m)) {
+        m
     } else {
-        m.name
-    };
-    match (f.kind) {
-        FieldKind.Child => child_ty,
-        FieldKind.Children => `${child_ty}[]`,
-        FieldKind.Head => m.head,
-        FieldKind.Name => "string",
-        FieldKind.Media => "root.base.MediaKind",
-        FieldKind.Id => "int",
-        FieldKind.LitValue => "LitValue",
-        FieldKind.Freshness => "Freshness",
+        child_of(m)
     }
 }
 
-function class_decl(v: Variant, m: Member) -> string {
-    let fields = v.fields
+// port: emit.rs::satellite_name_for. `RuntimeTy` + `FunctionParamTy` is
+// `RuntimeFunctionParamTy`; the master's satellites keep their bare names.
+function satellite_class(s: Satellite, m: Member) -> string {
+    let owner = satellite_owner(m).name;
+    let prefix = if (owner.ends_with("Ty")) {
+        owner.slice(0, owner.length() - 2)
+    } else {
+        owner
+    };
+    `${prefix}${s.name}`
+}
+
+function child_type(m: Member) -> string {
+    if (m.interned) {
+        "int"
+    } else {
+        m.child
+    }
+}
+
+function field_type(f: Field, m: Member) -> string {
+    match (f.kind) {
+        FieldKind.Child => child_type(m),
+        FieldKind.Children => `${child_type(m)}[]`,
+        FieldKind.Head => m.head,
+        FieldKind.Satellite => satellite_class(satellite_named(f.of), m),
+        FieldKind.Satellites => `${satellite_class(satellite_named(f.of), m)}[]`,
+        FieldKind.Opaque => f.of,
+    }
+}
+
+function struct_decl(name: string, fields: Field[], m: Member) -> string {
+    let body = fields
         .map((f) -> {
             `    ${f.name}: ${field_type(f, m)},\n`
         })
         .join("");
-    `class ${class_name(v, m)} {\n${fields}}\n`
+    `class ${name} {\n${body}}\n`
 }
 
-function leaf_classes() -> string {
+function shared_classes() -> string {
     FAMILY.variants
         .filter((v) -> {
             !per_member(v)
         })
         .map((v) -> {
-            class_decl(
-                v,
-                FAMILY.members.find((m) -> {
-                    has(m, v)
-                })
-                    ?? FAMILY.members[0],
-            )
+            let m = FAMILY.members.find((m) -> {
+                has(m, v)
+            })
+                ?? FAMILY.members[0];
+            struct_decl(class_name(v, m), v.fields, m)
         })
         .join("\n")
 }
@@ -137,76 +198,114 @@ function member_decls(m: Member) -> string {
             per_member(v)
         })
         .map((v) -> {
-            class_decl(v, m)
+            struct_decl(class_name(v, m), v.fields, m)
+        });
+    let sats: string[] = if (satellite_owner(m).name == m.name) {
+        FAMILY.satellites.map((s) -> {
+            struct_decl(satellite_class(s, m), s.fields, m)
         })
-        .join("\n");
+    } else {
+        []
+    };
     let arms = vs
         .map((v) -> {
             class_name(v, m)
         })
         .join("\n    | ");
-    `// -- ${m.name} ${"-".repeat(70 - m.name.length())}\n\n${classes}\ntype ${m.name} =\n    ${arms};\n`
+    let what = if (m.interned) {
+        "interned: children are pool handles"
+    } else if (deep(m)) {
+        "deep"
+    } else {
+        `shallow over ${m.child}`
+    };
+    let title = `${m.name} (${what})`;
+    `// -- ${title} ${"-".repeat(70 - title.length())}\n\n${classes.concat(sats).join("\n")}\ntype ${m.name} =\n    ${arms};\n`
 }
 
-// `Target { f: conv(x.f), ... }` for variant `v` bound as `x`.
-function rebuild(v: Variant, to: Member, conv: Conv) -> string {
-    let fields = v.fields
+// The fields of a value bound as `e`, rebuilt from member `from` into `to`.
+function rebuild_fields(
+    fields: Field[],
+    from: Member,
+    to: Member,
+    conv: Conv,
+    e: string,
+    depth: int,
+) -> string {
+    fields
         .map((f) -> {
-            let e = `x.${f.name}`;
+            let x = `${e}.${f.name}`;
             let value = match (f.kind) {
-                FieldKind.Child => conv.call(e),
-                FieldKind.Children => conv.call_each(e),
-                _ => e,
+                FieldKind.Child => conv.call(x),
+                FieldKind.Children => conv.call_each(x, depth),
+                FieldKind.Satellite => {
+                    rebuild_satellite(satellite_named(f.of), from, to, conv, x, depth)
+                },
+                FieldKind.Satellites => {
+                    let s = satellite_named(f.of);
+                    if (conv.identity && satellite_class(s, from) == satellite_class(s, to)) {
+                        x
+                    } else {
+                        `${x}.map((s${depth}) -> { ${rebuild_satellite(s, from, to, conv, `s${depth}`, depth + 1)} })`
+                    }
+                },
+                FieldKind.Head => x,
+                FieldKind.Opaque => x,
             };
             `${f.name}: ${value}`
         })
-        .join(", ");
-    `${class_name(v, to)} { ${fields} }`
+        .join(", ")
 }
 
-function leaf_arm(leaves: Variant[], wrap: string) -> string[] {
-    if (leaves.length() == 0) {
-        return [];
-    }
-    let pattern = leaves
-        .map((v) -> {
-            `Ty${v.name}`
-        })
-        .join(" | ");
-    let result = if (wrap) {
-        `${wrap}(x)`
+function rebuild_satellite(
+    s: Satellite,
+    from: Member,
+    to: Member,
+    conv: Conv,
+    e: string,
+    depth: int,
+) -> string {
+    if (conv.identity && satellite_class(s, from) == satellite_class(s, to)) {
+        e
     } else {
-        "x"
-    };
-    [`let x: ${pattern} => ${result},`]
+        `${satellite_class(s, to)} { ${rebuild_fields(s.fields, from, to, conv, e, depth)} }`
+    }
 }
 
 // The arms of a match over `from` that rebuild each value as `to`: shared
-// leaves pass through (`wrap`ped), nesting variants are rebuilt with `conv`,
-// and variants `to` lacks throw a NarrowError.
+// classes pass through (`wrap`ped), per-member classes are rebuilt with
+// `conv` on their nested positions, and variants `to` lacks throw.
 function convert_arms(from: Member, to: Member, conv: Conv, wrap: string) -> string[] {
+    let wrapped = (e: string) -> string {
+        if (wrap) {
+            `${wrap}(${e})`
+        } else {
+            e
+        }
+    };
     let vs = variants_of(from);
     let kept = vs.filter((v) -> {
         has(to, v)
     });
-    let leaves = leaf_arm(
-        kept.filter((v) -> {
+    let shared = kept
+        .filter((v) -> {
             !per_member(v)
-        }),
-        wrap,
-    );
-    let nested = kept
+        })
+        .map((v) -> {
+            class_name(v, from)
+        });
+    let pass: string[] = if (shared.length() == 0) {
+        []
+    } else {
+        [`let x: ${shared.join(" | ")} => ${wrapped("x")},`]
+    };
+    let rebuilt = kept
         .filter((v) -> {
             per_member(v)
         })
         .map((v) -> {
-            let built = rebuild(v, to, conv);
-            let result = if (wrap) {
-                `${wrap}(${built})`
-            } else {
-                built
-            };
-            `let x: ${class_name(v, from)} => ${result},`
+            let built = `${class_name(v, to)} { ${rebuild_fields(v.fields, from, to, conv, "x", 0)} }`;
+            `let x: ${class_name(v, from)} => ${wrapped(built)},`
         });
     let rejected = vs
         .filter((v) -> {
@@ -215,7 +314,7 @@ function convert_arms(from: Member, to: Member, conv: Conv, wrap: string) -> str
         .map((v) -> {
             `${class_name(v, from)} => throw NarrowError { variant: "${v.name}", into: "${to.name}" },`
         });
-    leaves.concat(nested).concat(rejected)
+    pass.concat(rebuilt).concat(rejected)
 }
 
 function match_fn(signature: string, scrutinee: string, arms: string[]) -> string {
@@ -227,35 +326,41 @@ function match_fn(signature: string, scrutinee: string, arms: string[]) -> strin
     `${signature} {\n    match (${scrutinee}) {\n${body}    }\n}\n`
 }
 
-function convert_fn(from: Member, to: Member) -> string {
-    let widening = subset(from, to);
-    let verb = if (widening) {
+function convert_name(from: Member, to: Member) -> string {
+    let verb = if (le(from, to)) {
         "widen"
     } else {
         "narrow"
     };
-    let name = `${verb}_${from.snake}_to_${to.snake}`;
-    let throws_ = if (widening) {
-        "never"
+    `${verb}_${from.snake}_to_${to.snake}`
+}
+
+// port: convert.rs, one `From` (widening) or `TryFrom` (narrowing). Nested
+// positions convert between the two members' children.
+function convert_fn(from: Member, to: Member) -> string {
+    let widening = le(from, to);
+    let (let cf, let ct) = (child_of(from), child_of(to));
+    let conv = if (cf.name == ct.name) {
+        IDENTITY
     } else {
-        "NarrowError"
+        via(convert_name(cf, ct))
     };
-    let doc = if (widening) {
-        `// Infallible: every ${from.name} variant is a ${to.name} variant.\n`
+    let (let throws_, let doc) = if (widening) {
+        ("never", `// Infallible: every ${from.name} is a ${to.name}.\n`)
     } else {
-        `// Fails if any variant, at any depth, is outside ${to.name}.\n`
+        ("NarrowError", `// Fails if any variant, at any depth, is outside ${to.name}.\n`)
     };
-    let sig = `${doc}function ${name}(t: ${from.name}) -> ${to.name} throws ${throws_}`;
-    match_fn(sig, "t", convert_arms(from, to, Conv { fn: name, args: "" }, ""))
+    let sig = `${doc}function ${convert_name(from, to)}(t: ${from.name}) -> ${to.name} throws ${throws_}`;
+    match_fn(sig, "t", convert_arms(from, to, conv, ""))
 }
 
 function conversions() -> string {
-    let ms = deep_members();
+    let ms = plain_members();
     ms
         .flat_map((a) -> {
             ms
                 .filter((b) -> {
-                    a.name != b.name && comparable(a, b)
+                    a.name != b.name && (le(a, b) || le(b, a))
                 })
                 .map((b) -> {
                     convert_fn(a, b)
@@ -264,119 +369,96 @@ function conversions() -> string {
         .join("\n")
 }
 
+// port: emit.rs::gen_child_walkers (`map_children`).
 function map_children_fn(m: Member) -> string {
-    let name = `map_children_${m.snake}`;
-    let sig = `// Rebuilds \`t\` with \`f\` applied to each direct child; leaves are returned as is.\nfunction ${name}(t: ${m.name}, f: (${m.name}) -> ${m.name}) -> ${m.name}`;
-    let arms = convert_arms(m, m, Conv { fn: "f", args: "" }, "");
-    match_fn(sig, "t", arms)
+    let c = m.child;
+    let sig = `// Rebuilds \`t\` with \`f\` applied to each direct child; leaves are returned as is.\nfunction map_children_${m.snake}(t: ${m.name}, f: (${c}) -> ${c}) -> ${m.name}`;
+    match_fn(sig, "t", convert_arms(m, m, via("f"), ""))
 }
 
+// The expressions (each a list) of the children of a value bound as `e`.
+function children_parts(fields: Field[], e: string, depth: int) -> string[] {
+    fields.flat_map((f) -> {
+        let x = `${e}.${f.name}`;
+        match (f.kind) {
+            FieldKind.Child => [`[${x}]`],
+            FieldKind.Children => [x],
+            FieldKind.Satellite => children_parts(satellite_named(f.of).fields, x, depth),
+            FieldKind.Satellites => {
+                let inner = children_parts(satellite_named(f.of).fields, `s${depth}`, depth + 1);
+                [`${x}.flat_map((s${depth}) -> { ${concat_all(inner)} })`]
+            },
+            _ => [],
+        }
+    })
+}
+
+function concat_all(parts: string[]) -> string {
+    if (parts.length() == 0) {
+        return "[]";
+    }
+    parts.slice(1, parts.length()).reduce(
+        (acc, p) -> {
+            `${acc}.concat(${p})`
+        },
+        parts[0],
+    )
+}
+
+// port: emit.rs::gen_child_walkers (`visit_children`), as a list.
 function children_fn(m: Member) -> string {
     let vs = variants_of(m);
-    let leaves = vs
+    let none = vs
         .filter((v) -> {
             !v.nests()
         })
         .map((v) -> {
             class_name(v, m)
-        })
-        .join(" | ");
-    let nested = vs
+        });
+    let some = vs
         .filter((v) -> {
             v.nests()
         })
         .map((v) -> {
-            let parts = v.fields.flat_map((f) -> {
-                match (f.kind) {
-                    FieldKind.Child => [`[x.${f.name}]`],
-                    FieldKind.Children => [`x.${f.name}`],
-                    _ => [],
-                }
-            });
-            let first = parts[0];
-            let all = parts.slice(1, parts.length()).reduce(
-                (acc, p) -> {
-                    `${acc}.concat(${p})`
-                },
-                first,
-            );
-            `let x: ${class_name(v, m)} => ${all},`
+            `let x: ${class_name(v, m)} => ${concat_all(children_parts(v.fields, "x", 0))},`
         });
-    let sig = `// The direct children of \`t\`, in field order.\nfunction children_${m.snake}(t: ${m.name}) -> ${m.name}[]`;
-    match_fn(sig, "t", [`${leaves} => [],`].concat(nested))
+    let sig = `// The direct children of \`t\`, in field order.\nfunction children_${m.snake}(t: ${m.name}) -> ${child_type(m)}[]`;
+    match_fn(sig, "t", [`${none.join(" | ")} => [],`].concat(some))
 }
 
 function intern_fn(m: Member, pool: Member) -> string {
     let name = `intern_${m.snake}`;
-    let sig = `function ${name}(pool: InferPool, t: ${m.name}) -> int`;
-    let arms = convert_arms(m, pool, Conv { fn: name, args: "pool, " }, "pool.add");
-    match_fn(sig, "t", arms)
+    let sig = `// Interns \`t\` bottom-up; returns its handle.\nfunction ${name}(pool: InferPool, t: ${m.name}) -> int`;
+    let conv = Conv { fn: name, args: "pool, ", identity: false };
+    match_fn(sig, "t", convert_arms(m, pool, conv, "pool.add"))
 }
 
 function resolve_fn(m: Member, pool: Member) -> string {
     let name = `resolve_${m.snake}`;
     let sig = `// Reads handle \`h\` back as a ${m.name}; fails on a variant outside it.\nfunction ${name}(pool: InferPool, h: int) -> ${m.name} throws NarrowError`;
-    let arms = convert_arms(pool, m, Conv { fn: name, args: "pool, " }, "");
-    match_fn(sig, "pool.kinds[h]", arms)
+    let conv = Conv { fn: name, args: "pool, ", identity: false };
+    match_fn(sig, "pool.kinds[h]", convert_arms(pool, m, conv, ""))
 }
 
-function own_flag(v: Variant) -> int {
-    FAMILY.flags
-        .find((f) -> {
-            f.axis == v.axis
-        })
-        ?.bit
-        ?? 0
-}
-
-// A pool entry's flags: its own axis bit or'ed with its children's flags.
-function flags_fn(pool: Member) -> string {
-    let arms = variants_of(pool).map((v) -> {
-        let parts = v.fields.flat_map((f) -> {
-            match (f.kind) {
-                FieldKind.Child => [`pool.flags[x.${f.name}]`],
-                FieldKind.Children => [`x.${f.name}.reduce((acc, c) -> { acc | pool.flags[c] }, 0)`],
-                _ => [],
-            }
-        });
-        let own = own_flag(v);
-        if (parts.length() == 0) {
-            return `${class_name(v, pool)} => ${own},`;
-        }
-        let all = if (own) {
-            [own.to_string()].concat(parts)
-        } else {
-            parts
-        };
-        `let x: ${class_name(v, pool)} => ${all.join(" | ")},`
-    });
-    match_fn(`function infer_flags(pool: InferPool, k: ${pool.name}) -> int`, "k", arms)
-}
-
-function flag_consts() -> string {
-    FAMILY.flags
-        .map((f) -> {
-            `const ${f.flag} = ${f.bit};\n`
-        })
-        .join("")
-}
-
+// Interning and resolving between the deep members and the pool member, at
+// the pool's head. (Rust writes these by hand in interned.rs; they are as
+// mechanical as the rest.)
 function interning() -> string {
     let pool = interned_member();
-    let ms = deep_members().filter((m) -> {
-        m.head == pool.head && subset(m, pool)
+    let ms = plain_members().filter((m) -> {
+        deep(m) && m.head == pool.head
     });
-    let interns = ms.map((m) -> {
-        intern_fn(m, pool)
-    });
-    let resolves = deep_members()
+    let interns = ms
         .filter((m) -> {
-            m.head == pool.head
+            subset(m, pool)
         })
         .map((m) -> {
-            resolve_fn(m, pool)
+            intern_fn(m, pool)
         });
-    [flag_consts(), flags_fn(pool)].concat(interns).concat(resolves).join("\n")
+    let resolves = ms.map((m) -> {
+        resolve_fn(m, pool)
+    });
+    [children_fn(pool)].concat(interns).concat(resolves).join("\n")
 }
 
 function family_source() -> string {
@@ -386,8 +468,8 @@ function family_source() -> string {
     };
     [
         header,
-        section("Shared leaf variants"),
-        leaf_classes(),
+        section("Shared variants"),
+        shared_classes(),
         FAMILY.members
             .map((m) -> {
                 member_decls(m)
@@ -395,13 +477,13 @@ function family_source() -> string {
             .join("\n"),
         section("Widening and narrowing"),
         conversions(),
-        section("Generic child walkers"),
-        deep_members()
+        section("Child walkers"),
+        plain_members()
             .flat_map((m) -> {
                 [map_children_fn(m), children_fn(m)]
             })
             .join("\n"),
-        section("InferTy pool conversions"),
+        section("InferTy pool"),
         interning(),
     ]
         .join("\n")

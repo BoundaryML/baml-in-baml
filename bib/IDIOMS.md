@@ -113,3 +113,22 @@ The `Db` is `root.hir.Db` (`ns_hir/db.baml`); compile setup is `root.db.project_
 | `seeded_*` inputs (cache seeding) | absent: always `None` |
 | `Arc<T>` | `T` |
 
+
+## Type family (`ty_family!`)
+
+`baml_type`'s family is generated, as in Rust: `ns_types/ns_family_gen/spec.baml`
+is the `ty_family!` invocation, `gen.baml` the macro, and `ns_types/family.baml`
+the checked-in output. Change the spec, then from `bib/compiler`:
+
+    baml run types.family_gen.main -- --out baml_src/ns_types/family.baml
+
+- Variant classes are `<Member><Variant>` (`RuntimeTyList`); a variant with no
+  nested type and one head across members is a single shared `Ty<Variant>`.
+- Satellites keep Rust's names (`RuntimeFunctionParamTy`), except
+  `InterfaceConstraint` (Rust's `Interface` satellite) and `AssociatedType`
+  (Rust's `(Name, Ty)` pair; tuples are not hashable).
+- Each member names its head type in the spec; conversions exist only between
+  members at the same head.
+- The generator runs only while the project checks. If a spec change breaks
+  `family.baml` or `family_support.baml`, move both aside, regenerate, and put
+  `family_support.baml` back.

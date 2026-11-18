@@ -1,16 +1,58 @@
 // Hand-written pieces the generated family (family.baml) refers to.
 
+// port: baml_type/src/lib.rs::Freshness @ d9be6853b
 enum Freshness {
     Fresh,
     Regular,
 }
 
-type LitValue = int | string | bool;
+// port: baml_type/src/lib.rs::FunctionParamMode @ d9be6853b
+enum FunctionParamMode {
+    Required,
+    Optional,
+}
 
-// A deep narrowing met a variant the target member does not include.
+// port: baml_type/src/param.rs::ParamTy @ d9be6853b
+// A generic parameter: its position in the declaring item's list and name.
+class ParamTy {
+    index: int,
+    name: string,
+}
+
+// port: the `Not<Member>` errors of the conversion matrix, as one class.
+// A narrowing met a variant the target member does not include.
 class NarrowError {
     variant: string,
     into: string,
+}
+
+// port: baml_type/src/interned.rs::TypeFlags @ d9be6853b
+// Facts about a type computed once at intern time; the union of each node's
+// own bit and all its children's flags.
+const HAS_INFER = 1;
+const HAS_ERROR = 2;
+const HAS_TYPEVAR = 4;
+const HAS_PROJECTION = 8;
+const HAS_FRESH_LITERAL = 16;
+const HAS_UNION = 32;
+
+// A pool entry's own flag bits, before its children's are or'ed in.
+function own_flags(k: InferTy) -> int throws never {
+    match (k) {
+        TyInferVar => HAS_INFER,
+        TyError => HAS_ERROR,
+        TyTypeVar => HAS_TYPEVAR,
+        InferTyAssociatedTypeProjection => HAS_PROJECTION,
+        let l: TyLiteral => {
+            if (l.freshness == Freshness.Fresh) {
+                HAS_FRESH_LITERAL
+            } else {
+                0
+            }
+        },
+        InferTyUnion => HAS_UNION,
+        _ => 0,
+    }
 }
 
 // The InferTy hash-cons pool: a handle is an index into `kinds`. Entries are
@@ -30,21 +72,19 @@ class InferPool {
             return found;
         }
         let h = self.kinds.length();
+        let flags = children_infer_ty(k).reduce(
+            (acc, c) -> {
+                acc | self.flags[c]
+            },
+            own_flags(k),
+        );
         self.kinds.push(k);
-        self.flags.push(infer_flags(self, k));
+        self.flags.push(flags);
         self.index.set(k, h);
         h
     }
 
-    function has_infer(self, h: int) -> bool {
-        (self.flags[h] & HAS_INFER) != 0
-    }
-
-    function has_error(self, h: int) -> bool {
-        (self.flags[h] & HAS_ERROR) != 0
-    }
-
-    function has_typevar(self, h: int) -> bool {
-        (self.flags[h] & HAS_TYPEVAR) != 0
+    function has(self, h: int, flag: int) -> bool {
+        (self.flags[h] & flag) != 0
     }
 }

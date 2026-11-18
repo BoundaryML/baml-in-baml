@@ -1,7 +1,7 @@
 // GENERATED from ns_family_gen/spec.baml by `baml run types.family_gen.main`.
 // Do not edit by hand: change the spec and regenerate.
 
-// == Shared leaf variants ==================================================
+// == Shared variants =======================================================
 
 class TyInt {
 }
@@ -29,7 +29,7 @@ class TyMedia {
 }
 
 class TyLiteral {
-    value: LitValue,
+    value: root.base.Literal,
     freshness: Freshness,
 }
 
@@ -59,7 +59,7 @@ class TyTypeAlias {
 }
 
 class TyTypeVar {
-    name: string,
+    param: ParamTy,
 }
 
 class TyUnknown {
@@ -74,15 +74,15 @@ class TyError {
 class TyInfer {
 }
 
-class TyInferVar {
-    id: int,
-}
-
 class TyTypeArgRef {
     index: int,
 }
 
-// -- Ty --------------------------------------------------------------------
+class TyInferVar {
+    var: int,
+}
+
+// -- Ty (deep) -------------------------------------------------------------
 
 class TyClass {
     name: DeclName,
@@ -92,7 +92,7 @@ class TyClass {
 class TyInterface {
     name: DeclName,
     args: Ty[],
-    assoc: Ty[],
+    associated_types: AssociatedType[],
 }
 
 class TyList {
@@ -109,7 +109,7 @@ class TyUnion {
 }
 
 class TyFunction {
-    params: Ty[],
+    params: FunctionParamTy[],
     ret: Ty,
     throws_: Ty,
 }
@@ -119,14 +119,31 @@ class TyFuture {
     error: Ty,
 }
 
-class TyProjection {
+class TyAssociatedTypeProjection {
     base: Ty,
-    interface_args: Ty[],
+    interface_: InterfaceConstraint,
     member: string,
 }
 
 class TyTuple {
     items: Ty[],
+}
+
+class FunctionParamTy {
+    name: string?,
+    ty: Ty,
+    mode: FunctionParamMode,
+}
+
+class InterfaceConstraint {
+    name: DeclName,
+    generics: Ty[],
+    associated_types: AssociatedType[],
+}
+
+class AssociatedType {
+    name: string,
+    ty: Ty,
 }
 
 type Ty = TyInt
@@ -153,13 +170,13 @@ type Ty = TyInt
     | TyPromptAst
     | TyTypeAlias
     | TyTypeVar
-    | TyProjection
+    | TyAssociatedTypeProjection
     | TyUnknown
     | TyNever
     | TyError
     | TyTuple;
 
-// -- LoweringTy ------------------------------------------------------------
+// -- LoweringTy (deep) -----------------------------------------------------
 
 class LoweringTyClass {
     name: DeclName,
@@ -169,7 +186,7 @@ class LoweringTyClass {
 class LoweringTyInterface {
     name: DeclName,
     args: LoweringTy[],
-    assoc: LoweringTy[],
+    associated_types: LoweringAssociatedType[],
 }
 
 class LoweringTyList {
@@ -186,7 +203,7 @@ class LoweringTyUnion {
 }
 
 class LoweringTyFunction {
-    params: LoweringTy[],
+    params: LoweringFunctionParamTy[],
     ret: LoweringTy,
     throws_: LoweringTy,
 }
@@ -196,14 +213,31 @@ class LoweringTyFuture {
     error: LoweringTy,
 }
 
-class LoweringTyProjection {
+class LoweringTyAssociatedTypeProjection {
     base: LoweringTy,
-    interface_args: LoweringTy[],
+    interface_: LoweringInterfaceConstraint,
     member: string,
 }
 
 class LoweringTyTuple {
     items: LoweringTy[],
+}
+
+class LoweringFunctionParamTy {
+    name: string?,
+    ty: LoweringTy,
+    mode: FunctionParamMode,
+}
+
+class LoweringInterfaceConstraint {
+    name: DeclName,
+    generics: LoweringTy[],
+    associated_types: LoweringAssociatedType[],
+}
+
+class LoweringAssociatedType {
+    name: string,
+    ty: LoweringTy,
 }
 
 type LoweringTy = TyInt
@@ -230,14 +264,14 @@ type LoweringTy = TyInt
     | TyPromptAst
     | TyTypeAlias
     | TyTypeVar
-    | LoweringTyProjection
+    | LoweringTyAssociatedTypeProjection
     | TyUnknown
     | TyNever
     | TyError
     | TyInfer
     | LoweringTyTuple;
 
-// -- RuntimeTy -------------------------------------------------------------
+// -- RuntimeTy (deep) ------------------------------------------------------
 
 class RuntimeTyClass {
     name: DeclName,
@@ -247,7 +281,7 @@ class RuntimeTyClass {
 class RuntimeTyInterface {
     name: DeclName,
     args: RuntimeTy[],
-    assoc: RuntimeTy[],
+    associated_types: RuntimeAssociatedType[],
 }
 
 class RuntimeTyList {
@@ -264,7 +298,7 @@ class RuntimeTyUnion {
 }
 
 class RuntimeTyFunction {
-    params: RuntimeTy[],
+    params: RuntimeFunctionParamTy[],
     ret: RuntimeTy,
     throws_: RuntimeTy,
 }
@@ -274,14 +308,31 @@ class RuntimeTyFuture {
     error: RuntimeTy,
 }
 
-class RuntimeTyProjection {
+class RuntimeTyAssociatedTypeProjection {
     base: RuntimeTy,
-    interface_args: RuntimeTy[],
+    interface_: RuntimeInterfaceConstraint,
     member: string,
 }
 
 class RuntimeTyTuple {
     items: RuntimeTy[],
+}
+
+class RuntimeFunctionParamTy {
+    name: string?,
+    ty: RuntimeTy,
+    mode: FunctionParamMode,
+}
+
+class RuntimeInterfaceConstraint {
+    name: DeclName,
+    generics: RuntimeTy[],
+    associated_types: RuntimeAssociatedType[],
+}
+
+class RuntimeAssociatedType {
+    name: string,
+    ty: RuntimeTy,
 }
 
 type RuntimeTy = TyInt
@@ -308,12 +359,12 @@ type RuntimeTy = TyInt
     | TyPromptAst
     | TyTypeAlias
     | TyTypeVar
-    | RuntimeTyProjection
+    | RuntimeTyAssociatedTypeProjection
     | TyUnknown
     | TyNever
     | RuntimeTyTuple;
 
-// -- CodegenTy -------------------------------------------------------------
+// -- CodegenTy (deep) ------------------------------------------------------
 
 class CodegenTyClass {
     name: DeclName,
@@ -323,7 +374,7 @@ class CodegenTyClass {
 class CodegenTyInterface {
     name: DeclName,
     args: CodegenTy[],
-    assoc: CodegenTy[],
+    associated_types: CodegenAssociatedType[],
 }
 
 class CodegenTyList {
@@ -340,7 +391,7 @@ class CodegenTyUnion {
 }
 
 class CodegenTyFunction {
-    params: CodegenTy[],
+    params: CodegenFunctionParamTy[],
     ret: CodegenTy,
     throws_: CodegenTy,
 }
@@ -352,6 +403,23 @@ class CodegenTyFuture {
 
 class CodegenTyTuple {
     items: CodegenTy[],
+}
+
+class CodegenFunctionParamTy {
+    name: string?,
+    ty: CodegenTy,
+    mode: FunctionParamMode,
+}
+
+class CodegenInterfaceConstraint {
+    name: DeclName,
+    generics: CodegenTy[],
+    associated_types: CodegenAssociatedType[],
+}
+
+class CodegenAssociatedType {
+    name: string,
+    ty: CodegenTy,
 }
 
 type CodegenTy = TyInt
@@ -382,7 +450,7 @@ type CodegenTy = TyInt
     | TyNever
     | CodegenTyTuple;
 
-// -- RealizedTy ------------------------------------------------------------
+// -- RealizedTy (deep) -----------------------------------------------------
 
 class RealizedTyClass {
     name: DeclName,
@@ -392,7 +460,7 @@ class RealizedTyClass {
 class RealizedTyInterface {
     name: DeclName,
     args: RealizedTy[],
-    assoc: RealizedTy[],
+    associated_types: RealizedAssociatedType[],
 }
 
 class RealizedTyList {
@@ -409,7 +477,7 @@ class RealizedTyUnion {
 }
 
 class RealizedTyFunction {
-    params: RealizedTy[],
+    params: RealizedFunctionParamTy[],
     ret: RealizedTy,
     throws_: RealizedTy,
 }
@@ -421,6 +489,23 @@ class RealizedTyFuture {
 
 class RealizedTyTuple {
     items: RealizedTy[],
+}
+
+class RealizedFunctionParamTy {
+    name: string?,
+    ty: RealizedTy,
+    mode: FunctionParamMode,
+}
+
+class RealizedInterfaceConstraint {
+    name: DeclName,
+    generics: RealizedTy[],
+    associated_types: RealizedAssociatedType[],
+}
+
+class RealizedAssociatedType {
+    name: string,
+    ty: RealizedTy,
 }
 
 type RealizedTy = TyInt
@@ -450,35 +535,35 @@ type RealizedTy = TyInt
     | TyNever
     | RealizedTyTuple;
 
-// -- ConcreteTy ------------------------------------------------------------
+// -- ConcreteTy (shallow over RuntimeTy) -----------------------------------
 
 class ConcreteTyClass {
     name: DeclName,
-    args: ConcreteTy[],
+    args: RuntimeTy[],
 }
 
 class ConcreteTyList {
-    elem: ConcreteTy,
+    elem: RuntimeTy,
 }
 
 class ConcreteTyMap {
-    key: ConcreteTy,
-    value: ConcreteTy,
+    key: RuntimeTy,
+    value: RuntimeTy,
 }
 
 class ConcreteTyFunction {
-    params: ConcreteTy[],
-    ret: ConcreteTy,
-    throws_: ConcreteTy,
+    params: RuntimeFunctionParamTy[],
+    ret: RuntimeTy,
+    throws_: RuntimeTy,
 }
 
 class ConcreteTyFuture {
-    value: ConcreteTy,
-    error: ConcreteTy,
+    value: RuntimeTy,
+    error: RuntimeTy,
 }
 
 class ConcreteTyTuple {
-    items: ConcreteTy[],
+    items: RuntimeTy[],
 }
 
 type ConcreteTy = TyInt
@@ -502,7 +587,59 @@ type ConcreteTy = TyInt
     | TyNever
     | ConcreteTyTuple;
 
-// -- TyTemplate ------------------------------------------------------------
+// -- ConcreteRealizedTy (shallow over RealizedTy) --------------------------
+
+class ConcreteRealizedTyClass {
+    name: DeclName,
+    args: RealizedTy[],
+}
+
+class ConcreteRealizedTyList {
+    elem: RealizedTy,
+}
+
+class ConcreteRealizedTyMap {
+    key: RealizedTy,
+    value: RealizedTy,
+}
+
+class ConcreteRealizedTyFunction {
+    params: RealizedFunctionParamTy[],
+    ret: RealizedTy,
+    throws_: RealizedTy,
+}
+
+class ConcreteRealizedTyFuture {
+    value: RealizedTy,
+    error: RealizedTy,
+}
+
+class ConcreteRealizedTyTuple {
+    items: RealizedTy[],
+}
+
+type ConcreteRealizedTy = TyInt
+    | TyBigint
+    | TyFloat
+    | TyString
+    | TyBool
+    | TyNull
+    | TyUint8Array
+    | TyMedia
+    | ConcreteRealizedTyClass
+    | TyEnum
+    | ConcreteRealizedTyList
+    | ConcreteRealizedTyMap
+    | ConcreteRealizedTyFunction
+    | ConcreteRealizedTyFuture
+    | TyRustType
+    | TyType
+    | TyResource
+    | TyPromptAst
+    | TyNever
+    | ConcreteRealizedTyTuple;
+
+// -- TyTemplate (deep) -----------------------------------------------------
 
 class TyTemplateClass {
     name: DeclName,
@@ -512,7 +649,7 @@ class TyTemplateClass {
 class TyTemplateInterface {
     name: DeclName,
     args: TyTemplate[],
-    assoc: TyTemplate[],
+    associated_types: TyTemplateAssociatedType[],
 }
 
 class TyTemplateList {
@@ -529,7 +666,7 @@ class TyTemplateUnion {
 }
 
 class TyTemplateFunction {
-    params: TyTemplate[],
+    params: TyTemplateFunctionParamTy[],
     ret: TyTemplate,
     throws_: TyTemplate,
 }
@@ -539,14 +676,31 @@ class TyTemplateFuture {
     error: TyTemplate,
 }
 
-class TyTemplateProjection {
+class TyTemplateAssociatedTypeProjection {
     base: TyTemplate,
-    interface_args: TyTemplate[],
+    interface_: TyTemplateInterfaceConstraint,
     member: string,
 }
 
 class TyTemplateTuple {
     items: TyTemplate[],
+}
+
+class TyTemplateFunctionParamTy {
+    name: string?,
+    ty: TyTemplate,
+    mode: FunctionParamMode,
+}
+
+class TyTemplateInterfaceConstraint {
+    name: DeclName,
+    generics: TyTemplate[],
+    associated_types: TyTemplateAssociatedType[],
+}
+
+class TyTemplateAssociatedType {
+    name: string,
+    ty: TyTemplate,
 }
 
 type TyTemplate = TyInt
@@ -572,13 +726,13 @@ type TyTemplate = TyInt
     | TyResource
     | TyPromptAst
     | TyTypeAlias
-    | TyTemplateProjection
+    | TyTemplateAssociatedTypeProjection
     | TyUnknown
     | TyNever
     | TyTypeArgRef
     | TyTemplateTuple;
 
-// -- InferTy ---------------------------------------------------------------
+// -- InferTy (interned: children are pool handles) -------------------------
 
 class InferTyClass {
     name: DeclName,
@@ -588,7 +742,7 @@ class InferTyClass {
 class InferTyInterface {
     name: DeclName,
     args: int[],
-    assoc: int[],
+    associated_types: InferAssociatedType[],
 }
 
 class InferTyList {
@@ -605,7 +759,7 @@ class InferTyUnion {
 }
 
 class InferTyFunction {
-    params: int[],
+    params: InferFunctionParamTy[],
     ret: int,
     throws_: int,
 }
@@ -615,14 +769,31 @@ class InferTyFuture {
     error: int,
 }
 
-class InferTyProjection {
+class InferTyAssociatedTypeProjection {
     base: int,
-    interface_args: int[],
+    interface_: InferInterfaceConstraint,
     member: string,
 }
 
 class InferTyTuple {
     items: int[],
+}
+
+class InferFunctionParamTy {
+    name: string?,
+    ty: int,
+    mode: FunctionParamMode,
+}
+
+class InferInterfaceConstraint {
+    name: DeclName,
+    generics: int[],
+    associated_types: InferAssociatedType[],
+}
+
+class InferAssociatedType {
+    name: string,
+    ty: int,
 }
 
 type InferTy = TyInt
@@ -649,7 +820,7 @@ type InferTy = TyInt
     | TyPromptAst
     | TyTypeAlias
     | TyTypeVar
-    | InferTyProjection
+    | InferTyAssociatedTypeProjection
     | TyUnknown
     | TyNever
     | TyError
@@ -658,7 +829,7 @@ type InferTy = TyInt
 
 // == Widening and narrowing ================================================
 
-// Infallible: every Ty variant is a LoweringTy variant.
+// Infallible: every Ty is a LoweringTy.
 function widen_ty_to_lowering_ty(t: Ty) -> LoweringTy throws never {
     match (t) {
         let x: TyInt
@@ -691,7 +862,9 @@ function widen_ty_to_lowering_ty(t: Ty) -> LoweringTy throws never {
             LoweringTyInterface {
                 name: x.name,
                 args: x.args.map(widen_ty_to_lowering_ty),
-                assoc: x.assoc.map(widen_ty_to_lowering_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    LoweringAssociatedType { name: s0.name, ty: widen_ty_to_lowering_ty(s0.ty) }
+                }),
             }
         },
         let x: TyList => LoweringTyList { elem: widen_ty_to_lowering_ty(x.elem) },
@@ -704,7 +877,13 @@ function widen_ty_to_lowering_ty(t: Ty) -> LoweringTy throws never {
         let x: TyUnion => LoweringTyUnion { members: x.members.map(widen_ty_to_lowering_ty) },
         let x: TyFunction => {
             LoweringTyFunction {
-                params: x.params.map(widen_ty_to_lowering_ty),
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_ty_to_lowering_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_ty_to_lowering_ty(x.ret),
                 throws_: widen_ty_to_lowering_ty(x.throws_),
             }
@@ -715,10 +894,16 @@ function widen_ty_to_lowering_ty(t: Ty) -> LoweringTy throws never {
                 error: widen_ty_to_lowering_ty(x.error),
             }
         },
-        let x: TyProjection => {
-            LoweringTyProjection {
+        let x: TyAssociatedTypeProjection => {
+            LoweringTyAssociatedTypeProjection {
                 base: widen_ty_to_lowering_ty(x.base),
-                interface_args: x.interface_args.map(widen_ty_to_lowering_ty),
+                interface_: LoweringInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(widen_ty_to_lowering_ty),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        LoweringAssociatedType { name: s0.name, ty: widen_ty_to_lowering_ty(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -756,7 +941,9 @@ function narrow_ty_to_runtime_ty(t: Ty) -> RuntimeTy throws NarrowError {
             RuntimeTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_ty_to_runtime_ty),
-                assoc: x.assoc.map(narrow_ty_to_runtime_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RuntimeAssociatedType { name: s0.name, ty: narrow_ty_to_runtime_ty(s0.ty) }
+                }),
             }
         },
         let x: TyList => RuntimeTyList { elem: narrow_ty_to_runtime_ty(x.elem) },
@@ -769,7 +956,13 @@ function narrow_ty_to_runtime_ty(t: Ty) -> RuntimeTy throws NarrowError {
         let x: TyUnion => RuntimeTyUnion { members: x.members.map(narrow_ty_to_runtime_ty) },
         let x: TyFunction => {
             RuntimeTyFunction {
-                params: x.params.map(narrow_ty_to_runtime_ty),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_ty_to_runtime_ty(x.ret),
                 throws_: narrow_ty_to_runtime_ty(x.throws_),
             }
@@ -780,10 +973,16 @@ function narrow_ty_to_runtime_ty(t: Ty) -> RuntimeTy throws NarrowError {
                 error: narrow_ty_to_runtime_ty(x.error),
             }
         },
-        let x: TyProjection => {
-            RuntimeTyProjection {
+        let x: TyAssociatedTypeProjection => {
+            RuntimeTyAssociatedTypeProjection {
                 base: narrow_ty_to_runtime_ty(x.base),
-                interface_args: x.interface_args.map(narrow_ty_to_runtime_ty),
+                interface_: RuntimeInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(narrow_ty_to_runtime_ty),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        RuntimeAssociatedType { name: s0.name, ty: narrow_ty_to_runtime_ty(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -822,7 +1021,9 @@ function narrow_ty_to_codegen_ty(t: Ty) -> CodegenTy throws NarrowError {
             CodegenTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_ty_to_codegen_ty),
-                assoc: x.assoc.map(narrow_ty_to_codegen_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    CodegenAssociatedType { name: s0.name, ty: narrow_ty_to_codegen_ty(s0.ty) }
+                }),
             }
         },
         let x: TyList => CodegenTyList { elem: narrow_ty_to_codegen_ty(x.elem) },
@@ -835,7 +1036,13 @@ function narrow_ty_to_codegen_ty(t: Ty) -> CodegenTy throws NarrowError {
         let x: TyUnion => CodegenTyUnion { members: x.members.map(narrow_ty_to_codegen_ty) },
         let x: TyFunction => {
             CodegenTyFunction {
-                params: x.params.map(narrow_ty_to_codegen_ty),
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_to_codegen_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_ty_to_codegen_ty(x.ret),
                 throws_: narrow_ty_to_codegen_ty(x.throws_),
             }
@@ -847,7 +1054,9 @@ function narrow_ty_to_codegen_ty(t: Ty) -> CodegenTy throws NarrowError {
             }
         },
         let x: TyTuple => CodegenTyTuple { items: x.items.map(narrow_ty_to_codegen_ty) },
-        TyProjection => throw NarrowError { variant: "Projection", into: "CodegenTy" },
+        TyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "CodegenTy" }
+        },
         TyError => throw NarrowError { variant: "Error", into: "CodegenTy" },
     }
 }
@@ -883,7 +1092,9 @@ function narrow_ty_to_realized_ty(t: Ty) -> RealizedTy throws NarrowError {
             RealizedTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_ty_to_realized_ty),
-                assoc: x.assoc.map(narrow_ty_to_realized_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType { name: s0.name, ty: narrow_ty_to_realized_ty(s0.ty) }
+                }),
             }
         },
         let x: TyList => RealizedTyList { elem: narrow_ty_to_realized_ty(x.elem) },
@@ -896,7 +1107,13 @@ function narrow_ty_to_realized_ty(t: Ty) -> RealizedTy throws NarrowError {
         let x: TyUnion => RealizedTyUnion { members: x.members.map(narrow_ty_to_realized_ty) },
         let x: TyFunction => {
             RealizedTyFunction {
-                params: x.params.map(narrow_ty_to_realized_ty),
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_ty_to_realized_ty(x.ret),
                 throws_: narrow_ty_to_realized_ty(x.throws_),
             }
@@ -909,7 +1126,9 @@ function narrow_ty_to_realized_ty(t: Ty) -> RealizedTy throws NarrowError {
         },
         let x: TyTuple => RealizedTyTuple { items: x.items.map(narrow_ty_to_realized_ty) },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "RealizedTy" },
-        TyProjection => throw NarrowError { variant: "Projection", into: "RealizedTy" },
+        TyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "RealizedTy" }
+        },
         TyError => throw NarrowError { variant: "Error", into: "RealizedTy" },
     }
 }
@@ -935,38 +1154,110 @@ function narrow_ty_to_concrete_ty(t: Ty) -> ConcreteTy throws NarrowError {
             x
         },
         let x: TyClass => {
-            ConcreteTyClass { name: x.name, args: x.args.map(narrow_ty_to_concrete_ty) }
+            ConcreteTyClass { name: x.name, args: x.args.map(narrow_ty_to_runtime_ty) }
         },
-        let x: TyList => ConcreteTyList { elem: narrow_ty_to_concrete_ty(x.elem) },
+        let x: TyList => ConcreteTyList { elem: narrow_ty_to_runtime_ty(x.elem) },
         let x: TyMap => {
             ConcreteTyMap {
-                key: narrow_ty_to_concrete_ty(x.key),
-                value: narrow_ty_to_concrete_ty(x.value),
+                key: narrow_ty_to_runtime_ty(x.key),
+                value: narrow_ty_to_runtime_ty(x.value),
             }
         },
         let x: TyFunction => {
             ConcreteTyFunction {
-                params: x.params.map(narrow_ty_to_concrete_ty),
-                ret: narrow_ty_to_concrete_ty(x.ret),
-                throws_: narrow_ty_to_concrete_ty(x.throws_),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_ty_to_runtime_ty(x.ret),
+                throws_: narrow_ty_to_runtime_ty(x.throws_),
             }
         },
         let x: TyFuture => {
             ConcreteTyFuture {
-                value: narrow_ty_to_concrete_ty(x.value),
-                error: narrow_ty_to_concrete_ty(x.error),
+                value: narrow_ty_to_runtime_ty(x.value),
+                error: narrow_ty_to_runtime_ty(x.error),
             }
         },
-        let x: TyTuple => ConcreteTyTuple { items: x.items.map(narrow_ty_to_concrete_ty) },
+        let x: TyTuple => ConcreteTyTuple { items: x.items.map(narrow_ty_to_runtime_ty) },
         TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
         TyInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
         TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteTy" },
         TyUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
         TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteTy" },
-        TyProjection => throw NarrowError { variant: "Projection", into: "ConcreteTy" },
+        TyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteTy" }
+        },
         TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
         TyError => throw NarrowError { variant: "Error", into: "ConcreteTy" },
+    }
+}
+
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_ty_to_concrete_realized_ty(t: Ty) -> ConcreteRealizedTy throws NarrowError {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: TyClass => {
+            ConcreteRealizedTyClass { name: x.name, args: x.args.map(narrow_ty_to_realized_ty) }
+        },
+        let x: TyList => ConcreteRealizedTyList { elem: narrow_ty_to_realized_ty(x.elem) },
+        let x: TyMap => {
+            ConcreteRealizedTyMap {
+                key: narrow_ty_to_realized_ty(x.key),
+                value: narrow_ty_to_realized_ty(x.value),
+            }
+        },
+        let x: TyFunction => {
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_ty_to_realized_ty(x.ret),
+                throws_: narrow_ty_to_realized_ty(x.throws_),
+            }
+        },
+        let x: TyFuture => {
+            ConcreteRealizedTyFuture {
+                value: narrow_ty_to_realized_ty(x.value),
+                error: narrow_ty_to_realized_ty(x.error),
+            }
+        },
+        let x: TyTuple => ConcreteRealizedTyTuple { items: x.items.map(narrow_ty_to_realized_ty) },
+        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteRealizedTy" },
+        TyInterface => throw NarrowError { variant: "Interface", into: "ConcreteRealizedTy" },
+        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteRealizedTy" },
+        TyUnion => throw NarrowError { variant: "Union", into: "ConcreteRealizedTy" },
+        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteRealizedTy" },
+        TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteRealizedTy" },
+        TyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteRealizedTy" }
+        },
+        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteRealizedTy" },
+        TyError => throw NarrowError { variant: "Error", into: "ConcreteRealizedTy" },
     }
 }
 
@@ -1003,7 +1294,9 @@ function narrow_lowering_ty_to_ty(t: LoweringTy) -> Ty throws NarrowError {
             TyInterface {
                 name: x.name,
                 args: x.args.map(narrow_lowering_ty_to_ty),
-                assoc: x.assoc.map(narrow_lowering_ty_to_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    AssociatedType { name: s0.name, ty: narrow_lowering_ty_to_ty(s0.ty) }
+                }),
             }
         },
         let x: LoweringTyList => TyList { elem: narrow_lowering_ty_to_ty(x.elem) },
@@ -1013,7 +1306,13 @@ function narrow_lowering_ty_to_ty(t: LoweringTy) -> Ty throws NarrowError {
         let x: LoweringTyUnion => TyUnion { members: x.members.map(narrow_lowering_ty_to_ty) },
         let x: LoweringTyFunction => {
             TyFunction {
-                params: x.params.map(narrow_lowering_ty_to_ty),
+                params: x.params.map((s0) -> {
+                    FunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_lowering_ty_to_ty(x.ret),
                 throws_: narrow_lowering_ty_to_ty(x.throws_),
             }
@@ -1024,10 +1323,16 @@ function narrow_lowering_ty_to_ty(t: LoweringTy) -> Ty throws NarrowError {
                 error: narrow_lowering_ty_to_ty(x.error),
             }
         },
-        let x: LoweringTyProjection => {
-            TyProjection {
+        let x: LoweringTyAssociatedTypeProjection => {
+            TyAssociatedTypeProjection {
                 base: narrow_lowering_ty_to_ty(x.base),
-                interface_args: x.interface_args.map(narrow_lowering_ty_to_ty),
+                interface_: InterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(narrow_lowering_ty_to_ty),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        AssociatedType { name: s0.name, ty: narrow_lowering_ty_to_ty(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -1068,7 +1373,12 @@ function narrow_lowering_ty_to_runtime_ty(t: LoweringTy) -> RuntimeTy throws Nar
             RuntimeTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_lowering_ty_to_runtime_ty),
-                assoc: x.assoc.map(narrow_lowering_ty_to_runtime_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RuntimeAssociatedType {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_runtime_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: LoweringTyList => RuntimeTyList { elem: narrow_lowering_ty_to_runtime_ty(x.elem) },
@@ -1083,7 +1393,13 @@ function narrow_lowering_ty_to_runtime_ty(t: LoweringTy) -> RuntimeTy throws Nar
         },
         let x: LoweringTyFunction => {
             RuntimeTyFunction {
-                params: x.params.map(narrow_lowering_ty_to_runtime_ty),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_lowering_ty_to_runtime_ty(x.ret),
                 throws_: narrow_lowering_ty_to_runtime_ty(x.throws_),
             }
@@ -1094,10 +1410,19 @@ function narrow_lowering_ty_to_runtime_ty(t: LoweringTy) -> RuntimeTy throws Nar
                 error: narrow_lowering_ty_to_runtime_ty(x.error),
             }
         },
-        let x: LoweringTyProjection => {
-            RuntimeTyProjection {
+        let x: LoweringTyAssociatedTypeProjection => {
+            RuntimeTyAssociatedTypeProjection {
                 base: narrow_lowering_ty_to_runtime_ty(x.base),
-                interface_args: x.interface_args.map(narrow_lowering_ty_to_runtime_ty),
+                interface_: RuntimeInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(narrow_lowering_ty_to_runtime_ty),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        RuntimeAssociatedType {
+                            name: s0.name,
+                            ty: narrow_lowering_ty_to_runtime_ty(s0.ty),
+                        }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -1141,7 +1466,12 @@ function narrow_lowering_ty_to_codegen_ty(t: LoweringTy) -> CodegenTy throws Nar
             CodegenTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_lowering_ty_to_codegen_ty),
-                assoc: x.assoc.map(narrow_lowering_ty_to_codegen_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    CodegenAssociatedType {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_codegen_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: LoweringTyList => CodegenTyList { elem: narrow_lowering_ty_to_codegen_ty(x.elem) },
@@ -1156,7 +1486,13 @@ function narrow_lowering_ty_to_codegen_ty(t: LoweringTy) -> CodegenTy throws Nar
         },
         let x: LoweringTyFunction => {
             CodegenTyFunction {
-                params: x.params.map(narrow_lowering_ty_to_codegen_ty),
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_codegen_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_lowering_ty_to_codegen_ty(x.ret),
                 throws_: narrow_lowering_ty_to_codegen_ty(x.throws_),
             }
@@ -1170,7 +1506,9 @@ function narrow_lowering_ty_to_codegen_ty(t: LoweringTy) -> CodegenTy throws Nar
         let x: LoweringTyTuple => {
             CodegenTyTuple { items: x.items.map(narrow_lowering_ty_to_codegen_ty) }
         },
-        LoweringTyProjection => throw NarrowError { variant: "Projection", into: "CodegenTy" },
+        LoweringTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "CodegenTy" }
+        },
         TyError => throw NarrowError { variant: "Error", into: "CodegenTy" },
         TyInfer => throw NarrowError { variant: "Infer", into: "CodegenTy" },
     }
@@ -1207,7 +1545,12 @@ function narrow_lowering_ty_to_realized_ty(t: LoweringTy) -> RealizedTy throws N
             RealizedTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_lowering_ty_to_realized_ty),
-                assoc: x.assoc.map(narrow_lowering_ty_to_realized_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_realized_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: LoweringTyList => RealizedTyList { elem: narrow_lowering_ty_to_realized_ty(x.elem) },
@@ -1222,7 +1565,13 @@ function narrow_lowering_ty_to_realized_ty(t: LoweringTy) -> RealizedTy throws N
         },
         let x: LoweringTyFunction => {
             RealizedTyFunction {
-                params: x.params.map(narrow_lowering_ty_to_realized_ty),
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_lowering_ty_to_realized_ty(x.ret),
                 throws_: narrow_lowering_ty_to_realized_ty(x.throws_),
             }
@@ -1237,7 +1586,9 @@ function narrow_lowering_ty_to_realized_ty(t: LoweringTy) -> RealizedTy throws N
             RealizedTyTuple { items: x.items.map(narrow_lowering_ty_to_realized_ty) }
         },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "RealizedTy" },
-        LoweringTyProjection => throw NarrowError { variant: "Projection", into: "RealizedTy" },
+        LoweringTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "RealizedTy" }
+        },
         TyError => throw NarrowError { variant: "Error", into: "RealizedTy" },
         TyInfer => throw NarrowError { variant: "Infer", into: "RealizedTy" },
     }
@@ -1264,30 +1615,36 @@ function narrow_lowering_ty_to_concrete_ty(t: LoweringTy) -> ConcreteTy throws N
             x
         },
         let x: LoweringTyClass => {
-            ConcreteTyClass { name: x.name, args: x.args.map(narrow_lowering_ty_to_concrete_ty) }
+            ConcreteTyClass { name: x.name, args: x.args.map(narrow_lowering_ty_to_runtime_ty) }
         },
-        let x: LoweringTyList => ConcreteTyList { elem: narrow_lowering_ty_to_concrete_ty(x.elem) },
+        let x: LoweringTyList => ConcreteTyList { elem: narrow_lowering_ty_to_runtime_ty(x.elem) },
         let x: LoweringTyMap => {
             ConcreteTyMap {
-                key: narrow_lowering_ty_to_concrete_ty(x.key),
-                value: narrow_lowering_ty_to_concrete_ty(x.value),
+                key: narrow_lowering_ty_to_runtime_ty(x.key),
+                value: narrow_lowering_ty_to_runtime_ty(x.value),
             }
         },
         let x: LoweringTyFunction => {
             ConcreteTyFunction {
-                params: x.params.map(narrow_lowering_ty_to_concrete_ty),
-                ret: narrow_lowering_ty_to_concrete_ty(x.ret),
-                throws_: narrow_lowering_ty_to_concrete_ty(x.throws_),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_lowering_ty_to_runtime_ty(x.ret),
+                throws_: narrow_lowering_ty_to_runtime_ty(x.throws_),
             }
         },
         let x: LoweringTyFuture => {
             ConcreteTyFuture {
-                value: narrow_lowering_ty_to_concrete_ty(x.value),
-                error: narrow_lowering_ty_to_concrete_ty(x.error),
+                value: narrow_lowering_ty_to_runtime_ty(x.value),
+                error: narrow_lowering_ty_to_runtime_ty(x.error),
             }
         },
         let x: LoweringTyTuple => {
-            ConcreteTyTuple { items: x.items.map(narrow_lowering_ty_to_concrete_ty) }
+            ConcreteTyTuple { items: x.items.map(narrow_lowering_ty_to_runtime_ty) }
         },
         TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
         LoweringTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
@@ -1295,14 +1652,92 @@ function narrow_lowering_ty_to_concrete_ty(t: LoweringTy) -> ConcreteTy throws N
         LoweringTyUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
         TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteTy" },
-        LoweringTyProjection => throw NarrowError { variant: "Projection", into: "ConcreteTy" },
+        LoweringTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteTy" }
+        },
         TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
         TyError => throw NarrowError { variant: "Error", into: "ConcreteTy" },
         TyInfer => throw NarrowError { variant: "Infer", into: "ConcreteTy" },
     }
 }
 
-// Infallible: every RuntimeTy variant is a Ty variant.
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_lowering_ty_to_concrete_realized_ty(
+    t: LoweringTy,
+) -> ConcreteRealizedTy throws NarrowError {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: LoweringTyClass => {
+            ConcreteRealizedTyClass {
+                name: x.name,
+                args: x.args.map(narrow_lowering_ty_to_realized_ty),
+            }
+        },
+        let x: LoweringTyList => {
+            ConcreteRealizedTyList { elem: narrow_lowering_ty_to_realized_ty(x.elem) }
+        },
+        let x: LoweringTyMap => {
+            ConcreteRealizedTyMap {
+                key: narrow_lowering_ty_to_realized_ty(x.key),
+                value: narrow_lowering_ty_to_realized_ty(x.value),
+            }
+        },
+        let x: LoweringTyFunction => {
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_lowering_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_lowering_ty_to_realized_ty(x.ret),
+                throws_: narrow_lowering_ty_to_realized_ty(x.throws_),
+            }
+        },
+        let x: LoweringTyFuture => {
+            ConcreteRealizedTyFuture {
+                value: narrow_lowering_ty_to_realized_ty(x.value),
+                error: narrow_lowering_ty_to_realized_ty(x.error),
+            }
+        },
+        let x: LoweringTyTuple => {
+            ConcreteRealizedTyTuple { items: x.items.map(narrow_lowering_ty_to_realized_ty) }
+        },
+        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteRealizedTy" },
+        LoweringTyInterface => {
+            throw NarrowError { variant: "Interface", into: "ConcreteRealizedTy" }
+        },
+        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteRealizedTy" },
+        LoweringTyUnion => throw NarrowError { variant: "Union", into: "ConcreteRealizedTy" },
+        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteRealizedTy" },
+        TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteRealizedTy" },
+        LoweringTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteRealizedTy" }
+        },
+        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteRealizedTy" },
+        TyError => throw NarrowError { variant: "Error", into: "ConcreteRealizedTy" },
+        TyInfer => throw NarrowError { variant: "Infer", into: "ConcreteRealizedTy" },
+    }
+}
+
+// Infallible: every RuntimeTy is a Ty.
 function widen_runtime_ty_to_ty(t: RuntimeTy) -> Ty throws never {
     match (t) {
         let x: TyInt
@@ -1332,7 +1767,9 @@ function widen_runtime_ty_to_ty(t: RuntimeTy) -> Ty throws never {
             TyInterface {
                 name: x.name,
                 args: x.args.map(widen_runtime_ty_to_ty),
-                assoc: x.assoc.map(widen_runtime_ty_to_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    AssociatedType { name: s0.name, ty: widen_runtime_ty_to_ty(s0.ty) }
+                }),
             }
         },
         let x: RuntimeTyList => TyList { elem: widen_runtime_ty_to_ty(x.elem) },
@@ -1342,7 +1779,13 @@ function widen_runtime_ty_to_ty(t: RuntimeTy) -> Ty throws never {
         let x: RuntimeTyUnion => TyUnion { members: x.members.map(widen_runtime_ty_to_ty) },
         let x: RuntimeTyFunction => {
             TyFunction {
-                params: x.params.map(widen_runtime_ty_to_ty),
+                params: x.params.map((s0) -> {
+                    FunctionParamTy {
+                        name: s0.name,
+                        ty: widen_runtime_ty_to_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_runtime_ty_to_ty(x.ret),
                 throws_: widen_runtime_ty_to_ty(x.throws_),
             }
@@ -1353,10 +1796,16 @@ function widen_runtime_ty_to_ty(t: RuntimeTy) -> Ty throws never {
                 error: widen_runtime_ty_to_ty(x.error),
             }
         },
-        let x: RuntimeTyProjection => {
-            TyProjection {
+        let x: RuntimeTyAssociatedTypeProjection => {
+            TyAssociatedTypeProjection {
                 base: widen_runtime_ty_to_ty(x.base),
-                interface_args: x.interface_args.map(widen_runtime_ty_to_ty),
+                interface_: InterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(widen_runtime_ty_to_ty),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        AssociatedType { name: s0.name, ty: widen_runtime_ty_to_ty(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -1364,7 +1813,7 @@ function widen_runtime_ty_to_ty(t: RuntimeTy) -> Ty throws never {
     }
 }
 
-// Infallible: every RuntimeTy variant is a LoweringTy variant.
+// Infallible: every RuntimeTy is a LoweringTy.
 function widen_runtime_ty_to_lowering_ty(t: RuntimeTy) -> LoweringTy throws never {
     match (t) {
         let x: TyInt
@@ -1396,7 +1845,12 @@ function widen_runtime_ty_to_lowering_ty(t: RuntimeTy) -> LoweringTy throws neve
             LoweringTyInterface {
                 name: x.name,
                 args: x.args.map(widen_runtime_ty_to_lowering_ty),
-                assoc: x.assoc.map(widen_runtime_ty_to_lowering_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    LoweringAssociatedType {
+                        name: s0.name,
+                        ty: widen_runtime_ty_to_lowering_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: RuntimeTyList => LoweringTyList { elem: widen_runtime_ty_to_lowering_ty(x.elem) },
@@ -1411,7 +1865,13 @@ function widen_runtime_ty_to_lowering_ty(t: RuntimeTy) -> LoweringTy throws neve
         },
         let x: RuntimeTyFunction => {
             LoweringTyFunction {
-                params: x.params.map(widen_runtime_ty_to_lowering_ty),
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_runtime_ty_to_lowering_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_runtime_ty_to_lowering_ty(x.ret),
                 throws_: widen_runtime_ty_to_lowering_ty(x.throws_),
             }
@@ -1422,10 +1882,19 @@ function widen_runtime_ty_to_lowering_ty(t: RuntimeTy) -> LoweringTy throws neve
                 error: widen_runtime_ty_to_lowering_ty(x.error),
             }
         },
-        let x: RuntimeTyProjection => {
-            LoweringTyProjection {
+        let x: RuntimeTyAssociatedTypeProjection => {
+            LoweringTyAssociatedTypeProjection {
                 base: widen_runtime_ty_to_lowering_ty(x.base),
-                interface_args: x.interface_args.map(widen_runtime_ty_to_lowering_ty),
+                interface_: LoweringInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(widen_runtime_ty_to_lowering_ty),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        LoweringAssociatedType {
+                            name: s0.name,
+                            ty: widen_runtime_ty_to_lowering_ty(s0.ty),
+                        }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -1467,7 +1936,12 @@ function narrow_runtime_ty_to_codegen_ty(t: RuntimeTy) -> CodegenTy throws Narro
             CodegenTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_runtime_ty_to_codegen_ty),
-                assoc: x.assoc.map(narrow_runtime_ty_to_codegen_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    CodegenAssociatedType {
+                        name: s0.name,
+                        ty: narrow_runtime_ty_to_codegen_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: RuntimeTyList => CodegenTyList { elem: narrow_runtime_ty_to_codegen_ty(x.elem) },
@@ -1482,7 +1956,13 @@ function narrow_runtime_ty_to_codegen_ty(t: RuntimeTy) -> CodegenTy throws Narro
         },
         let x: RuntimeTyFunction => {
             CodegenTyFunction {
-                params: x.params.map(narrow_runtime_ty_to_codegen_ty),
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_runtime_ty_to_codegen_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_runtime_ty_to_codegen_ty(x.ret),
                 throws_: narrow_runtime_ty_to_codegen_ty(x.throws_),
             }
@@ -1496,7 +1976,9 @@ function narrow_runtime_ty_to_codegen_ty(t: RuntimeTy) -> CodegenTy throws Narro
         let x: RuntimeTyTuple => {
             CodegenTyTuple { items: x.items.map(narrow_runtime_ty_to_codegen_ty) }
         },
-        RuntimeTyProjection => throw NarrowError { variant: "Projection", into: "CodegenTy" },
+        RuntimeTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "CodegenTy" }
+        },
     }
 }
 
@@ -1531,7 +2013,12 @@ function narrow_runtime_ty_to_realized_ty(t: RuntimeTy) -> RealizedTy throws Nar
             RealizedTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_runtime_ty_to_realized_ty),
-                assoc: x.assoc.map(narrow_runtime_ty_to_realized_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType {
+                        name: s0.name,
+                        ty: narrow_runtime_ty_to_realized_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: RuntimeTyList => RealizedTyList { elem: narrow_runtime_ty_to_realized_ty(x.elem) },
@@ -1546,7 +2033,13 @@ function narrow_runtime_ty_to_realized_ty(t: RuntimeTy) -> RealizedTy throws Nar
         },
         let x: RuntimeTyFunction => {
             RealizedTyFunction {
-                params: x.params.map(narrow_runtime_ty_to_realized_ty),
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_runtime_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_runtime_ty_to_realized_ty(x.ret),
                 throws_: narrow_runtime_ty_to_realized_ty(x.throws_),
             }
@@ -1561,7 +2054,9 @@ function narrow_runtime_ty_to_realized_ty(t: RuntimeTy) -> RealizedTy throws Nar
             RealizedTyTuple { items: x.items.map(narrow_runtime_ty_to_realized_ty) }
         },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "RealizedTy" },
-        RuntimeTyProjection => throw NarrowError { variant: "Projection", into: "RealizedTy" },
+        RuntimeTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "RealizedTy" }
+        },
     }
 }
 
@@ -1585,44 +2080,100 @@ function narrow_runtime_ty_to_concrete_ty(t: RuntimeTy) -> ConcreteTy throws Nar
         {
             x
         },
-        let x: RuntimeTyClass => {
-            ConcreteTyClass { name: x.name, args: x.args.map(narrow_runtime_ty_to_concrete_ty) }
-        },
-        let x: RuntimeTyList => ConcreteTyList { elem: narrow_runtime_ty_to_concrete_ty(x.elem) },
-        let x: RuntimeTyMap => {
-            ConcreteTyMap {
-                key: narrow_runtime_ty_to_concrete_ty(x.key),
-                value: narrow_runtime_ty_to_concrete_ty(x.value),
-            }
-        },
+        let x: RuntimeTyClass => ConcreteTyClass { name: x.name, args: x.args },
+        let x: RuntimeTyList => ConcreteTyList { elem: x.elem },
+        let x: RuntimeTyMap => ConcreteTyMap { key: x.key, value: x.value },
         let x: RuntimeTyFunction => {
-            ConcreteTyFunction {
-                params: x.params.map(narrow_runtime_ty_to_concrete_ty),
-                ret: narrow_runtime_ty_to_concrete_ty(x.ret),
-                throws_: narrow_runtime_ty_to_concrete_ty(x.throws_),
-            }
+            ConcreteTyFunction { params: x.params, ret: x.ret, throws_: x.throws_ }
         },
-        let x: RuntimeTyFuture => {
-            ConcreteTyFuture {
-                value: narrow_runtime_ty_to_concrete_ty(x.value),
-                error: narrow_runtime_ty_to_concrete_ty(x.error),
-            }
-        },
-        let x: RuntimeTyTuple => {
-            ConcreteTyTuple { items: x.items.map(narrow_runtime_ty_to_concrete_ty) }
-        },
+        let x: RuntimeTyFuture => ConcreteTyFuture { value: x.value, error: x.error },
+        let x: RuntimeTyTuple => ConcreteTyTuple { items: x.items },
         TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
         RuntimeTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
         TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteTy" },
         RuntimeTyUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
         TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteTy" },
-        RuntimeTyProjection => throw NarrowError { variant: "Projection", into: "ConcreteTy" },
+        RuntimeTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteTy" }
+        },
         TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
     }
 }
 
-// Infallible: every CodegenTy variant is a Ty variant.
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_runtime_ty_to_concrete_realized_ty(
+    t: RuntimeTy,
+) -> ConcreteRealizedTy throws NarrowError {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: RuntimeTyClass => {
+            ConcreteRealizedTyClass {
+                name: x.name,
+                args: x.args.map(narrow_runtime_ty_to_realized_ty),
+            }
+        },
+        let x: RuntimeTyList => {
+            ConcreteRealizedTyList { elem: narrow_runtime_ty_to_realized_ty(x.elem) }
+        },
+        let x: RuntimeTyMap => {
+            ConcreteRealizedTyMap {
+                key: narrow_runtime_ty_to_realized_ty(x.key),
+                value: narrow_runtime_ty_to_realized_ty(x.value),
+            }
+        },
+        let x: RuntimeTyFunction => {
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_runtime_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_runtime_ty_to_realized_ty(x.ret),
+                throws_: narrow_runtime_ty_to_realized_ty(x.throws_),
+            }
+        },
+        let x: RuntimeTyFuture => {
+            ConcreteRealizedTyFuture {
+                value: narrow_runtime_ty_to_realized_ty(x.value),
+                error: narrow_runtime_ty_to_realized_ty(x.error),
+            }
+        },
+        let x: RuntimeTyTuple => {
+            ConcreteRealizedTyTuple { items: x.items.map(narrow_runtime_ty_to_realized_ty) }
+        },
+        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteRealizedTy" },
+        RuntimeTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteRealizedTy" },
+        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteRealizedTy" },
+        RuntimeTyUnion => throw NarrowError { variant: "Union", into: "ConcreteRealizedTy" },
+        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteRealizedTy" },
+        TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteRealizedTy" },
+        RuntimeTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteRealizedTy" }
+        },
+        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteRealizedTy" },
+    }
+}
+
+// Infallible: every CodegenTy is a Ty.
 function widen_codegen_ty_to_ty(t: CodegenTy) -> Ty throws never {
     match (t) {
         let x: TyInt
@@ -1652,7 +2203,9 @@ function widen_codegen_ty_to_ty(t: CodegenTy) -> Ty throws never {
             TyInterface {
                 name: x.name,
                 args: x.args.map(widen_codegen_ty_to_ty),
-                assoc: x.assoc.map(widen_codegen_ty_to_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    AssociatedType { name: s0.name, ty: widen_codegen_ty_to_ty(s0.ty) }
+                }),
             }
         },
         let x: CodegenTyList => TyList { elem: widen_codegen_ty_to_ty(x.elem) },
@@ -1662,7 +2215,13 @@ function widen_codegen_ty_to_ty(t: CodegenTy) -> Ty throws never {
         let x: CodegenTyUnion => TyUnion { members: x.members.map(widen_codegen_ty_to_ty) },
         let x: CodegenTyFunction => {
             TyFunction {
-                params: x.params.map(widen_codegen_ty_to_ty),
+                params: x.params.map((s0) -> {
+                    FunctionParamTy {
+                        name: s0.name,
+                        ty: widen_codegen_ty_to_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_codegen_ty_to_ty(x.ret),
                 throws_: widen_codegen_ty_to_ty(x.throws_),
             }
@@ -1677,7 +2236,7 @@ function widen_codegen_ty_to_ty(t: CodegenTy) -> Ty throws never {
     }
 }
 
-// Infallible: every CodegenTy variant is a LoweringTy variant.
+// Infallible: every CodegenTy is a LoweringTy.
 function widen_codegen_ty_to_lowering_ty(t: CodegenTy) -> LoweringTy throws never {
     match (t) {
         let x: TyInt
@@ -1709,7 +2268,12 @@ function widen_codegen_ty_to_lowering_ty(t: CodegenTy) -> LoweringTy throws neve
             LoweringTyInterface {
                 name: x.name,
                 args: x.args.map(widen_codegen_ty_to_lowering_ty),
-                assoc: x.assoc.map(widen_codegen_ty_to_lowering_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    LoweringAssociatedType {
+                        name: s0.name,
+                        ty: widen_codegen_ty_to_lowering_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: CodegenTyList => LoweringTyList { elem: widen_codegen_ty_to_lowering_ty(x.elem) },
@@ -1724,7 +2288,13 @@ function widen_codegen_ty_to_lowering_ty(t: CodegenTy) -> LoweringTy throws neve
         },
         let x: CodegenTyFunction => {
             LoweringTyFunction {
-                params: x.params.map(widen_codegen_ty_to_lowering_ty),
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_codegen_ty_to_lowering_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_codegen_ty_to_lowering_ty(x.ret),
                 throws_: widen_codegen_ty_to_lowering_ty(x.throws_),
             }
@@ -1741,7 +2311,7 @@ function widen_codegen_ty_to_lowering_ty(t: CodegenTy) -> LoweringTy throws neve
     }
 }
 
-// Infallible: every CodegenTy variant is a RuntimeTy variant.
+// Infallible: every CodegenTy is a RuntimeTy.
 function widen_codegen_ty_to_runtime_ty(t: CodegenTy) -> RuntimeTy throws never {
     match (t) {
         let x: TyInt
@@ -1773,7 +2343,12 @@ function widen_codegen_ty_to_runtime_ty(t: CodegenTy) -> RuntimeTy throws never 
             RuntimeTyInterface {
                 name: x.name,
                 args: x.args.map(widen_codegen_ty_to_runtime_ty),
-                assoc: x.assoc.map(widen_codegen_ty_to_runtime_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RuntimeAssociatedType {
+                        name: s0.name,
+                        ty: widen_codegen_ty_to_runtime_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: CodegenTyList => RuntimeTyList { elem: widen_codegen_ty_to_runtime_ty(x.elem) },
@@ -1788,7 +2363,13 @@ function widen_codegen_ty_to_runtime_ty(t: CodegenTy) -> RuntimeTy throws never 
         },
         let x: CodegenTyFunction => {
             RuntimeTyFunction {
-                params: x.params.map(widen_codegen_ty_to_runtime_ty),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_codegen_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_codegen_ty_to_runtime_ty(x.ret),
                 throws_: widen_codegen_ty_to_runtime_ty(x.throws_),
             }
@@ -1836,7 +2417,12 @@ function narrow_codegen_ty_to_realized_ty(t: CodegenTy) -> RealizedTy throws Nar
             RealizedTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_codegen_ty_to_realized_ty),
-                assoc: x.assoc.map(narrow_codegen_ty_to_realized_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType {
+                        name: s0.name,
+                        ty: narrow_codegen_ty_to_realized_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: CodegenTyList => RealizedTyList { elem: narrow_codegen_ty_to_realized_ty(x.elem) },
@@ -1851,7 +2437,13 @@ function narrow_codegen_ty_to_realized_ty(t: CodegenTy) -> RealizedTy throws Nar
         },
         let x: CodegenTyFunction => {
             RealizedTyFunction {
-                params: x.params.map(narrow_codegen_ty_to_realized_ty),
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_codegen_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_codegen_ty_to_realized_ty(x.ret),
                 throws_: narrow_codegen_ty_to_realized_ty(x.throws_),
             }
@@ -1869,8 +2461,10 @@ function narrow_codegen_ty_to_realized_ty(t: CodegenTy) -> RealizedTy throws Nar
     }
 }
 
-// Fails if any variant, at any depth, is outside ConcreteTy.
-function narrow_codegen_ty_to_concrete_ty(t: CodegenTy) -> ConcreteTy throws NarrowError {
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_codegen_ty_to_concrete_realized_ty(
+    t: CodegenTy,
+) -> ConcreteRealizedTy throws NarrowError {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -1890,42 +2484,53 @@ function narrow_codegen_ty_to_concrete_ty(t: CodegenTy) -> ConcreteTy throws Nar
             x
         },
         let x: CodegenTyClass => {
-            ConcreteTyClass { name: x.name, args: x.args.map(narrow_codegen_ty_to_concrete_ty) }
+            ConcreteRealizedTyClass {
+                name: x.name,
+                args: x.args.map(narrow_codegen_ty_to_realized_ty),
+            }
         },
-        let x: CodegenTyList => ConcreteTyList { elem: narrow_codegen_ty_to_concrete_ty(x.elem) },
+        let x: CodegenTyList => {
+            ConcreteRealizedTyList { elem: narrow_codegen_ty_to_realized_ty(x.elem) }
+        },
         let x: CodegenTyMap => {
-            ConcreteTyMap {
-                key: narrow_codegen_ty_to_concrete_ty(x.key),
-                value: narrow_codegen_ty_to_concrete_ty(x.value),
+            ConcreteRealizedTyMap {
+                key: narrow_codegen_ty_to_realized_ty(x.key),
+                value: narrow_codegen_ty_to_realized_ty(x.value),
             }
         },
         let x: CodegenTyFunction => {
-            ConcreteTyFunction {
-                params: x.params.map(narrow_codegen_ty_to_concrete_ty),
-                ret: narrow_codegen_ty_to_concrete_ty(x.ret),
-                throws_: narrow_codegen_ty_to_concrete_ty(x.throws_),
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_codegen_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_codegen_ty_to_realized_ty(x.ret),
+                throws_: narrow_codegen_ty_to_realized_ty(x.throws_),
             }
         },
         let x: CodegenTyFuture => {
-            ConcreteTyFuture {
-                value: narrow_codegen_ty_to_concrete_ty(x.value),
-                error: narrow_codegen_ty_to_concrete_ty(x.error),
+            ConcreteRealizedTyFuture {
+                value: narrow_codegen_ty_to_realized_ty(x.value),
+                error: narrow_codegen_ty_to_realized_ty(x.error),
             }
         },
         let x: CodegenTyTuple => {
-            ConcreteTyTuple { items: x.items.map(narrow_codegen_ty_to_concrete_ty) }
+            ConcreteRealizedTyTuple { items: x.items.map(narrow_codegen_ty_to_realized_ty) }
         },
-        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
-        CodegenTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
-        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteTy" },
-        CodegenTyUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
-        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
-        TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteTy" },
-        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
+        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteRealizedTy" },
+        CodegenTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteRealizedTy" },
+        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteRealizedTy" },
+        CodegenTyUnion => throw NarrowError { variant: "Union", into: "ConcreteRealizedTy" },
+        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteRealizedTy" },
+        TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteRealizedTy" },
+        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteRealizedTy" },
     }
 }
 
-// Infallible: every RealizedTy variant is a Ty variant.
+// Infallible: every RealizedTy is a Ty.
 function widen_realized_ty_to_ty(t: RealizedTy) -> Ty throws never {
     match (t) {
         let x: TyInt
@@ -1956,7 +2561,9 @@ function widen_realized_ty_to_ty(t: RealizedTy) -> Ty throws never {
             TyInterface {
                 name: x.name,
                 args: x.args.map(widen_realized_ty_to_ty),
-                assoc: x.assoc.map(widen_realized_ty_to_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    AssociatedType { name: s0.name, ty: widen_realized_ty_to_ty(s0.ty) }
+                }),
             }
         },
         let x: RealizedTyList => TyList { elem: widen_realized_ty_to_ty(x.elem) },
@@ -1966,7 +2573,13 @@ function widen_realized_ty_to_ty(t: RealizedTy) -> Ty throws never {
         let x: RealizedTyUnion => TyUnion { members: x.members.map(widen_realized_ty_to_ty) },
         let x: RealizedTyFunction => {
             TyFunction {
-                params: x.params.map(widen_realized_ty_to_ty),
+                params: x.params.map((s0) -> {
+                    FunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_realized_ty_to_ty(x.ret),
                 throws_: widen_realized_ty_to_ty(x.throws_),
             }
@@ -1981,7 +2594,7 @@ function widen_realized_ty_to_ty(t: RealizedTy) -> Ty throws never {
     }
 }
 
-// Infallible: every RealizedTy variant is a LoweringTy variant.
+// Infallible: every RealizedTy is a LoweringTy.
 function widen_realized_ty_to_lowering_ty(t: RealizedTy) -> LoweringTy throws never {
     match (t) {
         let x: TyInt
@@ -2012,7 +2625,12 @@ function widen_realized_ty_to_lowering_ty(t: RealizedTy) -> LoweringTy throws ne
             LoweringTyInterface {
                 name: x.name,
                 args: x.args.map(widen_realized_ty_to_lowering_ty),
-                assoc: x.assoc.map(widen_realized_ty_to_lowering_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    LoweringAssociatedType {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_lowering_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: RealizedTyList => LoweringTyList { elem: widen_realized_ty_to_lowering_ty(x.elem) },
@@ -2027,7 +2645,13 @@ function widen_realized_ty_to_lowering_ty(t: RealizedTy) -> LoweringTy throws ne
         },
         let x: RealizedTyFunction => {
             LoweringTyFunction {
-                params: x.params.map(widen_realized_ty_to_lowering_ty),
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_lowering_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_realized_ty_to_lowering_ty(x.ret),
                 throws_: widen_realized_ty_to_lowering_ty(x.throws_),
             }
@@ -2044,7 +2668,7 @@ function widen_realized_ty_to_lowering_ty(t: RealizedTy) -> LoweringTy throws ne
     }
 }
 
-// Infallible: every RealizedTy variant is a RuntimeTy variant.
+// Infallible: every RealizedTy is a RuntimeTy.
 function widen_realized_ty_to_runtime_ty(t: RealizedTy) -> RuntimeTy throws never {
     match (t) {
         let x: TyInt
@@ -2075,7 +2699,12 @@ function widen_realized_ty_to_runtime_ty(t: RealizedTy) -> RuntimeTy throws neve
             RuntimeTyInterface {
                 name: x.name,
                 args: x.args.map(widen_realized_ty_to_runtime_ty),
-                assoc: x.assoc.map(widen_realized_ty_to_runtime_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RuntimeAssociatedType {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_runtime_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: RealizedTyList => RuntimeTyList { elem: widen_realized_ty_to_runtime_ty(x.elem) },
@@ -2090,7 +2719,13 @@ function widen_realized_ty_to_runtime_ty(t: RealizedTy) -> RuntimeTy throws neve
         },
         let x: RealizedTyFunction => {
             RuntimeTyFunction {
-                params: x.params.map(widen_realized_ty_to_runtime_ty),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_realized_ty_to_runtime_ty(x.ret),
                 throws_: widen_realized_ty_to_runtime_ty(x.throws_),
             }
@@ -2107,7 +2742,7 @@ function widen_realized_ty_to_runtime_ty(t: RealizedTy) -> RuntimeTy throws neve
     }
 }
 
-// Infallible: every RealizedTy variant is a CodegenTy variant.
+// Infallible: every RealizedTy is a CodegenTy.
 function widen_realized_ty_to_codegen_ty(t: RealizedTy) -> CodegenTy throws never {
     match (t) {
         let x: TyInt
@@ -2138,7 +2773,12 @@ function widen_realized_ty_to_codegen_ty(t: RealizedTy) -> CodegenTy throws neve
             CodegenTyInterface {
                 name: x.name,
                 args: x.args.map(widen_realized_ty_to_codegen_ty),
-                assoc: x.assoc.map(widen_realized_ty_to_codegen_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    CodegenAssociatedType {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_codegen_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: RealizedTyList => CodegenTyList { elem: widen_realized_ty_to_codegen_ty(x.elem) },
@@ -2153,7 +2793,13 @@ function widen_realized_ty_to_codegen_ty(t: RealizedTy) -> CodegenTy throws neve
         },
         let x: RealizedTyFunction => {
             CodegenTyFunction {
-                params: x.params.map(widen_realized_ty_to_codegen_ty),
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_codegen_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_realized_ty_to_codegen_ty(x.ret),
                 throws_: widen_realized_ty_to_codegen_ty(x.throws_),
             }
@@ -2170,8 +2816,10 @@ function widen_realized_ty_to_codegen_ty(t: RealizedTy) -> CodegenTy throws neve
     }
 }
 
-// Fails if any variant, at any depth, is outside ConcreteTy.
-function narrow_realized_ty_to_concrete_ty(t: RealizedTy) -> ConcreteTy throws NarrowError {
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_realized_ty_to_concrete_realized_ty(
+    t: RealizedTy,
+) -> ConcreteRealizedTy throws NarrowError {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -2190,42 +2838,26 @@ function narrow_realized_ty_to_concrete_ty(t: RealizedTy) -> ConcreteTy throws N
         {
             x
         },
-        let x: RealizedTyClass => {
-            ConcreteTyClass { name: x.name, args: x.args.map(narrow_realized_ty_to_concrete_ty) }
-        },
-        let x: RealizedTyList => ConcreteTyList { elem: narrow_realized_ty_to_concrete_ty(x.elem) },
-        let x: RealizedTyMap => {
-            ConcreteTyMap {
-                key: narrow_realized_ty_to_concrete_ty(x.key),
-                value: narrow_realized_ty_to_concrete_ty(x.value),
-            }
-        },
+        let x: RealizedTyClass => ConcreteRealizedTyClass { name: x.name, args: x.args },
+        let x: RealizedTyList => ConcreteRealizedTyList { elem: x.elem },
+        let x: RealizedTyMap => ConcreteRealizedTyMap { key: x.key, value: x.value },
         let x: RealizedTyFunction => {
-            ConcreteTyFunction {
-                params: x.params.map(narrow_realized_ty_to_concrete_ty),
-                ret: narrow_realized_ty_to_concrete_ty(x.ret),
-                throws_: narrow_realized_ty_to_concrete_ty(x.throws_),
-            }
+            ConcreteRealizedTyFunction { params: x.params, ret: x.ret, throws_: x.throws_ }
         },
-        let x: RealizedTyFuture => {
-            ConcreteTyFuture {
-                value: narrow_realized_ty_to_concrete_ty(x.value),
-                error: narrow_realized_ty_to_concrete_ty(x.error),
-            }
+        let x: RealizedTyFuture => ConcreteRealizedTyFuture { value: x.value, error: x.error },
+        let x: RealizedTyTuple => ConcreteRealizedTyTuple { items: x.items },
+        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteRealizedTy" },
+        RealizedTyInterface => {
+            throw NarrowError { variant: "Interface", into: "ConcreteRealizedTy" }
         },
-        let x: RealizedTyTuple => {
-            ConcreteTyTuple { items: x.items.map(narrow_realized_ty_to_concrete_ty) }
-        },
-        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
-        RealizedTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
-        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteTy" },
-        RealizedTyUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
-        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
-        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
+        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteRealizedTy" },
+        RealizedTyUnion => throw NarrowError { variant: "Union", into: "ConcreteRealizedTy" },
+        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteRealizedTy" },
+        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteRealizedTy" },
     }
 }
 
-// Infallible: every RealizedTy variant is a TyTemplate variant.
+// Infallible: every RealizedTy is a TyTemplate.
 function widen_realized_ty_to_ty_template(t: RealizedTy) -> TyTemplate throws never {
     match (t) {
         let x: TyInt
@@ -2256,7 +2888,12 @@ function widen_realized_ty_to_ty_template(t: RealizedTy) -> TyTemplate throws ne
             TyTemplateInterface {
                 name: x.name,
                 args: x.args.map(widen_realized_ty_to_ty_template),
-                assoc: x.assoc.map(widen_realized_ty_to_ty_template),
+                associated_types: x.associated_types.map((s0) -> {
+                    TyTemplateAssociatedType {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_ty_template(s0.ty),
+                    }
+                }),
             }
         },
         let x: RealizedTyList => TyTemplateList { elem: widen_realized_ty_to_ty_template(x.elem) },
@@ -2271,7 +2908,13 @@ function widen_realized_ty_to_ty_template(t: RealizedTy) -> TyTemplate throws ne
         },
         let x: RealizedTyFunction => {
             TyTemplateFunction {
-                params: x.params.map(widen_realized_ty_to_ty_template),
+                params: x.params.map((s0) -> {
+                    TyTemplateFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_ty_template(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: widen_realized_ty_to_ty_template(x.ret),
                 throws_: widen_realized_ty_to_ty_template(x.throws_),
             }
@@ -2288,7 +2931,7 @@ function widen_realized_ty_to_ty_template(t: RealizedTy) -> TyTemplate throws ne
     }
 }
 
-// Infallible: every ConcreteTy variant is a Ty variant.
+// Infallible: every ConcreteTy is a Ty.
 function widen_concrete_ty_to_ty(t: ConcreteTy) -> Ty throws never {
     match (t) {
         let x: TyInt
@@ -2308,31 +2951,35 @@ function widen_concrete_ty_to_ty(t: ConcreteTy) -> Ty throws never {
         {
             x
         },
-        let x: ConcreteTyClass => {
-            TyClass { name: x.name, args: x.args.map(widen_concrete_ty_to_ty) }
-        },
-        let x: ConcreteTyList => TyList { elem: widen_concrete_ty_to_ty(x.elem) },
+        let x: ConcreteTyClass => TyClass { name: x.name, args: x.args.map(widen_runtime_ty_to_ty) },
+        let x: ConcreteTyList => TyList { elem: widen_runtime_ty_to_ty(x.elem) },
         let x: ConcreteTyMap => {
-            TyMap { key: widen_concrete_ty_to_ty(x.key), value: widen_concrete_ty_to_ty(x.value) }
+            TyMap { key: widen_runtime_ty_to_ty(x.key), value: widen_runtime_ty_to_ty(x.value) }
         },
         let x: ConcreteTyFunction => {
             TyFunction {
-                params: x.params.map(widen_concrete_ty_to_ty),
-                ret: widen_concrete_ty_to_ty(x.ret),
-                throws_: widen_concrete_ty_to_ty(x.throws_),
+                params: x.params.map((s0) -> {
+                    FunctionParamTy {
+                        name: s0.name,
+                        ty: widen_runtime_ty_to_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_runtime_ty_to_ty(x.ret),
+                throws_: widen_runtime_ty_to_ty(x.throws_),
             }
         },
         let x: ConcreteTyFuture => {
             TyFuture {
-                value: widen_concrete_ty_to_ty(x.value),
-                error: widen_concrete_ty_to_ty(x.error),
+                value: widen_runtime_ty_to_ty(x.value),
+                error: widen_runtime_ty_to_ty(x.error),
             }
         },
-        let x: ConcreteTyTuple => TyTuple { items: x.items.map(widen_concrete_ty_to_ty) },
+        let x: ConcreteTyTuple => TyTuple { items: x.items.map(widen_runtime_ty_to_ty) },
     }
 }
 
-// Infallible: every ConcreteTy variant is a LoweringTy variant.
+// Infallible: every ConcreteTy is a LoweringTy.
 function widen_concrete_ty_to_lowering_ty(t: ConcreteTy) -> LoweringTy throws never {
     match (t) {
         let x: TyInt
@@ -2353,35 +3000,41 @@ function widen_concrete_ty_to_lowering_ty(t: ConcreteTy) -> LoweringTy throws ne
             x
         },
         let x: ConcreteTyClass => {
-            LoweringTyClass { name: x.name, args: x.args.map(widen_concrete_ty_to_lowering_ty) }
+            LoweringTyClass { name: x.name, args: x.args.map(widen_runtime_ty_to_lowering_ty) }
         },
-        let x: ConcreteTyList => LoweringTyList { elem: widen_concrete_ty_to_lowering_ty(x.elem) },
+        let x: ConcreteTyList => LoweringTyList { elem: widen_runtime_ty_to_lowering_ty(x.elem) },
         let x: ConcreteTyMap => {
             LoweringTyMap {
-                key: widen_concrete_ty_to_lowering_ty(x.key),
-                value: widen_concrete_ty_to_lowering_ty(x.value),
+                key: widen_runtime_ty_to_lowering_ty(x.key),
+                value: widen_runtime_ty_to_lowering_ty(x.value),
             }
         },
         let x: ConcreteTyFunction => {
             LoweringTyFunction {
-                params: x.params.map(widen_concrete_ty_to_lowering_ty),
-                ret: widen_concrete_ty_to_lowering_ty(x.ret),
-                throws_: widen_concrete_ty_to_lowering_ty(x.throws_),
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_runtime_ty_to_lowering_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_runtime_ty_to_lowering_ty(x.ret),
+                throws_: widen_runtime_ty_to_lowering_ty(x.throws_),
             }
         },
         let x: ConcreteTyFuture => {
             LoweringTyFuture {
-                value: widen_concrete_ty_to_lowering_ty(x.value),
-                error: widen_concrete_ty_to_lowering_ty(x.error),
+                value: widen_runtime_ty_to_lowering_ty(x.value),
+                error: widen_runtime_ty_to_lowering_ty(x.error),
             }
         },
         let x: ConcreteTyTuple => {
-            LoweringTyTuple { items: x.items.map(widen_concrete_ty_to_lowering_ty) }
+            LoweringTyTuple { items: x.items.map(widen_runtime_ty_to_lowering_ty) }
         },
     }
 }
 
-// Infallible: every ConcreteTy variant is a RuntimeTy variant.
+// Infallible: every ConcreteTy is a RuntimeTy.
 function widen_concrete_ty_to_runtime_ty(t: ConcreteTy) -> RuntimeTy throws never {
     match (t) {
         let x: TyInt
@@ -2401,37 +3054,247 @@ function widen_concrete_ty_to_runtime_ty(t: ConcreteTy) -> RuntimeTy throws neve
         {
             x
         },
-        let x: ConcreteTyClass => {
-            RuntimeTyClass { name: x.name, args: x.args.map(widen_concrete_ty_to_runtime_ty) }
+        let x: ConcreteTyClass => RuntimeTyClass { name: x.name, args: x.args },
+        let x: ConcreteTyList => RuntimeTyList { elem: x.elem },
+        let x: ConcreteTyMap => RuntimeTyMap { key: x.key, value: x.value },
+        let x: ConcreteTyFunction => {
+            RuntimeTyFunction { params: x.params, ret: x.ret, throws_: x.throws_ }
         },
-        let x: ConcreteTyList => RuntimeTyList { elem: widen_concrete_ty_to_runtime_ty(x.elem) },
+        let x: ConcreteTyFuture => RuntimeTyFuture { value: x.value, error: x.error },
+        let x: ConcreteTyTuple => RuntimeTyTuple { items: x.items },
+    }
+}
+
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_concrete_ty_to_concrete_realized_ty(
+    t: ConcreteTy,
+) -> ConcreteRealizedTy throws NarrowError {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: ConcreteTyClass => {
+            ConcreteRealizedTyClass {
+                name: x.name,
+                args: x.args.map(narrow_runtime_ty_to_realized_ty),
+            }
+        },
+        let x: ConcreteTyList => {
+            ConcreteRealizedTyList { elem: narrow_runtime_ty_to_realized_ty(x.elem) }
+        },
         let x: ConcreteTyMap => {
+            ConcreteRealizedTyMap {
+                key: narrow_runtime_ty_to_realized_ty(x.key),
+                value: narrow_runtime_ty_to_realized_ty(x.value),
+            }
+        },
+        let x: ConcreteTyFunction => {
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_runtime_ty_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_runtime_ty_to_realized_ty(x.ret),
+                throws_: narrow_runtime_ty_to_realized_ty(x.throws_),
+            }
+        },
+        let x: ConcreteTyFuture => {
+            ConcreteRealizedTyFuture {
+                value: narrow_runtime_ty_to_realized_ty(x.value),
+                error: narrow_runtime_ty_to_realized_ty(x.error),
+            }
+        },
+        let x: ConcreteTyTuple => {
+            ConcreteRealizedTyTuple { items: x.items.map(narrow_runtime_ty_to_realized_ty) }
+        },
+    }
+}
+
+// Infallible: every ConcreteRealizedTy is a Ty.
+function widen_concrete_realized_ty_to_ty(t: ConcreteRealizedTy) -> Ty throws never {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: ConcreteRealizedTyClass => {
+            TyClass { name: x.name, args: x.args.map(widen_realized_ty_to_ty) }
+        },
+        let x: ConcreteRealizedTyList => TyList { elem: widen_realized_ty_to_ty(x.elem) },
+        let x: ConcreteRealizedTyMap => {
+            TyMap { key: widen_realized_ty_to_ty(x.key), value: widen_realized_ty_to_ty(x.value) }
+        },
+        let x: ConcreteRealizedTyFunction => {
+            TyFunction {
+                params: x.params.map((s0) -> {
+                    FunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_realized_ty_to_ty(x.ret),
+                throws_: widen_realized_ty_to_ty(x.throws_),
+            }
+        },
+        let x: ConcreteRealizedTyFuture => {
+            TyFuture {
+                value: widen_realized_ty_to_ty(x.value),
+                error: widen_realized_ty_to_ty(x.error),
+            }
+        },
+        let x: ConcreteRealizedTyTuple => TyTuple { items: x.items.map(widen_realized_ty_to_ty) },
+    }
+}
+
+// Infallible: every ConcreteRealizedTy is a LoweringTy.
+function widen_concrete_realized_ty_to_lowering_ty(
+    t: ConcreteRealizedTy,
+) -> LoweringTy throws never {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: ConcreteRealizedTyClass => {
+            LoweringTyClass { name: x.name, args: x.args.map(widen_realized_ty_to_lowering_ty) }
+        },
+        let x: ConcreteRealizedTyList => {
+            LoweringTyList { elem: widen_realized_ty_to_lowering_ty(x.elem) }
+        },
+        let x: ConcreteRealizedTyMap => {
+            LoweringTyMap {
+                key: widen_realized_ty_to_lowering_ty(x.key),
+                value: widen_realized_ty_to_lowering_ty(x.value),
+            }
+        },
+        let x: ConcreteRealizedTyFunction => {
+            LoweringTyFunction {
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_lowering_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_realized_ty_to_lowering_ty(x.ret),
+                throws_: widen_realized_ty_to_lowering_ty(x.throws_),
+            }
+        },
+        let x: ConcreteRealizedTyFuture => {
+            LoweringTyFuture {
+                value: widen_realized_ty_to_lowering_ty(x.value),
+                error: widen_realized_ty_to_lowering_ty(x.error),
+            }
+        },
+        let x: ConcreteRealizedTyTuple => {
+            LoweringTyTuple { items: x.items.map(widen_realized_ty_to_lowering_ty) }
+        },
+    }
+}
+
+// Infallible: every ConcreteRealizedTy is a RuntimeTy.
+function widen_concrete_realized_ty_to_runtime_ty(t: ConcreteRealizedTy) -> RuntimeTy throws never {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: ConcreteRealizedTyClass => {
+            RuntimeTyClass { name: x.name, args: x.args.map(widen_realized_ty_to_runtime_ty) }
+        },
+        let x: ConcreteRealizedTyList => {
+            RuntimeTyList { elem: widen_realized_ty_to_runtime_ty(x.elem) }
+        },
+        let x: ConcreteRealizedTyMap => {
             RuntimeTyMap {
-                key: widen_concrete_ty_to_runtime_ty(x.key),
-                value: widen_concrete_ty_to_runtime_ty(x.value),
+                key: widen_realized_ty_to_runtime_ty(x.key),
+                value: widen_realized_ty_to_runtime_ty(x.value),
             }
         },
-        let x: ConcreteTyFunction => {
+        let x: ConcreteRealizedTyFunction => {
             RuntimeTyFunction {
-                params: x.params.map(widen_concrete_ty_to_runtime_ty),
-                ret: widen_concrete_ty_to_runtime_ty(x.ret),
-                throws_: widen_concrete_ty_to_runtime_ty(x.throws_),
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_realized_ty_to_runtime_ty(x.ret),
+                throws_: widen_realized_ty_to_runtime_ty(x.throws_),
             }
         },
-        let x: ConcreteTyFuture => {
+        let x: ConcreteRealizedTyFuture => {
             RuntimeTyFuture {
-                value: widen_concrete_ty_to_runtime_ty(x.value),
-                error: widen_concrete_ty_to_runtime_ty(x.error),
+                value: widen_realized_ty_to_runtime_ty(x.value),
+                error: widen_realized_ty_to_runtime_ty(x.error),
             }
         },
-        let x: ConcreteTyTuple => {
-            RuntimeTyTuple { items: x.items.map(widen_concrete_ty_to_runtime_ty) }
+        let x: ConcreteRealizedTyTuple => {
+            RuntimeTyTuple { items: x.items.map(widen_realized_ty_to_runtime_ty) }
         },
     }
 }
 
-// Infallible: every ConcreteTy variant is a CodegenTy variant.
-function widen_concrete_ty_to_codegen_ty(t: ConcreteTy) -> CodegenTy throws never {
+// Infallible: every ConcreteRealizedTy is a CodegenTy.
+function widen_concrete_realized_ty_to_codegen_ty(t: ConcreteRealizedTy) -> CodegenTy throws never {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -2450,37 +3313,47 @@ function widen_concrete_ty_to_codegen_ty(t: ConcreteTy) -> CodegenTy throws neve
         {
             x
         },
-        let x: ConcreteTyClass => {
-            CodegenTyClass { name: x.name, args: x.args.map(widen_concrete_ty_to_codegen_ty) }
+        let x: ConcreteRealizedTyClass => {
+            CodegenTyClass { name: x.name, args: x.args.map(widen_realized_ty_to_codegen_ty) }
         },
-        let x: ConcreteTyList => CodegenTyList { elem: widen_concrete_ty_to_codegen_ty(x.elem) },
-        let x: ConcreteTyMap => {
+        let x: ConcreteRealizedTyList => {
+            CodegenTyList { elem: widen_realized_ty_to_codegen_ty(x.elem) }
+        },
+        let x: ConcreteRealizedTyMap => {
             CodegenTyMap {
-                key: widen_concrete_ty_to_codegen_ty(x.key),
-                value: widen_concrete_ty_to_codegen_ty(x.value),
+                key: widen_realized_ty_to_codegen_ty(x.key),
+                value: widen_realized_ty_to_codegen_ty(x.value),
             }
         },
-        let x: ConcreteTyFunction => {
+        let x: ConcreteRealizedTyFunction => {
             CodegenTyFunction {
-                params: x.params.map(widen_concrete_ty_to_codegen_ty),
-                ret: widen_concrete_ty_to_codegen_ty(x.ret),
-                throws_: widen_concrete_ty_to_codegen_ty(x.throws_),
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_codegen_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_realized_ty_to_codegen_ty(x.ret),
+                throws_: widen_realized_ty_to_codegen_ty(x.throws_),
             }
         },
-        let x: ConcreteTyFuture => {
+        let x: ConcreteRealizedTyFuture => {
             CodegenTyFuture {
-                value: widen_concrete_ty_to_codegen_ty(x.value),
-                error: widen_concrete_ty_to_codegen_ty(x.error),
+                value: widen_realized_ty_to_codegen_ty(x.value),
+                error: widen_realized_ty_to_codegen_ty(x.error),
             }
         },
-        let x: ConcreteTyTuple => {
-            CodegenTyTuple { items: x.items.map(widen_concrete_ty_to_codegen_ty) }
+        let x: ConcreteRealizedTyTuple => {
+            CodegenTyTuple { items: x.items.map(widen_realized_ty_to_codegen_ty) }
         },
     }
 }
 
-// Infallible: every ConcreteTy variant is a RealizedTy variant.
-function widen_concrete_ty_to_realized_ty(t: ConcreteTy) -> RealizedTy throws never {
+// Infallible: every ConcreteRealizedTy is a RealizedTy.
+function widen_concrete_realized_ty_to_realized_ty(
+    t: ConcreteRealizedTy,
+) -> RealizedTy throws never {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -2499,37 +3372,21 @@ function widen_concrete_ty_to_realized_ty(t: ConcreteTy) -> RealizedTy throws ne
         {
             x
         },
-        let x: ConcreteTyClass => {
-            RealizedTyClass { name: x.name, args: x.args.map(widen_concrete_ty_to_realized_ty) }
+        let x: ConcreteRealizedTyClass => RealizedTyClass { name: x.name, args: x.args },
+        let x: ConcreteRealizedTyList => RealizedTyList { elem: x.elem },
+        let x: ConcreteRealizedTyMap => RealizedTyMap { key: x.key, value: x.value },
+        let x: ConcreteRealizedTyFunction => {
+            RealizedTyFunction { params: x.params, ret: x.ret, throws_: x.throws_ }
         },
-        let x: ConcreteTyList => RealizedTyList { elem: widen_concrete_ty_to_realized_ty(x.elem) },
-        let x: ConcreteTyMap => {
-            RealizedTyMap {
-                key: widen_concrete_ty_to_realized_ty(x.key),
-                value: widen_concrete_ty_to_realized_ty(x.value),
-            }
-        },
-        let x: ConcreteTyFunction => {
-            RealizedTyFunction {
-                params: x.params.map(widen_concrete_ty_to_realized_ty),
-                ret: widen_concrete_ty_to_realized_ty(x.ret),
-                throws_: widen_concrete_ty_to_realized_ty(x.throws_),
-            }
-        },
-        let x: ConcreteTyFuture => {
-            RealizedTyFuture {
-                value: widen_concrete_ty_to_realized_ty(x.value),
-                error: widen_concrete_ty_to_realized_ty(x.error),
-            }
-        },
-        let x: ConcreteTyTuple => {
-            RealizedTyTuple { items: x.items.map(widen_concrete_ty_to_realized_ty) }
-        },
+        let x: ConcreteRealizedTyFuture => RealizedTyFuture { value: x.value, error: x.error },
+        let x: ConcreteRealizedTyTuple => RealizedTyTuple { items: x.items },
     }
 }
 
-// Infallible: every ConcreteTy variant is a TyTemplate variant.
-function widen_concrete_ty_to_ty_template(t: ConcreteTy) -> TyTemplate throws never {
+// Infallible: every ConcreteRealizedTy is a ConcreteTy.
+function widen_concrete_realized_ty_to_concrete_ty(
+    t: ConcreteRealizedTy,
+) -> ConcreteTy throws never {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -2548,31 +3405,98 @@ function widen_concrete_ty_to_ty_template(t: ConcreteTy) -> TyTemplate throws ne
         {
             x
         },
-        let x: ConcreteTyClass => {
-            TyTemplateClass { name: x.name, args: x.args.map(widen_concrete_ty_to_ty_template) }
+        let x: ConcreteRealizedTyClass => {
+            ConcreteTyClass { name: x.name, args: x.args.map(widen_realized_ty_to_runtime_ty) }
         },
-        let x: ConcreteTyList => TyTemplateList { elem: widen_concrete_ty_to_ty_template(x.elem) },
-        let x: ConcreteTyMap => {
+        let x: ConcreteRealizedTyList => {
+            ConcreteTyList { elem: widen_realized_ty_to_runtime_ty(x.elem) }
+        },
+        let x: ConcreteRealizedTyMap => {
+            ConcreteTyMap {
+                key: widen_realized_ty_to_runtime_ty(x.key),
+                value: widen_realized_ty_to_runtime_ty(x.value),
+            }
+        },
+        let x: ConcreteRealizedTyFunction => {
+            ConcreteTyFunction {
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_runtime_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_realized_ty_to_runtime_ty(x.ret),
+                throws_: widen_realized_ty_to_runtime_ty(x.throws_),
+            }
+        },
+        let x: ConcreteRealizedTyFuture => {
+            ConcreteTyFuture {
+                value: widen_realized_ty_to_runtime_ty(x.value),
+                error: widen_realized_ty_to_runtime_ty(x.error),
+            }
+        },
+        let x: ConcreteRealizedTyTuple => {
+            ConcreteTyTuple { items: x.items.map(widen_realized_ty_to_runtime_ty) }
+        },
+    }
+}
+
+// Infallible: every ConcreteRealizedTy is a TyTemplate.
+function widen_concrete_realized_ty_to_ty_template(
+    t: ConcreteRealizedTy,
+) -> TyTemplate throws never {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: ConcreteRealizedTyClass => {
+            TyTemplateClass { name: x.name, args: x.args.map(widen_realized_ty_to_ty_template) }
+        },
+        let x: ConcreteRealizedTyList => {
+            TyTemplateList { elem: widen_realized_ty_to_ty_template(x.elem) }
+        },
+        let x: ConcreteRealizedTyMap => {
             TyTemplateMap {
-                key: widen_concrete_ty_to_ty_template(x.key),
-                value: widen_concrete_ty_to_ty_template(x.value),
+                key: widen_realized_ty_to_ty_template(x.key),
+                value: widen_realized_ty_to_ty_template(x.value),
             }
         },
-        let x: ConcreteTyFunction => {
+        let x: ConcreteRealizedTyFunction => {
             TyTemplateFunction {
-                params: x.params.map(widen_concrete_ty_to_ty_template),
-                ret: widen_concrete_ty_to_ty_template(x.ret),
-                throws_: widen_concrete_ty_to_ty_template(x.throws_),
+                params: x.params.map((s0) -> {
+                    TyTemplateFunctionParamTy {
+                        name: s0.name,
+                        ty: widen_realized_ty_to_ty_template(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: widen_realized_ty_to_ty_template(x.ret),
+                throws_: widen_realized_ty_to_ty_template(x.throws_),
             }
         },
-        let x: ConcreteTyFuture => {
+        let x: ConcreteRealizedTyFuture => {
             TyTemplateFuture {
-                value: widen_concrete_ty_to_ty_template(x.value),
-                error: widen_concrete_ty_to_ty_template(x.error),
+                value: widen_realized_ty_to_ty_template(x.value),
+                error: widen_realized_ty_to_ty_template(x.error),
             }
         },
-        let x: ConcreteTyTuple => {
-            TyTemplateTuple { items: x.items.map(widen_concrete_ty_to_ty_template) }
+        let x: ConcreteRealizedTyTuple => {
+            TyTemplateTuple { items: x.items.map(widen_realized_ty_to_ty_template) }
         },
     }
 }
@@ -2608,7 +3532,12 @@ function narrow_ty_template_to_realized_ty(t: TyTemplate) -> RealizedTy throws N
             RealizedTyInterface {
                 name: x.name,
                 args: x.args.map(narrow_ty_template_to_realized_ty),
-                assoc: x.assoc.map(narrow_ty_template_to_realized_ty),
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType {
+                        name: s0.name,
+                        ty: narrow_ty_template_to_realized_ty(s0.ty),
+                    }
+                }),
             }
         },
         let x: TyTemplateList => RealizedTyList { elem: narrow_ty_template_to_realized_ty(x.elem) },
@@ -2623,7 +3552,13 @@ function narrow_ty_template_to_realized_ty(t: TyTemplate) -> RealizedTy throws N
         },
         let x: TyTemplateFunction => {
             RealizedTyFunction {
-                params: x.params.map(narrow_ty_template_to_realized_ty),
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_template_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
                 ret: narrow_ty_template_to_realized_ty(x.ret),
                 throws_: narrow_ty_template_to_realized_ty(x.throws_),
             }
@@ -2637,13 +3572,17 @@ function narrow_ty_template_to_realized_ty(t: TyTemplate) -> RealizedTy throws N
         let x: TyTemplateTuple => {
             RealizedTyTuple { items: x.items.map(narrow_ty_template_to_realized_ty) }
         },
-        TyTemplateProjection => throw NarrowError { variant: "Projection", into: "RealizedTy" },
+        TyTemplateAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "RealizedTy" }
+        },
         TyTypeArgRef => throw NarrowError { variant: "TypeArgRef", into: "RealizedTy" },
     }
 }
 
-// Fails if any variant, at any depth, is outside ConcreteTy.
-function narrow_ty_template_to_concrete_ty(t: TyTemplate) -> ConcreteTy throws NarrowError {
+// Fails if any variant, at any depth, is outside ConcreteRealizedTy.
+function narrow_ty_template_to_concrete_realized_ty(
+    t: TyTemplate,
+) -> ConcreteRealizedTy throws NarrowError {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -2663,43 +3602,58 @@ function narrow_ty_template_to_concrete_ty(t: TyTemplate) -> ConcreteTy throws N
             x
         },
         let x: TyTemplateClass => {
-            ConcreteTyClass { name: x.name, args: x.args.map(narrow_ty_template_to_concrete_ty) }
+            ConcreteRealizedTyClass {
+                name: x.name,
+                args: x.args.map(narrow_ty_template_to_realized_ty),
+            }
         },
-        let x: TyTemplateList => ConcreteTyList { elem: narrow_ty_template_to_concrete_ty(x.elem) },
+        let x: TyTemplateList => {
+            ConcreteRealizedTyList { elem: narrow_ty_template_to_realized_ty(x.elem) }
+        },
         let x: TyTemplateMap => {
-            ConcreteTyMap {
-                key: narrow_ty_template_to_concrete_ty(x.key),
-                value: narrow_ty_template_to_concrete_ty(x.value),
+            ConcreteRealizedTyMap {
+                key: narrow_ty_template_to_realized_ty(x.key),
+                value: narrow_ty_template_to_realized_ty(x.value),
             }
         },
         let x: TyTemplateFunction => {
-            ConcreteTyFunction {
-                params: x.params.map(narrow_ty_template_to_concrete_ty),
-                ret: narrow_ty_template_to_concrete_ty(x.ret),
-                throws_: narrow_ty_template_to_concrete_ty(x.throws_),
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: narrow_ty_template_to_realized_ty(s0.ty),
+                        mode: s0.mode,
+                    }
+                }),
+                ret: narrow_ty_template_to_realized_ty(x.ret),
+                throws_: narrow_ty_template_to_realized_ty(x.throws_),
             }
         },
         let x: TyTemplateFuture => {
-            ConcreteTyFuture {
-                value: narrow_ty_template_to_concrete_ty(x.value),
-                error: narrow_ty_template_to_concrete_ty(x.error),
+            ConcreteRealizedTyFuture {
+                value: narrow_ty_template_to_realized_ty(x.value),
+                error: narrow_ty_template_to_realized_ty(x.error),
             }
         },
         let x: TyTemplateTuple => {
-            ConcreteTyTuple { items: x.items.map(narrow_ty_template_to_concrete_ty) }
+            ConcreteRealizedTyTuple { items: x.items.map(narrow_ty_template_to_realized_ty) }
         },
-        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
-        TyTemplateInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
-        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteTy" },
-        TyTemplateUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
-        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
-        TyTemplateProjection => throw NarrowError { variant: "Projection", into: "ConcreteTy" },
-        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
-        TyTypeArgRef => throw NarrowError { variant: "TypeArgRef", into: "ConcreteTy" },
+        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteRealizedTy" },
+        TyTemplateInterface => {
+            throw NarrowError { variant: "Interface", into: "ConcreteRealizedTy" }
+        },
+        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteRealizedTy" },
+        TyTemplateUnion => throw NarrowError { variant: "Union", into: "ConcreteRealizedTy" },
+        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteRealizedTy" },
+        TyTemplateAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "ConcreteRealizedTy" }
+        },
+        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteRealizedTy" },
+        TyTypeArgRef => throw NarrowError { variant: "TypeArgRef", into: "ConcreteRealizedTy" },
     }
 }
 
-// == Generic child walkers =================================================
+// == Child walkers =========================================================
 
 // Rebuilds `t` with `f` applied to each direct child; leaves are returned as is.
 function map_children_ty(t: Ty, f: (Ty) -> Ty) -> Ty {
@@ -2729,19 +3683,37 @@ function map_children_ty(t: Ty, f: (Ty) -> Ty) -> Ty {
         },
         let x: TyClass => TyClass { name: x.name, args: x.args.map(f) },
         let x: TyInterface => {
-            TyInterface { name: x.name, args: x.args.map(f), assoc: x.assoc.map(f) }
+            TyInterface {
+                name: x.name,
+                args: x.args.map(f),
+                associated_types: x.associated_types.map((s0) -> {
+                    AssociatedType { name: s0.name, ty: f(s0.ty) }
+                }),
+            }
         },
         let x: TyList => TyList { elem: f(x.elem) },
         let x: TyMap => TyMap { key: f(x.key), value: f(x.value) },
         let x: TyUnion => TyUnion { members: x.members.map(f) },
         let x: TyFunction => {
-            TyFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            TyFunction {
+                params: x.params.map((s0) -> {
+                    FunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: TyFuture => TyFuture { value: f(x.value), error: f(x.error) },
-        let x: TyProjection => {
-            TyProjection {
+        let x: TyAssociatedTypeProjection => {
+            TyAssociatedTypeProjection {
                 base: f(x.base),
-                interface_args: x.interface_args.map(f),
+                interface_: InterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(f),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        AssociatedType { name: s0.name, ty: f(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -2776,13 +3748,32 @@ function children_ty(t: Ty) -> Ty[] {
             []
         },
         let x: TyClass => x.args,
-        let x: TyInterface => x.args.concat(x.assoc),
+        let x: TyInterface => {
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: TyList => [x.elem],
         let x: TyMap => [x.key].concat([x.value]),
         let x: TyUnion => x.members,
-        let x: TyFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: TyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: TyFuture => [x.value].concat([x.error]),
-        let x: TyProjection => [x.base].concat(x.interface_args),
+        let x: TyAssociatedTypeProjection => {
+            [x.base].concat(x.interface_.generics).concat(
+                x.interface_.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: TyTuple => x.items,
     }
 }
@@ -2816,19 +3807,37 @@ function map_children_lowering_ty(t: LoweringTy, f: (LoweringTy) -> LoweringTy) 
         },
         let x: LoweringTyClass => LoweringTyClass { name: x.name, args: x.args.map(f) },
         let x: LoweringTyInterface => {
-            LoweringTyInterface { name: x.name, args: x.args.map(f), assoc: x.assoc.map(f) }
+            LoweringTyInterface {
+                name: x.name,
+                args: x.args.map(f),
+                associated_types: x.associated_types.map((s0) -> {
+                    LoweringAssociatedType { name: s0.name, ty: f(s0.ty) }
+                }),
+            }
         },
         let x: LoweringTyList => LoweringTyList { elem: f(x.elem) },
         let x: LoweringTyMap => LoweringTyMap { key: f(x.key), value: f(x.value) },
         let x: LoweringTyUnion => LoweringTyUnion { members: x.members.map(f) },
         let x: LoweringTyFunction => {
-            LoweringTyFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            LoweringTyFunction {
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: LoweringTyFuture => LoweringTyFuture { value: f(x.value), error: f(x.error) },
-        let x: LoweringTyProjection => {
-            LoweringTyProjection {
+        let x: LoweringTyAssociatedTypeProjection => {
+            LoweringTyAssociatedTypeProjection {
                 base: f(x.base),
-                interface_args: x.interface_args.map(f),
+                interface_: LoweringInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(f),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        LoweringAssociatedType { name: s0.name, ty: f(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -2864,13 +3873,32 @@ function children_lowering_ty(t: LoweringTy) -> LoweringTy[] {
             []
         },
         let x: LoweringTyClass => x.args,
-        let x: LoweringTyInterface => x.args.concat(x.assoc),
+        let x: LoweringTyInterface => {
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: LoweringTyList => [x.elem],
         let x: LoweringTyMap => [x.key].concat([x.value]),
         let x: LoweringTyUnion => x.members,
-        let x: LoweringTyFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: LoweringTyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: LoweringTyFuture => [x.value].concat([x.error]),
-        let x: LoweringTyProjection => [x.base].concat(x.interface_args),
+        let x: LoweringTyAssociatedTypeProjection => {
+            [x.base].concat(x.interface_.generics).concat(
+                x.interface_.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: LoweringTyTuple => x.items,
     }
 }
@@ -2902,19 +3930,37 @@ function map_children_runtime_ty(t: RuntimeTy, f: (RuntimeTy) -> RuntimeTy) -> R
         },
         let x: RuntimeTyClass => RuntimeTyClass { name: x.name, args: x.args.map(f) },
         let x: RuntimeTyInterface => {
-            RuntimeTyInterface { name: x.name, args: x.args.map(f), assoc: x.assoc.map(f) }
+            RuntimeTyInterface {
+                name: x.name,
+                args: x.args.map(f),
+                associated_types: x.associated_types.map((s0) -> {
+                    RuntimeAssociatedType { name: s0.name, ty: f(s0.ty) }
+                }),
+            }
         },
         let x: RuntimeTyList => RuntimeTyList { elem: f(x.elem) },
         let x: RuntimeTyMap => RuntimeTyMap { key: f(x.key), value: f(x.value) },
         let x: RuntimeTyUnion => RuntimeTyUnion { members: x.members.map(f) },
         let x: RuntimeTyFunction => {
-            RuntimeTyFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            RuntimeTyFunction {
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: RuntimeTyFuture => RuntimeTyFuture { value: f(x.value), error: f(x.error) },
-        let x: RuntimeTyProjection => {
-            RuntimeTyProjection {
+        let x: RuntimeTyAssociatedTypeProjection => {
+            RuntimeTyAssociatedTypeProjection {
                 base: f(x.base),
-                interface_args: x.interface_args.map(f),
+                interface_: RuntimeInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(f),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        RuntimeAssociatedType { name: s0.name, ty: f(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -2948,13 +3994,32 @@ function children_runtime_ty(t: RuntimeTy) -> RuntimeTy[] {
             []
         },
         let x: RuntimeTyClass => x.args,
-        let x: RuntimeTyInterface => x.args.concat(x.assoc),
+        let x: RuntimeTyInterface => {
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: RuntimeTyList => [x.elem],
         let x: RuntimeTyMap => [x.key].concat([x.value]),
         let x: RuntimeTyUnion => x.members,
-        let x: RuntimeTyFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: RuntimeTyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: RuntimeTyFuture => [x.value].concat([x.error]),
-        let x: RuntimeTyProjection => [x.base].concat(x.interface_args),
+        let x: RuntimeTyAssociatedTypeProjection => {
+            [x.base].concat(x.interface_.generics).concat(
+                x.interface_.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: RuntimeTyTuple => x.items,
     }
 }
@@ -2986,13 +4051,25 @@ function map_children_codegen_ty(t: CodegenTy, f: (CodegenTy) -> CodegenTy) -> C
         },
         let x: CodegenTyClass => CodegenTyClass { name: x.name, args: x.args.map(f) },
         let x: CodegenTyInterface => {
-            CodegenTyInterface { name: x.name, args: x.args.map(f), assoc: x.assoc.map(f) }
+            CodegenTyInterface {
+                name: x.name,
+                args: x.args.map(f),
+                associated_types: x.associated_types.map((s0) -> {
+                    CodegenAssociatedType { name: s0.name, ty: f(s0.ty) }
+                }),
+            }
         },
         let x: CodegenTyList => CodegenTyList { elem: f(x.elem) },
         let x: CodegenTyMap => CodegenTyMap { key: f(x.key), value: f(x.value) },
         let x: CodegenTyUnion => CodegenTyUnion { members: x.members.map(f) },
         let x: CodegenTyFunction => {
-            CodegenTyFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            CodegenTyFunction {
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: CodegenTyFuture => CodegenTyFuture { value: f(x.value), error: f(x.error) },
         let x: CodegenTyTuple => CodegenTyTuple { items: x.items.map(f) },
@@ -3025,11 +4102,24 @@ function children_codegen_ty(t: CodegenTy) -> CodegenTy[] {
             []
         },
         let x: CodegenTyClass => x.args,
-        let x: CodegenTyInterface => x.args.concat(x.assoc),
+        let x: CodegenTyInterface => {
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: CodegenTyList => [x.elem],
         let x: CodegenTyMap => [x.key].concat([x.value]),
         let x: CodegenTyUnion => x.members,
-        let x: CodegenTyFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: CodegenTyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: CodegenTyFuture => [x.value].concat([x.error]),
         let x: CodegenTyTuple => x.items,
     }
@@ -3061,13 +4151,25 @@ function map_children_realized_ty(t: RealizedTy, f: (RealizedTy) -> RealizedTy) 
         },
         let x: RealizedTyClass => RealizedTyClass { name: x.name, args: x.args.map(f) },
         let x: RealizedTyInterface => {
-            RealizedTyInterface { name: x.name, args: x.args.map(f), assoc: x.assoc.map(f) }
+            RealizedTyInterface {
+                name: x.name,
+                args: x.args.map(f),
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType { name: s0.name, ty: f(s0.ty) }
+                }),
+            }
         },
         let x: RealizedTyList => RealizedTyList { elem: f(x.elem) },
         let x: RealizedTyMap => RealizedTyMap { key: f(x.key), value: f(x.value) },
         let x: RealizedTyUnion => RealizedTyUnion { members: x.members.map(f) },
         let x: RealizedTyFunction => {
-            RealizedTyFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            RealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: RealizedTyFuture => RealizedTyFuture { value: f(x.value), error: f(x.error) },
         let x: RealizedTyTuple => RealizedTyTuple { items: x.items.map(f) },
@@ -3099,18 +4201,31 @@ function children_realized_ty(t: RealizedTy) -> RealizedTy[] {
             []
         },
         let x: RealizedTyClass => x.args,
-        let x: RealizedTyInterface => x.args.concat(x.assoc),
+        let x: RealizedTyInterface => {
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: RealizedTyList => [x.elem],
         let x: RealizedTyMap => [x.key].concat([x.value]),
         let x: RealizedTyUnion => x.members,
-        let x: RealizedTyFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: RealizedTyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: RealizedTyFuture => [x.value].concat([x.error]),
         let x: RealizedTyTuple => x.items,
     }
 }
 
 // Rebuilds `t` with `f` applied to each direct child; leaves are returned as is.
-function map_children_concrete_ty(t: ConcreteTy, f: (ConcreteTy) -> ConcreteTy) -> ConcreteTy {
+function map_children_concrete_ty(t: ConcreteTy, f: (RuntimeTy) -> RuntimeTy) -> ConcreteTy {
     match (t) {
         let x: TyInt
             | TyBigint
@@ -3133,7 +4248,13 @@ function map_children_concrete_ty(t: ConcreteTy, f: (ConcreteTy) -> ConcreteTy) 
         let x: ConcreteTyList => ConcreteTyList { elem: f(x.elem) },
         let x: ConcreteTyMap => ConcreteTyMap { key: f(x.key), value: f(x.value) },
         let x: ConcreteTyFunction => {
-            ConcreteTyFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            ConcreteTyFunction {
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: ConcreteTyFuture => ConcreteTyFuture { value: f(x.value), error: f(x.error) },
         let x: ConcreteTyTuple => ConcreteTyTuple { items: x.items.map(f) },
@@ -3141,7 +4262,7 @@ function map_children_concrete_ty(t: ConcreteTy, f: (ConcreteTy) -> ConcreteTy) 
 }
 
 // The direct children of `t`, in field order.
-function children_concrete_ty(t: ConcreteTy) -> ConcreteTy[] {
+function children_concrete_ty(t: ConcreteTy) -> RuntimeTy[] {
     match (t) {
         TyInt
             | TyBigint
@@ -3163,9 +4284,96 @@ function children_concrete_ty(t: ConcreteTy) -> ConcreteTy[] {
         let x: ConcreteTyClass => x.args,
         let x: ConcreteTyList => [x.elem],
         let x: ConcreteTyMap => [x.key].concat([x.value]),
-        let x: ConcreteTyFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: ConcreteTyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: ConcreteTyFuture => [x.value].concat([x.error]),
         let x: ConcreteTyTuple => x.items,
+    }
+}
+
+// Rebuilds `t` with `f` applied to each direct child; leaves are returned as is.
+function map_children_concrete_realized_ty(
+    t: ConcreteRealizedTy,
+    f: (RealizedTy) -> RealizedTy,
+) -> ConcreteRealizedTy {
+    match (t) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            x
+        },
+        let x: ConcreteRealizedTyClass => {
+            ConcreteRealizedTyClass { name: x.name, args: x.args.map(f) }
+        },
+        let x: ConcreteRealizedTyList => ConcreteRealizedTyList { elem: f(x.elem) },
+        let x: ConcreteRealizedTyMap => ConcreteRealizedTyMap { key: f(x.key), value: f(x.value) },
+        let x: ConcreteRealizedTyFunction => {
+            ConcreteRealizedTyFunction {
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
+        },
+        let x: ConcreteRealizedTyFuture => {
+            ConcreteRealizedTyFuture { value: f(x.value), error: f(x.error) }
+        },
+        let x: ConcreteRealizedTyTuple => ConcreteRealizedTyTuple { items: x.items.map(f) },
+    }
+}
+
+// The direct children of `t`, in field order.
+function children_concrete_realized_ty(t: ConcreteRealizedTy) -> RealizedTy[] {
+    match (t) {
+        TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyNever =>
+        {
+            []
+        },
+        let x: ConcreteRealizedTyClass => x.args,
+        let x: ConcreteRealizedTyList => [x.elem],
+        let x: ConcreteRealizedTyMap => [x.key].concat([x.value]),
+        let x: ConcreteRealizedTyFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
+        let x: ConcreteRealizedTyFuture => [x.value].concat([x.error]),
+        let x: ConcreteRealizedTyTuple => x.items,
     }
 }
 
@@ -3196,19 +4404,37 @@ function map_children_ty_template(t: TyTemplate, f: (TyTemplate) -> TyTemplate) 
         },
         let x: TyTemplateClass => TyTemplateClass { name: x.name, args: x.args.map(f) },
         let x: TyTemplateInterface => {
-            TyTemplateInterface { name: x.name, args: x.args.map(f), assoc: x.assoc.map(f) }
+            TyTemplateInterface {
+                name: x.name,
+                args: x.args.map(f),
+                associated_types: x.associated_types.map((s0) -> {
+                    TyTemplateAssociatedType { name: s0.name, ty: f(s0.ty) }
+                }),
+            }
         },
         let x: TyTemplateList => TyTemplateList { elem: f(x.elem) },
         let x: TyTemplateMap => TyTemplateMap { key: f(x.key), value: f(x.value) },
         let x: TyTemplateUnion => TyTemplateUnion { members: x.members.map(f) },
         let x: TyTemplateFunction => {
-            TyTemplateFunction { params: x.params.map(f), ret: f(x.ret), throws_: f(x.throws_) }
+            TyTemplateFunction {
+                params: x.params.map((s0) -> {
+                    TyTemplateFunctionParamTy { name: s0.name, ty: f(s0.ty), mode: s0.mode }
+                }),
+                ret: f(x.ret),
+                throws_: f(x.throws_),
+            }
         },
         let x: TyTemplateFuture => TyTemplateFuture { value: f(x.value), error: f(x.error) },
-        let x: TyTemplateProjection => {
-            TyTemplateProjection {
+        let x: TyTemplateAssociatedTypeProjection => {
+            TyTemplateAssociatedTypeProjection {
                 base: f(x.base),
-                interface_args: x.interface_args.map(f),
+                interface_: TyTemplateInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map(f),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        TyTemplateAssociatedType { name: s0.name, ty: f(s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
@@ -3242,111 +4468,97 @@ function children_ty_template(t: TyTemplate) -> TyTemplate[] {
             []
         },
         let x: TyTemplateClass => x.args,
-        let x: TyTemplateInterface => x.args.concat(x.assoc),
+        let x: TyTemplateInterface => {
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: TyTemplateList => [x.elem],
         let x: TyTemplateMap => [x.key].concat([x.value]),
         let x: TyTemplateUnion => x.members,
-        let x: TyTemplateFunction => x.params.concat([x.ret]).concat([x.throws_]),
+        let x: TyTemplateFunction => {
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
+        },
         let x: TyTemplateFuture => [x.value].concat([x.error]),
-        let x: TyTemplateProjection => [x.base].concat(x.interface_args),
+        let x: TyTemplateAssociatedTypeProjection => {
+            [x.base].concat(x.interface_.generics).concat(
+                x.interface_.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
+            )
+        },
         let x: TyTemplateTuple => x.items,
     }
 }
 
-// == InferTy pool conversions ==============================================
+// == InferTy pool ==========================================================
 
-const HAS_INFER = 1;
-const HAS_ERROR = 2;
-const HAS_TYPEVAR = 4;
-const HAS_PROJECTION = 8;
-
-function infer_flags(pool: InferPool, k: InferTy) -> int {
-    match (k) {
-        TyInt => 0,
-        TyBigint => 0,
-        TyFloat => 0,
-        TyString => 0,
-        TyBool => 0,
-        TyNull => 0,
-        TyUint8Array => 0,
-        TyMedia => 0,
-        TyLiteral => 0,
-        let x: InferTyClass => {
-            x.args.reduce(
-                (acc, c) -> {
-                    acc | pool.flags[c]
-                },
-                0,
-            )
+// The direct children of `t`, in field order.
+function children_infer_ty(t: InferTy) -> int[] {
+    match (t) {
+        TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyLiteral
+            | TyEnum
+            | TyEnumVariant
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyTypeAlias
+            | TyTypeVar
+            | TyUnknown
+            | TyNever
+            | TyError
+            | TyInferVar =>
+        {
+            []
         },
+        let x: InferTyClass => x.args,
         let x: InferTyInterface => {
-            x.args.reduce(
-                (acc, c) -> {
-                    acc | pool.flags[c]
-                },
-                0,
-            )
-                | x.assoc.reduce(
-                    (acc, c) -> {
-                        acc | pool.flags[c]
-                    },
-                    0,
-                )
-        },
-        TyEnum => 0,
-        TyEnumVariant => 0,
-        let x: InferTyList => pool.flags[x.elem],
-        let x: InferTyMap => pool.flags[x.key] | pool.flags[x.value],
-        let x: InferTyUnion => {
-            x.members.reduce(
-                (acc, c) -> {
-                    acc | pool.flags[c]
-                },
-                0,
+            x.args.concat(
+                x.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
             )
         },
+        let x: InferTyList => [x.elem],
+        let x: InferTyMap => [x.key].concat([x.value]),
+        let x: InferTyUnion => x.members,
         let x: InferTyFunction => {
-            x.params.reduce(
-                (acc, c) -> {
-                    acc | pool.flags[c]
-                },
-                0,
-            )
-                | pool.flags[x.ret]
-                | pool.flags[x.throws_]
+            x.params
+                .flat_map((s0) -> {
+                    [s0.ty]
+                })
+                .concat([x.ret])
+                .concat([x.throws_])
         },
-        let x: InferTyFuture => pool.flags[x.value] | pool.flags[x.error],
-        TyRustType => 0,
-        TyType => 0,
-        TyResource => 0,
-        TyPromptAst => 0,
-        TyTypeAlias => 0,
-        TyTypeVar => 4,
-        let x: InferTyProjection => {
-            8
-                | pool.flags[x.base]
-                | x.interface_args.reduce(
-                    (acc, c) -> {
-                        acc | pool.flags[c]
-                    },
-                    0,
-                )
-        },
-        TyUnknown => 0,
-        TyNever => 0,
-        TyError => 2,
-        TyInferVar => 1,
-        let x: InferTyTuple => {
-            x.items.reduce(
-                (acc, c) -> {
-                    acc | pool.flags[c]
-                },
-                0,
+        let x: InferTyFuture => [x.value].concat([x.error]),
+        let x: InferTyAssociatedTypeProjection => {
+            [x.base].concat(x.interface_.generics).concat(
+                x.interface_.associated_types.flat_map((s0) -> {
+                    [s0.ty]
+                }),
             )
         },
+        let x: InferTyTuple => x.items,
     }
 }
 
+// Interns `t` bottom-up; returns its handle.
 function intern_ty(pool: InferPool, t: Ty) -> int {
     match (t) {
         let x: TyInt
@@ -3376,8 +4588,8 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
             pool.add(
                 InferTyClass {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_ty(pool, c0)
                     }),
                 },
             )
@@ -3386,11 +4598,11 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
             pool.add(
                 InferTyInterface {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_ty(pool, c0)
                     }),
-                    assoc: x.assoc.map((c) -> {
-                        intern_ty(pool, c)
+                    associated_types: x.associated_types.map((s0) -> {
+                        InferAssociatedType { name: s0.name, ty: intern_ty(pool, s0.ty) }
                     }),
                 },
             )
@@ -3402,8 +4614,8 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
         let x: TyUnion => {
             pool.add(
                 InferTyUnion {
-                    members: x.members.map((c) -> {
-                        intern_ty(pool, c)
+                    members: x.members.map((c0) -> {
+                        intern_ty(pool, c0)
                     }),
                 },
             )
@@ -3411,8 +4623,12 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
         let x: TyFunction => {
             pool.add(
                 InferTyFunction {
-                    params: x.params.map((c) -> {
-                        intern_ty(pool, c)
+                    params: x.params.map((s0) -> {
+                        InferFunctionParamTy {
+                            name: s0.name,
+                            ty: intern_ty(pool, s0.ty),
+                            mode: s0.mode,
+                        }
                     }),
                     ret: intern_ty(pool, x.ret),
                     throws_: intern_ty(pool, x.throws_),
@@ -3424,13 +4640,19 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
                 InferTyFuture { value: intern_ty(pool, x.value), error: intern_ty(pool, x.error) },
             )
         },
-        let x: TyProjection => {
+        let x: TyAssociatedTypeProjection => {
             pool.add(
-                InferTyProjection {
+                InferTyAssociatedTypeProjection {
                     base: intern_ty(pool, x.base),
-                    interface_args: x.interface_args.map((c) -> {
-                        intern_ty(pool, c)
-                    }),
+                    interface_: InferInterfaceConstraint {
+                        name: x.interface_.name,
+                        generics: x.interface_.generics.map((c0) -> {
+                            intern_ty(pool, c0)
+                        }),
+                        associated_types: x.interface_.associated_types.map((s0) -> {
+                            InferAssociatedType { name: s0.name, ty: intern_ty(pool, s0.ty) }
+                        }),
+                    },
                     member: x.member,
                 },
             )
@@ -3438,8 +4660,8 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
         let x: TyTuple => {
             pool.add(
                 InferTyTuple {
-                    items: x.items.map((c) -> {
-                        intern_ty(pool, c)
+                    items: x.items.map((c0) -> {
+                        intern_ty(pool, c0)
                     }),
                 },
             )
@@ -3447,6 +4669,7 @@ function intern_ty(pool: InferPool, t: Ty) -> int {
     }
 }
 
+// Interns `t` bottom-up; returns its handle.
 function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
     match (t) {
         let x: TyInt
@@ -3475,8 +4698,8 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
             pool.add(
                 InferTyClass {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_runtime_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_runtime_ty(pool, c0)
                     }),
                 },
             )
@@ -3485,11 +4708,11 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
             pool.add(
                 InferTyInterface {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_runtime_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_runtime_ty(pool, c0)
                     }),
-                    assoc: x.assoc.map((c) -> {
-                        intern_runtime_ty(pool, c)
+                    associated_types: x.associated_types.map((s0) -> {
+                        InferAssociatedType { name: s0.name, ty: intern_runtime_ty(pool, s0.ty) }
                     }),
                 },
             )
@@ -3506,8 +4729,8 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
         let x: RuntimeTyUnion => {
             pool.add(
                 InferTyUnion {
-                    members: x.members.map((c) -> {
-                        intern_runtime_ty(pool, c)
+                    members: x.members.map((c0) -> {
+                        intern_runtime_ty(pool, c0)
                     }),
                 },
             )
@@ -3515,8 +4738,12 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
         let x: RuntimeTyFunction => {
             pool.add(
                 InferTyFunction {
-                    params: x.params.map((c) -> {
-                        intern_runtime_ty(pool, c)
+                    params: x.params.map((s0) -> {
+                        InferFunctionParamTy {
+                            name: s0.name,
+                            ty: intern_runtime_ty(pool, s0.ty),
+                            mode: s0.mode,
+                        }
                     }),
                     ret: intern_runtime_ty(pool, x.ret),
                     throws_: intern_runtime_ty(pool, x.throws_),
@@ -3531,13 +4758,22 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
                 },
             )
         },
-        let x: RuntimeTyProjection => {
+        let x: RuntimeTyAssociatedTypeProjection => {
             pool.add(
-                InferTyProjection {
+                InferTyAssociatedTypeProjection {
                     base: intern_runtime_ty(pool, x.base),
-                    interface_args: x.interface_args.map((c) -> {
-                        intern_runtime_ty(pool, c)
-                    }),
+                    interface_: InferInterfaceConstraint {
+                        name: x.interface_.name,
+                        generics: x.interface_.generics.map((c0) -> {
+                            intern_runtime_ty(pool, c0)
+                        }),
+                        associated_types: x.interface_.associated_types.map((s0) -> {
+                            InferAssociatedType {
+                                name: s0.name,
+                                ty: intern_runtime_ty(pool, s0.ty),
+                            }
+                        }),
+                    },
                     member: x.member,
                 },
             )
@@ -3545,8 +4781,8 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
         let x: RuntimeTyTuple => {
             pool.add(
                 InferTyTuple {
-                    items: x.items.map((c) -> {
-                        intern_runtime_ty(pool, c)
+                    items: x.items.map((c0) -> {
+                        intern_runtime_ty(pool, c0)
                     }),
                 },
             )
@@ -3554,6 +4790,7 @@ function intern_runtime_ty(pool: InferPool, t: RuntimeTy) -> int {
     }
 }
 
+// Interns `t` bottom-up; returns its handle.
 function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
     match (t) {
         let x: TyInt
@@ -3582,8 +4819,8 @@ function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
             pool.add(
                 InferTyClass {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_codegen_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_codegen_ty(pool, c0)
                     }),
                 },
             )
@@ -3592,11 +4829,11 @@ function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
             pool.add(
                 InferTyInterface {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_codegen_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_codegen_ty(pool, c0)
                     }),
-                    assoc: x.assoc.map((c) -> {
-                        intern_codegen_ty(pool, c)
+                    associated_types: x.associated_types.map((s0) -> {
+                        InferAssociatedType { name: s0.name, ty: intern_codegen_ty(pool, s0.ty) }
                     }),
                 },
             )
@@ -3613,8 +4850,8 @@ function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
         let x: CodegenTyUnion => {
             pool.add(
                 InferTyUnion {
-                    members: x.members.map((c) -> {
-                        intern_codegen_ty(pool, c)
+                    members: x.members.map((c0) -> {
+                        intern_codegen_ty(pool, c0)
                     }),
                 },
             )
@@ -3622,8 +4859,12 @@ function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
         let x: CodegenTyFunction => {
             pool.add(
                 InferTyFunction {
-                    params: x.params.map((c) -> {
-                        intern_codegen_ty(pool, c)
+                    params: x.params.map((s0) -> {
+                        InferFunctionParamTy {
+                            name: s0.name,
+                            ty: intern_codegen_ty(pool, s0.ty),
+                            mode: s0.mode,
+                        }
                     }),
                     ret: intern_codegen_ty(pool, x.ret),
                     throws_: intern_codegen_ty(pool, x.throws_),
@@ -3641,8 +4882,8 @@ function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
         let x: CodegenTyTuple => {
             pool.add(
                 InferTyTuple {
-                    items: x.items.map((c) -> {
-                        intern_codegen_ty(pool, c)
+                    items: x.items.map((c0) -> {
+                        intern_codegen_ty(pool, c0)
                     }),
                 },
             )
@@ -3650,6 +4891,7 @@ function intern_codegen_ty(pool: InferPool, t: CodegenTy) -> int {
     }
 }
 
+// Interns `t` bottom-up; returns its handle.
 function intern_realized_ty(pool: InferPool, t: RealizedTy) -> int {
     match (t) {
         let x: TyInt
@@ -3677,8 +4919,8 @@ function intern_realized_ty(pool: InferPool, t: RealizedTy) -> int {
             pool.add(
                 InferTyClass {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_realized_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_realized_ty(pool, c0)
                     }),
                 },
             )
@@ -3687,11 +4929,11 @@ function intern_realized_ty(pool: InferPool, t: RealizedTy) -> int {
             pool.add(
                 InferTyInterface {
                     name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_realized_ty(pool, c)
+                    args: x.args.map((c0) -> {
+                        intern_realized_ty(pool, c0)
                     }),
-                    assoc: x.assoc.map((c) -> {
-                        intern_realized_ty(pool, c)
+                    associated_types: x.associated_types.map((s0) -> {
+                        InferAssociatedType { name: s0.name, ty: intern_realized_ty(pool, s0.ty) }
                     }),
                 },
             )
@@ -3708,8 +4950,8 @@ function intern_realized_ty(pool: InferPool, t: RealizedTy) -> int {
         let x: RealizedTyUnion => {
             pool.add(
                 InferTyUnion {
-                    members: x.members.map((c) -> {
-                        intern_realized_ty(pool, c)
+                    members: x.members.map((c0) -> {
+                        intern_realized_ty(pool, c0)
                     }),
                 },
             )
@@ -3717,8 +4959,12 @@ function intern_realized_ty(pool: InferPool, t: RealizedTy) -> int {
         let x: RealizedTyFunction => {
             pool.add(
                 InferTyFunction {
-                    params: x.params.map((c) -> {
-                        intern_realized_ty(pool, c)
+                    params: x.params.map((s0) -> {
+                        InferFunctionParamTy {
+                            name: s0.name,
+                            ty: intern_realized_ty(pool, s0.ty),
+                            mode: s0.mode,
+                        }
                     }),
                     ret: intern_realized_ty(pool, x.ret),
                     throws_: intern_realized_ty(pool, x.throws_),
@@ -3736,77 +4982,8 @@ function intern_realized_ty(pool: InferPool, t: RealizedTy) -> int {
         let x: RealizedTyTuple => {
             pool.add(
                 InferTyTuple {
-                    items: x.items.map((c) -> {
-                        intern_realized_ty(pool, c)
-                    }),
-                },
-            )
-        },
-    }
-}
-
-function intern_concrete_ty(pool: InferPool, t: ConcreteTy) -> int {
-    match (t) {
-        let x: TyInt
-            | TyBigint
-            | TyFloat
-            | TyString
-            | TyBool
-            | TyNull
-            | TyUint8Array
-            | TyMedia
-            | TyEnum
-            | TyRustType
-            | TyType
-            | TyResource
-            | TyPromptAst
-            | TyNever =>
-        {
-            pool.add(x)
-        },
-        let x: ConcreteTyClass => {
-            pool.add(
-                InferTyClass {
-                    name: x.name,
-                    args: x.args.map((c) -> {
-                        intern_concrete_ty(pool, c)
-                    }),
-                },
-            )
-        },
-        let x: ConcreteTyList => pool.add(InferTyList { elem: intern_concrete_ty(pool, x.elem) }),
-        let x: ConcreteTyMap => {
-            pool.add(
-                InferTyMap {
-                    key: intern_concrete_ty(pool, x.key),
-                    value: intern_concrete_ty(pool, x.value),
-                },
-            )
-        },
-        let x: ConcreteTyFunction => {
-            pool.add(
-                InferTyFunction {
-                    params: x.params.map((c) -> {
-                        intern_concrete_ty(pool, c)
-                    }),
-                    ret: intern_concrete_ty(pool, x.ret),
-                    throws_: intern_concrete_ty(pool, x.throws_),
-                },
-            )
-        },
-        let x: ConcreteTyFuture => {
-            pool.add(
-                InferTyFuture {
-                    value: intern_concrete_ty(pool, x.value),
-                    error: intern_concrete_ty(pool, x.error),
-                },
-            )
-        },
-        let x: ConcreteTyTuple => {
-            pool.add(
-                InferTyTuple {
-                    items: x.items.map((c) -> {
-                        intern_concrete_ty(pool, c)
+                    items: x.items.map((c0) -> {
+                        intern_realized_ty(pool, c0)
                     }),
                 },
             )
@@ -3843,19 +5020,19 @@ function resolve_ty(pool: InferPool, h: int) -> Ty throws NarrowError {
         let x: InferTyClass => {
             TyClass {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyInterface => {
             TyInterface {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_ty(pool, c0)
                 }),
-                assoc: x.assoc.map((c) -> {
-                    resolve_ty(pool, c)
+                associated_types: x.associated_types.map((s0) -> {
+                    AssociatedType { name: s0.name, ty: resolve_ty(pool, s0.ty) }
                 }),
             }
         },
@@ -3865,15 +5042,15 @@ function resolve_ty(pool: InferPool, h: int) -> Ty throws NarrowError {
         },
         let x: InferTyUnion => {
             TyUnion {
-                members: x.members.map((c) -> {
-                    resolve_ty(pool, c)
+                members: x.members.map((c0) -> {
+                    resolve_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyFunction => {
             TyFunction {
-                params: x.params.map((c) -> {
-                    resolve_ty(pool, c)
+                params: x.params.map((s0) -> {
+                    FunctionParamTy { name: s0.name, ty: resolve_ty(pool, s0.ty), mode: s0.mode }
                 }),
                 ret: resolve_ty(pool, x.ret),
                 throws_: resolve_ty(pool, x.throws_),
@@ -3882,19 +5059,25 @@ function resolve_ty(pool: InferPool, h: int) -> Ty throws NarrowError {
         let x: InferTyFuture => {
             TyFuture { value: resolve_ty(pool, x.value), error: resolve_ty(pool, x.error) }
         },
-        let x: InferTyProjection => {
-            TyProjection {
+        let x: InferTyAssociatedTypeProjection => {
+            TyAssociatedTypeProjection {
                 base: resolve_ty(pool, x.base),
-                interface_args: x.interface_args.map((c) -> {
-                    resolve_ty(pool, c)
-                }),
+                interface_: InterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map((c0) -> {
+                        resolve_ty(pool, c0)
+                    }),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        AssociatedType { name: s0.name, ty: resolve_ty(pool, s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
         let x: InferTyTuple => {
             TyTuple {
-                items: x.items.map((c) -> {
-                    resolve_ty(pool, c)
+                items: x.items.map((c0) -> {
+                    resolve_ty(pool, c0)
                 }),
             }
         },
@@ -3931,19 +5114,19 @@ function resolve_lowering_ty(pool: InferPool, h: int) -> LoweringTy throws Narro
         let x: InferTyClass => {
             LoweringTyClass {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_lowering_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_lowering_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyInterface => {
             LoweringTyInterface {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_lowering_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_lowering_ty(pool, c0)
                 }),
-                assoc: x.assoc.map((c) -> {
-                    resolve_lowering_ty(pool, c)
+                associated_types: x.associated_types.map((s0) -> {
+                    LoweringAssociatedType { name: s0.name, ty: resolve_lowering_ty(pool, s0.ty) }
                 }),
             }
         },
@@ -3956,15 +5139,19 @@ function resolve_lowering_ty(pool: InferPool, h: int) -> LoweringTy throws Narro
         },
         let x: InferTyUnion => {
             LoweringTyUnion {
-                members: x.members.map((c) -> {
-                    resolve_lowering_ty(pool, c)
+                members: x.members.map((c0) -> {
+                    resolve_lowering_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyFunction => {
             LoweringTyFunction {
-                params: x.params.map((c) -> {
-                    resolve_lowering_ty(pool, c)
+                params: x.params.map((s0) -> {
+                    LoweringFunctionParamTy {
+                        name: s0.name,
+                        ty: resolve_lowering_ty(pool, s0.ty),
+                        mode: s0.mode,
+                    }
                 }),
                 ret: resolve_lowering_ty(pool, x.ret),
                 throws_: resolve_lowering_ty(pool, x.throws_),
@@ -3976,19 +5163,28 @@ function resolve_lowering_ty(pool: InferPool, h: int) -> LoweringTy throws Narro
                 error: resolve_lowering_ty(pool, x.error),
             }
         },
-        let x: InferTyProjection => {
-            LoweringTyProjection {
+        let x: InferTyAssociatedTypeProjection => {
+            LoweringTyAssociatedTypeProjection {
                 base: resolve_lowering_ty(pool, x.base),
-                interface_args: x.interface_args.map((c) -> {
-                    resolve_lowering_ty(pool, c)
-                }),
+                interface_: LoweringInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map((c0) -> {
+                        resolve_lowering_ty(pool, c0)
+                    }),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        LoweringAssociatedType {
+                            name: s0.name,
+                            ty: resolve_lowering_ty(pool, s0.ty),
+                        }
+                    }),
+                },
                 member: x.member,
             }
         },
         let x: InferTyTuple => {
             LoweringTyTuple {
-                items: x.items.map((c) -> {
-                    resolve_lowering_ty(pool, c)
+                items: x.items.map((c0) -> {
+                    resolve_lowering_ty(pool, c0)
                 }),
             }
         },
@@ -4024,19 +5220,19 @@ function resolve_runtime_ty(pool: InferPool, h: int) -> RuntimeTy throws NarrowE
         let x: InferTyClass => {
             RuntimeTyClass {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_runtime_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_runtime_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyInterface => {
             RuntimeTyInterface {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_runtime_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_runtime_ty(pool, c0)
                 }),
-                assoc: x.assoc.map((c) -> {
-                    resolve_runtime_ty(pool, c)
+                associated_types: x.associated_types.map((s0) -> {
+                    RuntimeAssociatedType { name: s0.name, ty: resolve_runtime_ty(pool, s0.ty) }
                 }),
             }
         },
@@ -4049,15 +5245,19 @@ function resolve_runtime_ty(pool: InferPool, h: int) -> RuntimeTy throws NarrowE
         },
         let x: InferTyUnion => {
             RuntimeTyUnion {
-                members: x.members.map((c) -> {
-                    resolve_runtime_ty(pool, c)
+                members: x.members.map((c0) -> {
+                    resolve_runtime_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyFunction => {
             RuntimeTyFunction {
-                params: x.params.map((c) -> {
-                    resolve_runtime_ty(pool, c)
+                params: x.params.map((s0) -> {
+                    RuntimeFunctionParamTy {
+                        name: s0.name,
+                        ty: resolve_runtime_ty(pool, s0.ty),
+                        mode: s0.mode,
+                    }
                 }),
                 ret: resolve_runtime_ty(pool, x.ret),
                 throws_: resolve_runtime_ty(pool, x.throws_),
@@ -4069,19 +5269,25 @@ function resolve_runtime_ty(pool: InferPool, h: int) -> RuntimeTy throws NarrowE
                 error: resolve_runtime_ty(pool, x.error),
             }
         },
-        let x: InferTyProjection => {
-            RuntimeTyProjection {
+        let x: InferTyAssociatedTypeProjection => {
+            RuntimeTyAssociatedTypeProjection {
                 base: resolve_runtime_ty(pool, x.base),
-                interface_args: x.interface_args.map((c) -> {
-                    resolve_runtime_ty(pool, c)
-                }),
+                interface_: RuntimeInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map((c0) -> {
+                        resolve_runtime_ty(pool, c0)
+                    }),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        RuntimeAssociatedType { name: s0.name, ty: resolve_runtime_ty(pool, s0.ty) }
+                    }),
+                },
                 member: x.member,
             }
         },
         let x: InferTyTuple => {
             RuntimeTyTuple {
-                items: x.items.map((c) -> {
-                    resolve_runtime_ty(pool, c)
+                items: x.items.map((c0) -> {
+                    resolve_runtime_ty(pool, c0)
                 }),
             }
         },
@@ -4118,19 +5324,19 @@ function resolve_codegen_ty(pool: InferPool, h: int) -> CodegenTy throws NarrowE
         let x: InferTyClass => {
             CodegenTyClass {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_codegen_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_codegen_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyInterface => {
             CodegenTyInterface {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_codegen_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_codegen_ty(pool, c0)
                 }),
-                assoc: x.assoc.map((c) -> {
-                    resolve_codegen_ty(pool, c)
+                associated_types: x.associated_types.map((s0) -> {
+                    CodegenAssociatedType { name: s0.name, ty: resolve_codegen_ty(pool, s0.ty) }
                 }),
             }
         },
@@ -4143,15 +5349,19 @@ function resolve_codegen_ty(pool: InferPool, h: int) -> CodegenTy throws NarrowE
         },
         let x: InferTyUnion => {
             CodegenTyUnion {
-                members: x.members.map((c) -> {
-                    resolve_codegen_ty(pool, c)
+                members: x.members.map((c0) -> {
+                    resolve_codegen_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyFunction => {
             CodegenTyFunction {
-                params: x.params.map((c) -> {
-                    resolve_codegen_ty(pool, c)
+                params: x.params.map((s0) -> {
+                    CodegenFunctionParamTy {
+                        name: s0.name,
+                        ty: resolve_codegen_ty(pool, s0.ty),
+                        mode: s0.mode,
+                    }
                 }),
                 ret: resolve_codegen_ty(pool, x.ret),
                 throws_: resolve_codegen_ty(pool, x.throws_),
@@ -4165,12 +5375,14 @@ function resolve_codegen_ty(pool: InferPool, h: int) -> CodegenTy throws NarrowE
         },
         let x: InferTyTuple => {
             CodegenTyTuple {
-                items: x.items.map((c) -> {
-                    resolve_codegen_ty(pool, c)
+                items: x.items.map((c0) -> {
+                    resolve_codegen_ty(pool, c0)
                 }),
             }
         },
-        InferTyProjection => throw NarrowError { variant: "Projection", into: "CodegenTy" },
+        InferTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "CodegenTy" }
+        },
         TyError => throw NarrowError { variant: "Error", into: "CodegenTy" },
         TyInferVar => throw NarrowError { variant: "InferVar", into: "CodegenTy" },
     }
@@ -4203,19 +5415,19 @@ function resolve_realized_ty(pool: InferPool, h: int) -> RealizedTy throws Narro
         let x: InferTyClass => {
             RealizedTyClass {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_realized_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_realized_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyInterface => {
             RealizedTyInterface {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_realized_ty(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_realized_ty(pool, c0)
                 }),
-                assoc: x.assoc.map((c) -> {
-                    resolve_realized_ty(pool, c)
+                associated_types: x.associated_types.map((s0) -> {
+                    RealizedAssociatedType { name: s0.name, ty: resolve_realized_ty(pool, s0.ty) }
                 }),
             }
         },
@@ -4228,15 +5440,19 @@ function resolve_realized_ty(pool: InferPool, h: int) -> RealizedTy throws Narro
         },
         let x: InferTyUnion => {
             RealizedTyUnion {
-                members: x.members.map((c) -> {
-                    resolve_realized_ty(pool, c)
+                members: x.members.map((c0) -> {
+                    resolve_realized_ty(pool, c0)
                 }),
             }
         },
         let x: InferTyFunction => {
             RealizedTyFunction {
-                params: x.params.map((c) -> {
-                    resolve_realized_ty(pool, c)
+                params: x.params.map((s0) -> {
+                    RealizedFunctionParamTy {
+                        name: s0.name,
+                        ty: resolve_realized_ty(pool, s0.ty),
+                        mode: s0.mode,
+                    }
                 }),
                 ret: resolve_realized_ty(pool, x.ret),
                 throws_: resolve_realized_ty(pool, x.throws_),
@@ -4250,85 +5466,17 @@ function resolve_realized_ty(pool: InferPool, h: int) -> RealizedTy throws Narro
         },
         let x: InferTyTuple => {
             RealizedTyTuple {
-                items: x.items.map((c) -> {
-                    resolve_realized_ty(pool, c)
+                items: x.items.map((c0) -> {
+                    resolve_realized_ty(pool, c0)
                 }),
             }
         },
         TyTypeVar => throw NarrowError { variant: "TypeVar", into: "RealizedTy" },
-        InferTyProjection => throw NarrowError { variant: "Projection", into: "RealizedTy" },
+        InferTyAssociatedTypeProjection => {
+            throw NarrowError { variant: "AssociatedTypeProjection", into: "RealizedTy" }
+        },
         TyError => throw NarrowError { variant: "Error", into: "RealizedTy" },
         TyInferVar => throw NarrowError { variant: "InferVar", into: "RealizedTy" },
-    }
-}
-
-// Reads handle `h` back as a ConcreteTy; fails on a variant outside it.
-function resolve_concrete_ty(pool: InferPool, h: int) -> ConcreteTy throws NarrowError {
-    match (pool.kinds[h]) {
-        let x: TyInt
-            | TyBigint
-            | TyFloat
-            | TyString
-            | TyBool
-            | TyNull
-            | TyUint8Array
-            | TyMedia
-            | TyEnum
-            | TyRustType
-            | TyType
-            | TyResource
-            | TyPromptAst
-            | TyNever =>
-        {
-            x
-        },
-        let x: InferTyClass => {
-            ConcreteTyClass {
-                name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_concrete_ty(pool, c)
-                }),
-            }
-        },
-        let x: InferTyList => ConcreteTyList { elem: resolve_concrete_ty(pool, x.elem) },
-        let x: InferTyMap => {
-            ConcreteTyMap {
-                key: resolve_concrete_ty(pool, x.key),
-                value: resolve_concrete_ty(pool, x.value),
-            }
-        },
-        let x: InferTyFunction => {
-            ConcreteTyFunction {
-                params: x.params.map((c) -> {
-                    resolve_concrete_ty(pool, c)
-                }),
-                ret: resolve_concrete_ty(pool, x.ret),
-                throws_: resolve_concrete_ty(pool, x.throws_),
-            }
-        },
-        let x: InferTyFuture => {
-            ConcreteTyFuture {
-                value: resolve_concrete_ty(pool, x.value),
-                error: resolve_concrete_ty(pool, x.error),
-            }
-        },
-        let x: InferTyTuple => {
-            ConcreteTyTuple {
-                items: x.items.map((c) -> {
-                    resolve_concrete_ty(pool, c)
-                }),
-            }
-        },
-        TyLiteral => throw NarrowError { variant: "Literal", into: "ConcreteTy" },
-        InferTyInterface => throw NarrowError { variant: "Interface", into: "ConcreteTy" },
-        TyEnumVariant => throw NarrowError { variant: "EnumVariant", into: "ConcreteTy" },
-        InferTyUnion => throw NarrowError { variant: "Union", into: "ConcreteTy" },
-        TyTypeAlias => throw NarrowError { variant: "TypeAlias", into: "ConcreteTy" },
-        TyTypeVar => throw NarrowError { variant: "TypeVar", into: "ConcreteTy" },
-        InferTyProjection => throw NarrowError { variant: "Projection", into: "ConcreteTy" },
-        TyUnknown => throw NarrowError { variant: "Unknown", into: "ConcreteTy" },
-        TyError => throw NarrowError { variant: "Error", into: "ConcreteTy" },
-        TyInferVar => throw NarrowError { variant: "InferVar", into: "ConcreteTy" },
     }
 }
 
@@ -4359,19 +5507,19 @@ function resolve_ty_template(pool: InferPool, h: int) -> TyTemplate throws Narro
         let x: InferTyClass => {
             TyTemplateClass {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_ty_template(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_ty_template(pool, c0)
                 }),
             }
         },
         let x: InferTyInterface => {
             TyTemplateInterface {
                 name: x.name,
-                args: x.args.map((c) -> {
-                    resolve_ty_template(pool, c)
+                args: x.args.map((c0) -> {
+                    resolve_ty_template(pool, c0)
                 }),
-                assoc: x.assoc.map((c) -> {
-                    resolve_ty_template(pool, c)
+                associated_types: x.associated_types.map((s0) -> {
+                    TyTemplateAssociatedType { name: s0.name, ty: resolve_ty_template(pool, s0.ty) }
                 }),
             }
         },
@@ -4384,15 +5532,19 @@ function resolve_ty_template(pool: InferPool, h: int) -> TyTemplate throws Narro
         },
         let x: InferTyUnion => {
             TyTemplateUnion {
-                members: x.members.map((c) -> {
-                    resolve_ty_template(pool, c)
+                members: x.members.map((c0) -> {
+                    resolve_ty_template(pool, c0)
                 }),
             }
         },
         let x: InferTyFunction => {
             TyTemplateFunction {
-                params: x.params.map((c) -> {
-                    resolve_ty_template(pool, c)
+                params: x.params.map((s0) -> {
+                    TyTemplateFunctionParamTy {
+                        name: s0.name,
+                        ty: resolve_ty_template(pool, s0.ty),
+                        mode: s0.mode,
+                    }
                 }),
                 ret: resolve_ty_template(pool, x.ret),
                 throws_: resolve_ty_template(pool, x.throws_),
@@ -4404,19 +5556,28 @@ function resolve_ty_template(pool: InferPool, h: int) -> TyTemplate throws Narro
                 error: resolve_ty_template(pool, x.error),
             }
         },
-        let x: InferTyProjection => {
-            TyTemplateProjection {
+        let x: InferTyAssociatedTypeProjection => {
+            TyTemplateAssociatedTypeProjection {
                 base: resolve_ty_template(pool, x.base),
-                interface_args: x.interface_args.map((c) -> {
-                    resolve_ty_template(pool, c)
-                }),
+                interface_: TyTemplateInterfaceConstraint {
+                    name: x.interface_.name,
+                    generics: x.interface_.generics.map((c0) -> {
+                        resolve_ty_template(pool, c0)
+                    }),
+                    associated_types: x.interface_.associated_types.map((s0) -> {
+                        TyTemplateAssociatedType {
+                            name: s0.name,
+                            ty: resolve_ty_template(pool, s0.ty),
+                        }
+                    }),
+                },
                 member: x.member,
             }
         },
         let x: InferTyTuple => {
             TyTemplateTuple {
-                items: x.items.map((c) -> {
-                    resolve_ty_template(pool, c)
+                items: x.items.map((c0) -> {
+                    resolve_ty_template(pool, c0)
                 }),
             }
         },

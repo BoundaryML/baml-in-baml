@@ -1,39 +1,42 @@
-// The master description of the type family: the BAML twin of the
-// `ty_family!` invocation in baml_type/src/family.rs. Every generated
-// declaration in ../family.baml is derived from FAMILY.
+// port: baml_type/src/family.rs @ d9be6853b (the `ty_family!` invocation)
+//
+// The master description of the type family. Every declaration in
+// ../family.baml is derived from FAMILY by gen.baml.
 
+// port: the `axes { .. }` section.
 enum Axis {
     Concrete,
     Abstract,
-    Projection,
-    Special,
-    Lower,
-    Frame,
     Literal,
     Never,
     Typevar,
+    Projection,
+    Lower,
     Infer,
     Error,
+    Special,
+    Frame,
 }
 
-// What a variant's field holds. `Child`/`Children` are nested types: they
-// are retargeted per member (the member itself, or a pool handle for an
-// interned member); every other kind is copied as is.
+// What a field holds. `Child`/`Children` are nested types and `Satellite`/
+// `Satellites` nested satellite structs: all four are retargeted per member.
+// `Head` is the nominal type head `N`, typed as the member's head. `Opaque`
+// is copied as is, typed as `Field.of`.
 enum FieldKind {
     Child,
     Children,
-    // A nominal type head (`N`): typed as the member's `head`.
     Head,
-    Name,
-    Media,
-    Id,
-    LitValue,
-    Freshness,
+    Satellite,
+    Satellites,
+    Opaque,
 }
 
 class Field {
     name: string,
     kind: FieldKind,
+    // The BAML type of an `Opaque` field, or the satellite a `Satellite(s)`
+    // field holds; empty otherwise.
+    of: string,
 }
 
 class Variant {
@@ -41,9 +44,13 @@ class Variant {
     axis: Axis,
     fields: Field[],
 
+    // Whether the variant holds a nested type (directly or in a satellite).
     function nests(self) -> bool {
         self.fields.some((f) -> {
-            f.kind == FieldKind.Child || f.kind == FieldKind.Children
+            f.kind == FieldKind.Child
+                || f.kind == FieldKind.Children
+                || f.kind == FieldKind.Satellite
+                || f.kind == FieldKind.Satellites
         })
     }
 
@@ -54,58 +61,63 @@ class Variant {
     }
 }
 
-// `interned`: children are `int` handles into the hash-cons pool instead of
-// the member itself (the `child: interned(..)` member).
+// port: a `satellite Name<N> { .. }` section: a struct threaded per member
+// (`FunctionParamTy`, `RuntimeFunctionParamTy`, ...).
+class Satellite {
+    name: string,
+    fields: Field[],
+}
+
+// port: a `type Name { includes: [..], child: C, head: H }` section.
 class Member {
     name: string,
     // Function-name stem (`narrow_ty_to_runtime_ty`).
     snake: string,
-    // The type a nominal head (`N`) is: the member's `head:` in family.rs.
+    // The type a nominal head (`N`) is.
     head: string,
     axes: Axis[],
+    // The member nested positions hold: the member itself (deep) or another
+    // deep member (shallow). Ignored when `interned`.
+    child: string,
+    // `child: interned(..)`: nested positions are `int` handles into the
+    // hash-cons pool.
     interned: bool,
-}
-
-// The bit each axis contributes to a pool entry's flags (`TypeFlags`).
-class AxisFlag {
-    axis: Axis,
-    flag: string,
-    bit: int,
 }
 
 class Family {
     variants: Variant[],
+    satellites: Satellite[],
     members: Member[],
-    flags: AxisFlag[],
 }
 
 function child(name: string) -> Field {
-    Field { name: name, kind: FieldKind.Child }
+    Field { name: name, kind: FieldKind.Child, of: "" }
 }
 
 function children(name: string) -> Field {
-    Field { name: name, kind: FieldKind.Children }
+    Field { name: name, kind: FieldKind.Children, of: "" }
+}
+
+function head(name: string) -> Field {
+    Field { name: name, kind: FieldKind.Head, of: "" }
+}
+
+function opaque(name: string, of: string) -> Field {
+    Field { name: name, kind: FieldKind.Opaque, of: of }
+}
+
+function satellite(name: string, of: string) -> Field {
+    Field { name: name, kind: FieldKind.Satellite, of: of }
+}
+
+function satellites(name: string, of: string) -> Field {
+    Field { name: name, kind: FieldKind.Satellites, of: of }
 }
 
 function leaf(name: string, axis: Axis) -> Variant {
     Variant { name: name, axis: axis, fields: [] }
 }
 
-function f(name: string, kind: FieldKind) -> Field {
-    Field { name: name, kind: kind }
-}
-
-function nest(name: string, axis: Axis, fields: Field[]) -> Variant {
-    Variant { name: name, axis: axis, fields: fields }
-}
-
-// Every member is headed by `DeclName`: the frontend (HIR through emit) uses
-// each member at `DeclName`; `TypeName` heads appear only on the runtime side.
-// A member needed at another head is another entry here.
-//
-// Full scale: the 32 variants of family.rs. Satellite positions
-// (FunctionParamTy, Interface, associated-type pairs) are modelled as child
-// lists of the same arity.
 const TY_AXES: Axis[] = [
     Axis.Concrete,
     Axis.Abstract,
@@ -117,6 +129,9 @@ const TY_AXES: Axis[] = [
     Axis.Special,
 ];
 
+// Every member is headed by `DeclName`: the frontend (HIR through emit) uses
+// each member at `DeclName`; `TypeName` heads appear only on the runtime side.
+// A member needed at another head is another entry here.
 const FAMILY: Family = Family {
     variants: [
         leaf("Int", Axis.Concrete),
@@ -126,51 +141,92 @@ const FAMILY: Family = Family {
         leaf("Bool", Axis.Concrete),
         leaf("Null", Axis.Concrete),
         leaf("Uint8Array", Axis.Concrete),
-        nest("Media", Axis.Concrete, [f("kind", FieldKind.Media)]),
-        nest(
-            "Literal",
-            Axis.Literal,
-            [f("value", FieldKind.LitValue), f("freshness", FieldKind.Freshness)],
-        ),
-        nest("Class", Axis.Concrete, [f("name", FieldKind.Head), children("args")]),
-        nest(
-            "Interface",
-            Axis.Abstract,
-            [f("name", FieldKind.Head), children("args"), children("assoc")],
-        ),
-        nest("Enum", Axis.Concrete, [f("name", FieldKind.Head)]),
-        nest("EnumVariant", Axis.Literal, [f("name", FieldKind.Head), f("variant", FieldKind.Name)]),
-        nest("List", Axis.Concrete, [child("elem")]),
-        nest("Map", Axis.Concrete, [child("key"), child("value")]),
-        nest("Union", Axis.Abstract, [children("members")]),
-        nest("Function", Axis.Concrete, [children("params"), child("ret"), child("throws_")]),
-        nest("Future", Axis.Concrete, [child("value"), child("error")]),
+        Variant {
+            name: "Media",
+            axis: Axis.Concrete,
+            fields: [opaque("kind", "root.base.MediaKind")],
+        },
+        Variant {
+            name: "Literal",
+            axis: Axis.Literal,
+            fields: [opaque("value", "root.base.Literal"), opaque("freshness", "Freshness")],
+        },
+        Variant { name: "Class", axis: Axis.Concrete, fields: [head("name"), children("args")] },
+        Variant {
+            name: "Interface",
+            axis: Axis.Abstract,
+            fields: [head("name"), children("args"), satellites("associated_types", "AssociatedType")],
+        },
+        Variant { name: "Enum", axis: Axis.Concrete, fields: [head("name")] },
+        Variant {
+            name: "EnumVariant",
+            axis: Axis.Literal,
+            fields: [head("name"), opaque("variant", "string")],
+        },
+        Variant { name: "List", axis: Axis.Concrete, fields: [child("elem")] },
+        Variant { name: "Map", axis: Axis.Concrete, fields: [child("key"), child("value")] },
+        Variant { name: "Union", axis: Axis.Abstract, fields: [children("members")] },
+        Variant {
+            name: "Function",
+            axis: Axis.Concrete,
+            fields: [satellites("params", "FunctionParamTy"), child("ret"), child("throws_")],
+        },
+        Variant { name: "Future", axis: Axis.Concrete, fields: [child("value"), child("error")] },
         leaf("RustType", Axis.Concrete),
         leaf("Type", Axis.Concrete),
         leaf("Resource", Axis.Concrete),
         leaf("PromptAst", Axis.Concrete),
-        nest("TypeAlias", Axis.Special, [f("name", FieldKind.Head)]),
-        nest("TypeVar", Axis.Typevar, [f("name", FieldKind.Name)]),
-        nest(
-            "Projection",
-            Axis.Projection,
-            [child("base"), children("interface_args"), f("member", FieldKind.Name)],
-        ),
+        Variant { name: "TypeAlias", axis: Axis.Special, fields: [head("name")] },
+        Variant { name: "TypeVar", axis: Axis.Typevar, fields: [opaque("param", "ParamTy")] },
+        Variant {
+            name: "AssociatedTypeProjection",
+            axis: Axis.Projection,
+            fields: [
+                child("base"),
+                satellite("interface_", "InterfaceConstraint"),
+                opaque("member", "string"),
+            ],
+        },
         leaf("Unknown", Axis.Abstract),
         leaf("Never", Axis.Never),
         leaf("Error", Axis.Error),
         leaf("Infer", Axis.Lower),
-        nest("InferVar", Axis.Infer, [f("id", FieldKind.Id)]),
-        nest("TypeArgRef", Axis.Frame, [f("index", FieldKind.Id)]),
-        nest("Tuple", Axis.Concrete, [children("items")]),
+        Variant { name: "TypeArgRef", axis: Axis.Frame, fields: [opaque("index", "int")] },
+        Variant { name: "InferVar", axis: Axis.Infer, fields: [opaque("var", "int")] },
+        Variant { name: "Tuple", axis: Axis.Concrete, fields: [children("items")] },
+    ],
+    satellites: [
+        Satellite {
+            name: "FunctionParamTy",
+            fields: [opaque("name", "string?"), child("ty"), opaque("mode", "FunctionParamMode")],
+        },
+        // Rust's `Interface` satellite: an interface constraint, distinct from
+        // the `Interface` existential variant. Renamed because a member's
+        // satellite and variant classes share one namespace here
+        // (`TyTemplate` + `Interface` would be both).
+        Satellite {
+            name: "InterfaceConstraint",
+            fields: [head("name"), children("generics"), satellites("associated_types", "AssociatedType")],
+        },
+        // Rust spells an associated-type binding as a `(Name, Ty)` pair; a
+        // tuple is not hashable in BAML, and the pool hashes its entries.
+        Satellite { name: "AssociatedType", fields: [opaque("name", "string"), child("ty")] },
     ],
     members: [
-        Member { name: "Ty", snake: "ty", head: "DeclName", axes: TY_AXES, interned: false },
+        Member {
+            name: "Ty",
+            snake: "ty",
+            head: "DeclName",
+            axes: TY_AXES,
+            child: "Ty",
+            interned: false,
+        },
         Member {
             name: "LoweringTy",
             snake: "lowering_ty",
             head: "DeclName",
             axes: TY_AXES.concat([Axis.Lower]),
+            child: "LoweringTy",
             interned: false,
         },
         Member {
@@ -186,6 +242,7 @@ const FAMILY: Family = Family {
                 Axis.Projection,
                 Axis.Special,
             ],
+            child: "RuntimeTy",
             interned: false,
         },
         Member {
@@ -193,6 +250,7 @@ const FAMILY: Family = Family {
             snake: "codegen_ty",
             head: "DeclName",
             axes: [Axis.Concrete, Axis.Abstract, Axis.Literal, Axis.Never, Axis.Typevar, Axis.Special],
+            child: "CodegenTy",
             interned: false,
         },
         Member {
@@ -200,6 +258,7 @@ const FAMILY: Family = Family {
             snake: "realized_ty",
             head: "DeclName",
             axes: [Axis.Concrete, Axis.Abstract, Axis.Literal, Axis.Never, Axis.Special],
+            child: "RealizedTy",
             interned: false,
         },
         Member {
@@ -207,6 +266,15 @@ const FAMILY: Family = Family {
             snake: "concrete_ty",
             head: "DeclName",
             axes: [Axis.Concrete, Axis.Never],
+            child: "RuntimeTy",
+            interned: false,
+        },
+        Member {
+            name: "ConcreteRealizedTy",
+            snake: "concrete_realized_ty",
+            head: "DeclName",
+            axes: [Axis.Concrete, Axis.Never],
+            child: "RealizedTy",
             interned: false,
         },
         Member {
@@ -222,20 +290,26 @@ const FAMILY: Family = Family {
                 Axis.Special,
                 Axis.Frame,
             ],
+            child: "TyTemplate",
             interned: false,
         },
         Member {
             name: "InferTy",
             snake: "infer_ty",
             head: "DeclName",
-            axes: TY_AXES.concat([Axis.Infer]),
+            axes: [
+                Axis.Concrete,
+                Axis.Abstract,
+                Axis.Literal,
+                Axis.Never,
+                Axis.Typevar,
+                Axis.Projection,
+                Axis.Infer,
+                Axis.Error,
+                Axis.Special,
+            ],
+            child: "InferTy",
             interned: true,
         },
-    ],
-    flags: [
-        AxisFlag { axis: Axis.Infer, flag: "HAS_INFER", bit: 1 },
-        AxisFlag { axis: Axis.Error, flag: "HAS_ERROR", bit: 2 },
-        AxisFlag { axis: Axis.Typevar, flag: "HAS_TYPEVAR", bit: 4 },
-        AxisFlag { axis: Axis.Projection, flag: "HAS_PROJECTION", bit: 8 },
     ],
 };
