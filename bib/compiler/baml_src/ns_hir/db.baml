@@ -117,6 +117,8 @@ class Db {
   scopes: LocArena,
   namespaces: NamespaceArena,
   memo: Memos,
+  // The type checker's caches (ns_hir_ty/db.baml).
+  ty_memo: root.hir_ty.TyMemos,
   // The tracked-query stack the type checker's cyclic queries share
   // (tracked.baml).
   cycles: Cycles,
@@ -138,6 +140,7 @@ class Db {
       scopes: LocArena.new(),
       namespaces: NamespaceArena.new(),
       memo: Memos.new(),
+      ty_memo: root.hir_ty.TyMemos.new(),
       cycles: Cycles.new(),
     }
   }
