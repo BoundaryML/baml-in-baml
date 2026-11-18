@@ -669,6 +669,12 @@ function generic_lambda(p: Parser, lt: int) -> AnyExpr throws never {
 }
 
 // port: baml_parser/src/expr.rs::impl Parse for PathExpr @ d9be6853b
+// The two `allowed` sets of `parse_path_expr`, compile-time constants in Rust
+// (`PATH_SEGMENT.insert(TokenKind::Client)`, `PATH_SEGMENT.union(MEMBER_NAME)`);
+// built once here, not per segment.
+const PATH_FIRST_SEGMENT: KindSet = PATH_SEGMENT.union(KindSet.of([TokenKind.Client]));
+const PATH_LATER_SEGMENT: KindSet = PATH_SEGMENT.union(MEMBER_NAME);
+
 // `x`, `a.b.c`: a name and the `.segment`s that follow it. The first segment
 // must be a path-shaped word; later ones may be any member name, so
 // `reflect.Class.extends` is one path. A `.` followed by nothing path-like
@@ -682,9 +688,9 @@ function parse_path_expr(p: Parser, head: int) -> PathExpr throws never {
             break;
         }
         let allowed = if (segments) {
-            PATH_SEGMENT.union(MEMBER_NAME)
+            PATH_LATER_SEGMENT
         } else {
-            PATH_SEGMENT.union(KindSet.of([TokenKind.Client]))
+            PATH_FIRST_SEGMENT
         };
         let continues = p.cur.at(TokenKind.Dot) && p.cur.nth_in(1, allowed);
         if (p.cur.nth_in(1, NUMBER) || (!continues && !segments)) {

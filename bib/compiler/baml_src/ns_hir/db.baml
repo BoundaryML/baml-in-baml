@@ -128,7 +128,7 @@ class Db {
       files: [],
       roots: [],
       root_order: [],
-      lang_roots: root.base.LangRoots { roots: {} },
+      lang_roots: root.base.LangRoots { roots: {}, by_root: null },
       prelude: [],
       function_locs: LocArena.new(),
       class_locs: LocArena.new(),

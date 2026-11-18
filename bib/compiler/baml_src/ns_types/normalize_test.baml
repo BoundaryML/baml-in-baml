@@ -44,7 +44,7 @@ function test_lang() -> root.base.LangRoots throws never {
     for (let package in root.base.LANG_PACKAGES) {
         roots.set(package, test_root(root.base.lang_package_manifest_name(package)));
     }
-    root.base.LangRoots { roots: roots }
+    root.base.LangRoots { roots: roots, by_root: null }
 }
 
 // port: baml_type/src/normalize/tests.rs::Ctx @ d9be6853b

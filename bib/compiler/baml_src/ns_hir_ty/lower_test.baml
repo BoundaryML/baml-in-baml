@@ -8,7 +8,7 @@ function lang() -> root.base.LangRoots throws never {
     for (let i = 0; i < root.base.LANG_PACKAGES.length(); i += 1) {
         roots[root.base.LANG_PACKAGES[i]] = USER_ROOT + 1 + i;
     }
-    root.base.LangRoots { roots: roots }
+    root.base.LangRoots { roots: roots, by_root: null }
 }
 
 // The compile-time head of a carrier definition spelled
@@ -78,7 +78,7 @@ test "compiler aliases stay nominal without the language root" {
     // an ordinary class: identity is the root, not the name.
     let pool = root.types.InferPool.new();
     let name = carrier_decl_name(lang(), ["baml", "media", "Image"]);
-    match (pool.kinds[class_ty_interned(pool, root.base.LangRoots { roots: {} }, name, [])]) {
+    match (pool.kinds[class_ty_interned(pool, root.base.LangRoots { roots: {}, by_root: null }, name, [])]) {
         let c: root.types.InferTyClass => assert.equal(c.name, name),
         _ => assert.is_true(false),
     }

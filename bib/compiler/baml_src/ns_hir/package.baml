@@ -324,6 +324,9 @@ class PackageItems {
     // Namespace path -> items within that namespace, in discovery order
     // (Rust's `IndexMap<Vec<Name>, _>`: arrays are not map keys).
     namespaces: (string[], NamespaceItems)[],
+    // Speed: a namespace's position in `namespaces`, by its path joined with
+    // ".", for `namespace` (Rust's IndexMap lookup is a hash lookup too).
+    index: map<string, int>,
     // Conflicts and other rare data; null when none exist.
     extra: PackageItemsExtra?,
 
@@ -339,9 +342,8 @@ class PackageItems {
 
     // `IndexMap::get` on `namespaces`: the items of the namespace `path`.
     function namespace(self, path: string[]) -> NamespaceItems? throws never {
-        self.namespaces.find((entry) -> {
-            entry.0 == path
-        })?.1
+        let at = self.index.get(path.join(".")) ?? return null;
+        self.namespaces[at].1
     }
 
     // port: baml_compiler2_hir/src/package.rs::PackageItems::lookup_type @ d9be6853b
@@ -395,7 +397,11 @@ function package_items(db: Db, root_id: int) -> PackageItems throws never {
             PackageItemsExtra { conflicts: all_conflicts, shadows: shadows }
         };
 
-        PackageItems { root_id: root_id, namespaces: namespaces, extra: extra }
+        let index: map<string, int> = {};
+        for (let i = 0; i < namespaces.length(); i += 1) {
+            index[namespaces[i].0.join(".")] = i;
+        }
+        PackageItems { root_id: root_id, namespaces: namespaces, index: index, extra: extra }
     })
 }
 

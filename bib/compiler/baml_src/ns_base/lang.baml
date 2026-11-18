@@ -64,6 +64,29 @@ function lang_package_from_manifest_name(name: string) -> LangPackage? throws ne
 // id), if it is.
 class LangRoots {
   roots: map<LangPackage, int>,
+  // Speed: `roots` inverted (root id -> package), built on first use and
+  // reset whenever `roots` changes (`set`). An int-keyed lookup is much
+  // cheaper than an enum-keyed one on the VM.
+  by_root: map<int, LangPackage>?,
+
+  // Install `package` at `root_id`.
+  function set(self, package: LangPackage, root_id: int) -> void throws never {
+    self.roots[package] = root_id;
+    self.by_root = null;
+  }
+
+  function inverted(self) -> map<int, LangPackage> throws never {
+    let built = self.by_root;
+    if (built != null) {
+      return built;
+    }
+    let out: map<int, LangPackage> = {};
+    for (let package in self.roots.keys()) {
+      out[self.roots[package]] = package;
+    }
+    self.by_root = out;
+    out
+  }
 
   function get(self, package: LangPackage) -> int? throws never {
     self.roots.get(package)
@@ -71,11 +94,11 @@ class LangRoots {
 
   // Whether `root` is the installed `package`.
   function is_(self, package: LangPackage, root_id: int) -> bool throws never {
-    self.roots.get(package) == root_id
+    self.inverted().get(root_id) == package
   }
 
   // Which language package `root` is, if it is one.
   function package_of(self, root_id: int) -> LangPackage? throws never {
-    LANG_PACKAGES.find((package) -> { self.roots.get(package) == root_id })
+    self.inverted().get(root_id)
   }
 }

@@ -87,7 +87,7 @@ function install_stdlib(db: root.hir.Db, stdlib_dir: string) -> void throws baml
   for (let lang in root.base.LANG_PACKAGES) {
     let id = roots.get(root.base.lang_package_manifest_name(lang));
     if (id != null) {
-      db.lang_roots.roots[lang] = id;
+      db.lang_roots.set(lang, id);
     }
   }
 }
