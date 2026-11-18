@@ -116,7 +116,9 @@ function lower_tagged_template(
     };
     if (tag_func_loc == null) {
         let tag_name: string? = match (ctx.body.exprs[tag]) {
-            let path: root.ast.ExprPath => path.value.segments.at(path.value.segments.length() - 1),
+            let path: root.ast.ExprPath if path.value.segments.length() > 0 => {
+                path.value.segments[path.value.segments.length() - 1]
+            },
             _ => null,
         };
         if (tag_name != null) {
