@@ -60,26 +60,6 @@ function is_at_type_start(cur: Cursor) -> bool throws never {
         || (cur.at(TokenKind.Minus) && cur.nth_in(1, NUMBER))
 }
 
-// port: baml_parser/src/types.rs::type_mark @ d9be6853b
-// The start token of a parsed type, for nodes wrapping it.
-// deviation: a field shared by every member of a union is not readable
-// through the union (E0007), so the span is read per member.
-function type_mark(p: Parser, ty: AnyType) -> Mark throws never {
-    let span = match (ty) {
-        let t: PathType => t.span,
-        let t: LiteralType => t.span,
-        let t: ParenType => t.span,
-        let t: TupleType => t.span,
-        let t: FunctionType => t.span,
-        let t: OptionalType => t.span,
-        let t: ArrayType => t.span,
-        let t: UnionType => t.span,
-        let t: QualifiedPath => t.span,
-        let t: Bogus => t.span,
-    };
-    p.mark_of(span)
-}
-
 // port: baml_parser/src/types.rs::any_type @ d9be6853b
 // A type expression; `Missing` when nothing here starts one. The entry point
 // from outside this file: once the whole type is built, its ambiguous
@@ -126,7 +106,7 @@ function type_expr_at(p: Parser) -> AnyType | Missing throws never {
     if (first is Missing || !p.cur.at(TokenKind.Pipe)) {
         return first;
     }
-    let mark = type_mark(p, first);
+    let mark = p.mark_of(node_span(first));
     let arms: UnionArm[] = [];
     while let pipe: int = p.cur.eat(TokenKind.Pipe) {
         let ty = type_postfix(p);
@@ -147,7 +127,7 @@ function type_postfix(p: Parser) -> AnyType | Missing throws never {
         return primary;
     }
     let ty: AnyType = primary;
-    let mark = type_mark(p, ty);
+    let mark = p.mark_of(node_span(ty));
     while (true) {
         let l = p.cur.eat(TokenKind.LBracket);
         if (l != null) {
@@ -401,7 +381,7 @@ function paren_group_contents(p: Parser, l: int) -> AnyType | ParseError throws 
         let ret = type_expr(p);
         let kw = p.cur.eat(TokenKind.Throws);
         let clause = if (kw != null) {
-            throws_clause(p, kw)
+            throws_(p, kw)
         } else {
             null
         };
@@ -412,7 +392,7 @@ function paren_group_contents(p: Parser, l: int) -> AnyType | ParseError throws 
             r: r,
             arrow: arrow,
             ret: ret,
-            throws_clause: clause,
+            throws_: clause,
         };
     }
 
@@ -505,10 +485,10 @@ function qualified_projection(
     }
 }
 
-// port: baml_parser/src/types.rs::throws_clause @ d9be6853b
+// port: baml_parser/src/types.rs::throws_ @ d9be6853b
 // `E` after a function type's `throws`: the operand is part of the type being
 // built.
-function throws_clause(p: Parser, kw: int) -> ThrowsClause throws never {
+function throws_(p: Parser, kw: int) -> ThrowsClause throws never {
     let ty = type_expr(p);
     ThrowsClause { span: p.span_from(Mark { idx: kw }), kw: kw, ty: ty }
 }
@@ -772,7 +752,7 @@ function collect_function_pipes(
     if (!(ret is Missing)) {
         collect_operand_pipes(p, ret, operand_owner, out);
     }
-    let throws_ty = function_ty.throws_clause?.ty;
+    let throws_ty = function_ty.throws_?.ty;
     if (throws_ty != null && !(throws_ty is Missing)) {
         collect_operand_pipes(p, throws_ty, operand_owner, out);
     }
@@ -946,7 +926,7 @@ function path_type_complete(p: Parser, t: PathType) -> bool throws never {
 }
 
 function function_type_complete(p: Parser, t: FunctionType) -> bool throws never {
-    let throws_ty = t.throws_clause?.ty;
+    let throws_ty = t.throws_?.ty;
     !(t.r is Missing)
         && t.params.every((param) -> {
             type_slot_complete(p, param.item.ty)

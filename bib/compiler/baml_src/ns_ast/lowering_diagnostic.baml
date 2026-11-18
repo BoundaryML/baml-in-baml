@@ -211,7 +211,7 @@ class LoweringDiagnosticInvalidLlmClient {
 // A numeric literal token failed validation. `InvalidDigits` gets one
 // diagnostic per offending digit, spanning that digit.
 class LoweringDiagnosticInvalidNumericLiteral {
-    error: IntLitError,
+    error: root.base.IntLitError,
     span: root.syntax.TextRange,
 }
 
@@ -259,18 +259,6 @@ function trim_matches_quote(s: string) -> string throws never {
         + 1;
     chars.slice(start, end).join("")
 }
-
-// Diagnostic codes (`DiagnosticId::code`) of the ids lowering uses.
-// needs foundation: baml_compiler_diagnostics/src/diagnostic.rs::DiagnosticId::code
-const TYPE_MISMATCH: string = "E0001";
-const INVALID_SYNTAX: string = "E0010";
-const GENERATOR_BLOCK_UNSUPPORTED: string = "E0017";
-const REMOVED_FEATURE: string = "E0098";
-const UNPARSEABLE_TYPE: string = "E0108";
-const INTERFACE_FIELD_DECLARED_IN_IMPLEMENTS_BLOCK: string = "E0127";
-const WILDCARD_TYPE_NOT_ALLOWED: string = "E0147";
-const INVALID_NUMERIC_LITERAL: string = "E0152";
-const INVALID_BUILTIN_TYPE_ARGUMENTS: string = "E0171";
 
 // What `to_diagnostic` reads off a lowering diagnostic: the Rust match's
 // `(id, severity, message, range, label)` tuple.
@@ -353,7 +341,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
     match (diagnostic) {
         let d: LoweringDiagnosticInvalidBuiltinTypeArguments => {
             r(
-                INVALID_BUILTIN_TYPE_ARGUMENTS,
+                root.diagnostics.INVALID_BUILTIN_TYPE_ARGUMENTS,
                 error,
                 if (d.associated_bindings == 0) {
                     `type \`${d.name}\` expects ${d.expected} type argument(s), got ${d.got}`
@@ -366,7 +354,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticSpecTargetNotFunctionName => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "`@spec` applies to a function name: write `Function@spec(...)` without type arguments or parentheses around the name",
                 d.span,
@@ -375,7 +363,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticUnparseableType => {
             r(
-                UNPARSEABLE_TYPE,
+                root.diagnostics.UNPARSEABLE_TYPE,
                 error,
                 `could not parse type expression for ${d.context}`,
                 d.span,
@@ -384,7 +372,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticUnsupportedParameterDefault => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 `parameter defaults are not supported in ${d.context}`,
                 d.span,
@@ -393,7 +381,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticReservedLlmParam => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 `LLM function \`${d.function_name}\` cannot declare a parameter named \`${d.param_name}\`; \`${d.param_name}\` is reserved for ${d.reserved_for}`,
                 d.span,
@@ -407,7 +395,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
                 "this `generator` block"
             };
             r(
-                GENERATOR_BLOCK_UNSUPPORTED,
+                root.diagnostics.GENERATOR_BLOCK_UNSUPPORTED,
                 warning,
                 `${what} is ignored: code generators are configured in \`baml.toml\` now. Move it to a \`[generator.<name>]\` section in \`baml.toml\`.`,
                 d.span,
@@ -416,7 +404,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInstanceofRemoved => {
             r(
-                REMOVED_FEATURE,
+                root.diagnostics.REMOVED_FEATURE,
                 error,
                 "`instanceof` is no longer supported. Use a `match` expression for type checking instead.",
                 d.span,
@@ -426,7 +414,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         // A warning: an empty `${}` renders to the empty string.
         let d: LoweringDiagnosticEmptyInterpolation => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 warning,
                 "empty interpolation ${} has no expression",
                 d.span,
@@ -435,7 +423,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticWildcardTypeNotAllowed => {
             r(
-                WILDCARD_TYPE_NOT_ALLOWED,
+                root.diagnostics.WILDCARD_TYPE_NOT_ALLOWED,
                 error,
                 `the \`_\` wildcard type can only be inferred in a \`let\` binding or a \`throws\` clause, not in ${d.context}`,
                 d.span,
@@ -444,7 +432,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInvalidPatternAscription => {
             r(
-                TYPE_MISMATCH,
+                root.diagnostics.TYPE_MISMATCH,
                 error,
                 `invalid pattern type ascription: ${d.reason}`,
                 d.span,
@@ -453,7 +441,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInvalidTopLevelLet => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 `invalid top-level \`const\`: ${d.reason}`,
                 d.span,
@@ -462,7 +450,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticTestOutsideTestset => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "invalid syntax",
                 d.span,
@@ -478,7 +466,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticTopLevelLetType => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "`let type` binds a type for the rest of a block, so it is only allowed inside a body",
                 d.span,
@@ -487,7 +475,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticConstBindingIntroducer => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 warning,
                 "`const` is currently treated like `let`; BAML does not enforce immutability yet. Use `let` for current BAML semantics.",
                 d.span,
@@ -496,7 +484,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticLetInConstDestructure => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "a destructure started with `const` binds only with `const`",
                 d.span,
@@ -505,7 +493,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticTopLevelLetIntroducer => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "global variables are declared with `const`: `const NAME = value;`",
                 d.span,
@@ -514,7 +502,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticReservedConstBindingName => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "`const` is reserved and cannot be used as a binding name",
                 d.span,
@@ -523,7 +511,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInvalidAssignmentTarget => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 if (d.destructure) {
                     `invalid assignment target; the left side of \`=\` is an expression, not a pattern. To destructure, use a \`let\` pattern: see ${DESTRUCTURING_DOCS_URL}`
@@ -536,7 +524,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticMissingObjectConstructor => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "object construction requires a class or type name",
                 d.span,
@@ -545,7 +533,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInterfaceFieldDeclaredInImplementsBlock => {
             r(
-                INTERFACE_FIELD_DECLARED_IN_IMPLEMENTS_BLOCK,
+                root.diagnostics.INTERFACE_FIELD_DECLARED_IN_IMPLEMENTS_BLOCK,
                 error,
                 `field \`${d.field_name}\` cannot be declared inside \`implements ${d.interface_name}\``,
                 d.span,
@@ -554,7 +542,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticTypeArgsOnNonPathBase => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "type arguments can only be applied to a function reference",
                 d.span,
@@ -563,7 +551,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticClientBlockRemoved => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 `\`client<llm>\` config blocks are removed; declare a client value instead: \`client ${d.name} = ${client_replacement_expr(d.provider)};\` (compose reliability with ai.Retry / ai.Fallback / ai.RoundRobin)`,
                 d.span,
@@ -572,7 +560,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticRetryPolicyRemoved => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 `\`retry_policy\` blocks are removed; wrap the client instead: \`client Reliable = ai.Retry.new(<inner>, max_attempts = ...);\` (\`${d.name}\` has no effect)`,
                 d.span,
@@ -581,7 +569,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticLlmJinjaPromptRemoved => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "Jinja `#\"...\"#` prompts are no longer supported. Use a backtick prompt with `${...}` interpolation instead.",
                 d.span,
@@ -591,7 +579,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         // A warning: the prompt renders, with the marker verbatim.
         let d: LoweringDiagnosticQuotedPromptInterpolation => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 warning,
                 "`${...}` in a quoted prompt is sent to the model as literal text — `\"...\"` strings do not interpolate. Use a backtick prompt to interpolate, or write `\\${...}` in a backtick prompt to keep the literal `${`.",
                 d.span,
@@ -600,7 +588,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticTemplateStringRemoved => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 "`template_string` declarations are no longer supported. Use a function returning a backtick string instead.",
                 d.span,
@@ -609,7 +597,7 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInvalidLlmClient => {
             r(
-                INVALID_SYNTAX,
+                root.diagnostics.INVALID_SYNTAX,
                 error,
                 `LLM function \`${d.function_name}\` has an unusable \`client\`: ${d.reason}`,
                 d.span,
@@ -618,17 +606,17 @@ function lowering_report(diagnostic: LoweringDiagnostic) -> LoweringReport throw
         },
         let d: LoweringDiagnosticInvalidNumericLiteral => {
             r(
-                INVALID_NUMERIC_LITERAL,
+                root.diagnostics.INVALID_NUMERIC_LITERAL,
                 error,
-                int_lit_error_message(d.error),
+                root.base.int_lit_error_message(d.error),
                 d.span,
                 match (d.error) {
-                    IntLitErrorUppercaseBasePrefix => {
+                    root.base.IntLitErrorUppercaseBasePrefix => {
                         "base prefixes (`0x`, `0o`, `0b`) are lowercase"
                     },
-                    IntLitErrorNoDigits => "expected at least one digit",
-                    IntLitErrorInvalidDigits => "invalid digit",
-                    IntLitErrorTooLarge => {
+                    root.base.IntLitErrorNoDigits => "expected at least one digit",
+                    root.base.IntLitErrorInvalidDigits => "invalid digit",
+                    root.base.IntLitErrorTooLarge => {
                         "does not fit in `int`; use a `bigint` literal (`n` suffix) for arbitrary precision"
                     },
                 },

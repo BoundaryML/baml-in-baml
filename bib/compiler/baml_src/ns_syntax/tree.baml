@@ -14,25 +14,34 @@
 
 // port: tree.rs::TokenRange. Tokens [start, end).
 class TokenRange {
-  start: int,
-  end: int,
+    start: int,
+    end: int,
 }
 
 // port: tree.rs::Missing. A required position the parser had to leave empty,
 // always alongside a diagnostic; `at` is the byte offset where it belongs.
 class Missing {
-  at: int,
+    at: int,
 }
 
 // port: tree.rs::Bogus. Tokens that fit no node, kept in place, always
 // alongside a diagnostic.
 class Bogus {
-  span: TokenRange,
+    span: TokenRange,
 }
 
 // port: tree.rs::SepItem. An item of a separated list and the separator token
 // after it, if any.
 class SepItem<T> {
-  item: T,
-  sep: int?,
+    item: T,
+    sep: int?,
+}
+
+// port: Rust's `Result::ok` for a `T | Missing` position: the
+// node, or null when the position was left empty.
+function ok<T>(value: T | Missing) -> T? throws never {
+    match (value) {
+        let _missing: Missing => null,
+        let node: T => node,
+    }
 }

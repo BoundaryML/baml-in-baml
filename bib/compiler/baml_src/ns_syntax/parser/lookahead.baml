@@ -330,7 +330,7 @@ function looks_like_qualified_projection(cur: Cursor) -> bool throws never {
         i += 1;
     }
     // `i` is the closing `)`.
-    saw_as && cur.kind_at_sig(i + 1) == TokenKind.Dot && sig_in(cur, i + 2, MEMBER_NAME)
+    saw_as && cur.kind_at_sig(i + 1) == TokenKind.Dot && cur.sig_in(i + 2, MEMBER_NAME)
 }
 
 // port: baml_parser/src/lookahead.rs::looks_like_as_projection @ d9be6853b
@@ -402,7 +402,7 @@ function destructure_brace(cur: Cursor) -> int? throws never {
     let i = cur.pos + 1;
     while (true) {
         match (cur.kind_at_sig(i)) {
-            TokenKind.Dot if sig_in(cur, i + 1, PATH_SEGMENT) => {
+            TokenKind.Dot if cur.sig_in(i + 1, PATH_SEGMENT) => {
                 i += 2;
             },
             TokenKind.LBrace => {
@@ -452,7 +452,7 @@ function brace_looks_like_fields(cur: Cursor, open: int) -> bool throws never {
 function brace_literal_before_body(cur: Cursor, open: int) -> bool throws never {
     let close = matching_close(cur, open)
         ?? return false;
-    sig_in(cur, close + 1, CONTINUES_AFTER_BRACE)
+    cur.sig_in(close + 1, CONTINUES_AFTER_BRACE)
 }
 
 // port: baml_parser/src/lookahead.rs::looks_like_for_in @ d9be6853b
@@ -516,11 +516,3 @@ function looks_like_catch_arm_ahead(cur: Cursor) -> bool throws never {
 
 // How many tokens `looks_like_catch_arm_ahead` reads at most.
 const CATCH_ARM_LOOKAHEAD: int = 64;
-
-// needs foundation: `Cursor.sig_in(i, set)`, the absolute-index twin of
-// `Cursor.nth_in` (Rust: `cur.kind_at_sig(i).is_some_and(|k| set.contains(k))`).
-function sig_in(cur: Cursor, i: int, set: KindSet) -> bool throws never {
-    let kind = cur.kind_at_sig(i)
-        ?? return false;
-    set.contains(kind)
-}

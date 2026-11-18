@@ -39,7 +39,7 @@ function lower_file(
     for (let item in tree.file.items) {
         match (item) {
             let id: root.syntax.FunctionDef => {
-                let func = items.function_def(id, null);
+                let func = items.function_(id, null);
                 if (func) {
                     let no_owner_generics: string[] = [];
                     let companions = expand_companions(func, null, no_owner_generics);
@@ -50,7 +50,7 @@ function lower_file(
                 }
             },
             let id: root.syntax.ClassDef => {
-                let lowered = items.class_def(id);
+                let lowered = items.class_(id);
                 if (lowered) {
                     out.push(ItemClass { value: lowered.0 });
                     for (let imp in lowered.1) {
@@ -64,7 +64,7 @@ function lower_file(
                 }
             },
             let id: root.syntax.InterfaceDef => {
-                if let def: InterfaceDef = items.interface_def(id) {
+                if let def: InterfaceDef = items.interface_(id) {
                     out.push(ItemInterface { value: def });
                 }
             },
@@ -89,10 +89,10 @@ function lower_file(
                 items.diags.push(LoweringDiagnosticTopLevelLetType { span: v.range(id.span) });
             },
             let id: root.syntax.ClientValueDef => {
-                out.push(ItemLet { value: items.client_value(id) });
+                out.push(ItemLet { value: items.client_(id) });
             },
             let id: root.syntax.TestDef => {
-                push_some(registrations, items.test_registration(id));
+                root.base.push_some(registrations, items.test_registration(id));
             },
             let id: root.syntax.RemovedItem => items.removed_item(id),
             root.syntax.Bogus => {},
@@ -132,7 +132,7 @@ class Items {
         sep: int?,
     ) -> root.syntax.TextRange throws never {
         let last = if (sep != null) {
-            prev_significant(self.v.tree.tokens, sep)
+            self.v.tree.tokens.prev_significant(sep)
         } else {
             null
         };
@@ -172,7 +172,7 @@ class Items {
         for (let doc in docs) {
             if let header: root.syntax.HeaderLine = doc {
                 let text = self.v.text(header.token);
-                let title = trim_start_matches(strip_prefix(text, "//") ?? text, "#").trim();
+                let title = root.base.trim_start_matches(root.base.strip_prefix(text, "//") ?? text, "#").trim();
                 if (title) {
                     return title;
                 }
@@ -197,8 +197,8 @@ class Items {
             })
             .map((token) -> {
                 let text = v.text(token);
-                let doc = strip_prefix(text, "///") ?? text;
-                strip_prefix(doc, " ") ?? doc
+                let doc = root.base.strip_prefix(text, "///") ?? text;
+                root.base.strip_prefix(doc, " ") ?? doc
             });
         if (lines) {
             lines.join("\n")
@@ -391,7 +391,7 @@ class Items {
     // ── Functions ──
 
     // port: baml_compiler2_ast/src/lower_tree/items.rs::Items::function @ d9be6853b
-    function function_def(
+    function function_(
         self,
         id: root.syntax.FunctionDef,
         class_method: ClassMethodContext?,
@@ -416,7 +416,7 @@ class Items {
         };
         let (let params, let defaults) = lowered_params;
         let return_type = self.return_type(id.ret, name);
-        let throws_ = match (id.throws_clause?.ty) {
+        let throws_ = match (id.throws_?.ty) {
             let ty: root.syntax.AnyType => {
                 let te_span = v.range(root.syntax.node_span(ty));
                 let expr = lower_type(v, self.diags, ty);
@@ -448,8 +448,8 @@ class Items {
                     body = FunctionBodyDefBuiltin { value: kind };
                 } else {
                     let (let expr_body, let source_map, let diags, let env) = lower_body(v.tree, block);
-                    extend(self.diags, diags);
-                    extend(self.env_var_refs, env);
+                    root.base.extend(self.diags, diags);
+                    root.base.extend(self.env_var_refs, env);
                     body = FunctionBodyDefExpr { v0: expr_body, v1: source_map };
                 }
             },
@@ -516,7 +516,7 @@ class Items {
                 root.syntax.Bogus => {},
             }
         }
-        let client_value = match (client_field?.value) {
+        let client_ = match (client_field?.value) {
             let value: root.syntax.AnyExpr => value,
             _ => null,
         };
@@ -530,8 +530,8 @@ class Items {
         };
 
         let llm_body_def = LlmBodyDef {
-            client_: if (client_value != null) {
-                self.client_name(client_value)
+            client_: if (client_ != null) {
+                self.client_name(client_)
             } else {
                 null
             },
@@ -578,7 +578,7 @@ class Items {
                 null => null,
             };
 
-        let llm_client = self.llm_client(name, client_value, llm_span);
+        let llm_client = self.llm_client(name, client_, llm_span);
 
         // The function's real parameters: the injected `client` and `on_event`
         // overrides are added below and are never part of the spec's bound
@@ -601,12 +601,7 @@ class Items {
         };
 
         if (prompt != null && llm_client != null) {
-            let source = TypedLlmSpecSource {
-                v: v,
-                prompt: prompt,
-                tools_value: tools_value,
-                client_value: client_value,
-            };
+            let source = TypedLlmSpecSource { v: v, prompt: prompt, tools_value: tools_value, client_: client_ };
             let (let spec_body, let spec_sm, let prompt_segments, let spec_diags, let spec_env_refs) = synthesize_llm_spec_body(
                 name,
                 param_names,
@@ -618,8 +613,8 @@ class Items {
                 source,
                 llm_span,
             );
-            extend(self.diags, spec_diags);
-            extend(self.env_var_refs, spec_env_refs);
+            root.base.extend(self.diags, spec_diags);
+            root.base.extend(self.env_var_refs, spec_env_refs);
             llm_body_def.companion_bodies.push(("spec", (spec_body, spec_sm)));
             llm_body_def.prompt_segments = prompt_segments;
         }
@@ -719,7 +714,7 @@ class Items {
             root.syntax.Missing => [],
         };
         let return_type = self.return_type(id.ret, name);
-        let throws_ = match (id.throws_clause?.ty) {
+        let throws_ = match (id.throws_?.ty) {
             let ty: root.syntax.AnyType => {
                 // A bodyless method signature has nothing to infer an open
                 // `throws … | _` from, and its declared throws is compared
@@ -752,7 +747,7 @@ class Items {
     // port: baml_compiler2_ast/src/lower_tree/items.rs::Items::class @ d9be6853b
     // A class and the `implements` blocks written in its body, which are its
     // own items (an in-body block is shorthand for `implements<…> I for C<…>`).
-    function class_def(
+    function class_(
         self,
         id: root.syntax.ClassDef,
     ) -> (ClassDef, ImplementsForDef[])? throws never {
@@ -787,21 +782,24 @@ class Items {
                     );
                 },
                 let method: root.syntax.FunctionDef => {
-                    let func = self.function_def(
+                    let func = self.function_(
                         method,
                         ClassMethodContext { name: class_name, generic_params: generic_params },
                     );
                     if (func) {
                         let companions = expand_companions(func, class_name, owner_generic_param_names);
                         methods.push(func);
-                        extend(methods, companions);
+                        root.base.extend(methods, companions);
                     }
                 },
                 let block: root.syntax.ImplementsBlock => {
-                    push_some(implements_defs, self.implements_block(block, generic_params, self_type));
+                    root.base.push_some(
+                        implements_defs,
+                        self.implements_block(block, generic_params, self_type),
+                    );
                 },
                 let attr: root.syntax.BlockAttr => {
-                    push_some(attributes, self.block_attribute(attr));
+                    root.base.push_some(attributes, self.block_attribute(attr));
                 },
                 // Reported by the parser.
                 root.syntax.Bogus => {},
@@ -868,7 +866,7 @@ class Items {
                     variants.push(self.variant(variant));
                 },
                 let attr: root.syntax.BlockAttr => {
-                    push_some(attributes, self.block_attribute(attr));
+                    root.base.push_some(attributes, self.block_attribute(attr));
                 },
                 root.syntax.Bogus => {},
             }
@@ -896,7 +894,7 @@ class Items {
     }
 
     // port: baml_compiler2_ast/src/lower_tree/items.rs::Items::interface @ d9be6853b
-    function interface_def(self, id: root.syntax.InterfaceDef) -> InterfaceDef? throws never {
+    function interface_(self, id: root.syntax.InterfaceDef) -> InterfaceDef? throws never {
         let v = self.v;
         let span = span_from(v.token_range(id.kw), v.range(id.span));
         let name_id = id.name;
@@ -907,7 +905,7 @@ class Items {
         let iface_name = v.name(name_id);
         let generic_params = self.generic_params(id.generics);
 
-        let parents: root.syntax.AnyType[] = match (id.requires_clause?.types) {
+        let parents: root.syntax.AnyType[] = match (id.requires_?.types) {
             let types: root.syntax.SepItem<root.syntax.AnyType>[] => {
                 types.map((item) -> {
                     item.item
@@ -942,16 +940,16 @@ class Items {
                     );
                 },
                 let sig: root.syntax.MethodSig => {
-                    push_some(required_methods, self.method_sig(sig));
+                    root.base.push_some(required_methods, self.method_sig(sig));
                 },
                 let decl: root.syntax.AssocTypeDecl => {
-                    push_some(associated_types, self.associated_type_decl(decl));
+                    root.base.push_some(associated_types, self.associated_type_decl(decl));
                 },
                 let method: root.syntax.FunctionDef => {
-                    push_some(default_methods, self.function_def(method, null));
+                    root.base.push_some(default_methods, self.function_(method, null));
                 },
                 let attr: root.syntax.BlockAttr => {
-                    push_some(attributes, self.block_attribute(attr));
+                    root.base.push_some(attributes, self.block_attribute(attr));
                 },
                 root.syntax.Bogus => {},
             }
@@ -1074,13 +1072,13 @@ class Items {
                     );
                 },
                 let link: root.syntax.InterfaceFieldLink => {
-                    push_some(field_links, self.interface_field_link(link));
+                    root.base.push_some(field_links, self.interface_field_link(link));
                 },
                 let def: root.syntax.AssocTypeDef => {
-                    push_some(associated_type_bindings, self.associated_type_binding(def));
+                    root.base.push_some(associated_type_bindings, self.associated_type_binding(def));
                 },
                 let method: root.syntax.FunctionDef => {
-                    push_some(methods, self.function_def(method, null));
+                    root.base.push_some(methods, self.function_(method, null));
                 },
                 root.syntax.Bogus => {},
             }
@@ -1202,19 +1200,19 @@ class Items {
         }
     }
 
-    // port: baml_compiler2_ast/src/lower_tree/items.rs::Items::client_value @ d9be6853b
+    // port: baml_compiler2_ast/src/lower_tree/items.rs::Items::client_ @ d9be6853b
     // `client Name = <expr>;`: a top-level client binding, the same
     // `LetOrigin.Client` item the legacy config blocks produced, so the name
     // resolves from every function body; the initializer is the user's own
     // expression (evaluated once at `$init`).
-    function client_value(self, id: root.syntax.ClientValueDef) -> LetDef throws never {
+    function client_(self, id: root.syntax.ClientValueDef) -> LetDef throws never {
         let v = self.v;
         let span = span_from(v.token_range(id.kw), v.range(id.span));
         let ctx = LoweringContext.new();
         let root_expr = expr_or_missing(ctx, v, id.value, span);
         let (let body, let source_map, let diags, let env) = ctx.finish(root_expr);
-        extend(self.diags, diags);
-        extend(self.env_var_refs, env);
+        root.base.extend(self.diags, diags);
+        root.base.extend(self.env_var_refs, env);
         LetDef {
             name: v.name(id.name),
             type_annotation: null,
@@ -1263,7 +1261,7 @@ class Items {
         let patterns = pattern_ctx.patterns;
         pattern_ctx.patterns = [];
         let (_, _, let pattern_diags, _) = pattern_ctx.finish(null);
-        extend(self.diags, pattern_diags);
+        root.base.extend(self.diags, pattern_diags);
 
         let reject = (session_reason: string, source_reason: string) -> {
             self.diags.push(
@@ -1340,8 +1338,8 @@ class Items {
             root.syntax.Missing => null,
         };
         let (let body, let source_map, let ctx_diags, let ctx_env_refs) = ctx.finish(initializer);
-        extend(self.diags, ctx_diags);
-        extend(self.env_var_refs, ctx_env_refs);
+        root.base.extend(self.diags, ctx_diags);
+        root.base.extend(self.env_var_refs, ctx_env_refs);
         LetDef {
             name: bound.name,
             type_annotation: type_annotation,
@@ -1422,7 +1420,7 @@ class Items {
                             root.syntax.TextRange { start: start, end: v.tree.utf8.length() },
                         );
                         let line = rest.split("\n").at(0) ?? rest;
-                        let value = trim_end_matches(line.trim(), ",").trim();
+                        let value = root.base.trim_end_matches(line.trim(), ",").trim();
                         provider = strip_string_delimiters(value);
                     }
                     i += 1;
@@ -1533,8 +1531,7 @@ class TypedLlmSpecSource {
     prompt: Prompt,
     // deviation: Rust's field `tools` would collide with the `tools` method.
     tools_value: root.syntax.AnyExpr?,
-    // deviation: Rust's field `client`; `client` is a BAML keyword.
-    client_value: root.syntax.AnyExpr?,
+    client_: root.syntax.AnyExpr?,
 
     implements LlmSpecSource {
         // port: baml_compiler2_ast/src/lower_tree/items.rs::TypedLlmSpecSource::prompt_span @ d9be6853b
@@ -1598,9 +1595,9 @@ class TypedLlmSpecSource {
             ctx: LoweringContext,
             span: root.syntax.TextRange,
         ) -> int throws never {
-            let client_value = self.client_value;
-            if (client_value != null) {
-                expression(ctx, self.v, client_value)
+            let client_ = self.client_;
+            if (client_ != null) {
+                expression(ctx, self.v, client_)
             } else {
                 ctx.alloc_expr(ExprMissing {}, span)
             }
@@ -1658,46 +1655,10 @@ class TypedTestRegistration {
     }
 }
 
-// needs foundation: baml_syntax/src/token.rs::Tokens::prev_significant. The
-// last non-trivia token before `idx`.
-function prev_significant(tokens: root.syntax.Tokens, idx: int) -> int? throws never {
-    let i = idx - 1;
-    while (i >= 0) {
-        if (!root.syntax.is_trivia(tokens.kinds[i])) {
-            return i;
-        }
-        i -= 1;
-    }
-    null
-}
-
-// needs foundation: `matches!(kind, TokenKind::LegacyHashString | TokenKind::UnclosedHashString)`.
+// A legacy `#"..."#` string, closed or not.
 function is_hash_string(kind: root.syntax.TokenKind) -> bool throws never {
     match (kind) {
         root.syntax.TokenKind.LegacyHashString | root.syntax.TokenKind.UnclosedHashString => true,
         _ => false,
-    }
-}
-
-// needs foundation: `Vec::extend`. Appends `items` to `out` in place.
-function extend<T>(out: T[], items: T[]) -> void throws never {
-    for (let item in items) {
-        out.push(item);
-    }
-}
-
-// needs foundation: `Vec::extend(Option)`. Appends `item` to `out` when present.
-function push_some<T>(out: T[], item: T?) -> void throws never {
-    if (item != null) {
-        out.push(item);
-    }
-}
-
-// needs foundation: `str::strip_prefix`.
-function strip_prefix(text: string, prefix: string) -> string? throws never {
-    if (text.starts_with(prefix)) {
-        text.slice(prefix.length(), text.length())
-    } else {
-        null
     }
 }

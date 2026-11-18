@@ -151,6 +151,18 @@ class Tokens {
     kinds: TokenKind[],
     starts: int[],
 
+    // port: Tokens::prev_significant. The nearest non-trivia token before `idx`.
+    function prev_significant(self, idx: int) -> int? throws never {
+        let i = idx - 1;
+        while (i >= 0) {
+            if (!is_trivia(self.kinds[i])) {
+                return i;
+            }
+            i -= 1;
+        }
+        null
+    }
+
     // port: Tokens::text. `utf8` is the source text's bytes.
     function text(self, utf8: uint8array, idx: int) -> string throws never {
         string.from_utf8(utf8.slice(self.starts[idx], self.starts[idx + 1])) catch (e) {

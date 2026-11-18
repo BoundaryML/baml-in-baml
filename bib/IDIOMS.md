@@ -24,7 +24,8 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | method on a type we own | method in the class (`Cursor`, `Parser`, `Sink`, ...) |
 | one-line forwarding helper | don't: one function with a named default parameter, or call the target directly |
 | `const FOO: KindSet = KindSet::new(&[..])` | `const FOO: KindSet = KindSet.of([..]);` |
-| field named after a BAML keyword (`throws`, `requires`) | `throws_clause`, `requires_clause` |
+| field, method or parameter named after a BAML keyword (`throws`, `requires`, `client`, `class`, `function`, `interface`) | the Rust name plus `_`: `throws_`, `client_`, `self.class_(..)`. Function names built from a keyword (`parse_throws_clause`, `class_def`) keep their Rust spelling |
+| a field that would clash with a method of the same class | the field gets a suffix (`tools_value`, `is_testset`); say so in a comment |
 | a binding, field or parameter named `root` | not allowed (`root` is the package path): `file`, `root_node`, ... |
 
 ## Types

@@ -66,7 +66,7 @@ class NodeAtom {
 class NodeFn {
     head: int,
     ret: Union,
-    throws_clause: Union?,
+    throws_: Union?,
 }
 
 // port: baml_parser/src/function_union.rs::Union @ d9be6853b
@@ -311,17 +311,14 @@ class Search {
                         for (let thrown in self.union(next + 1, true)) {
                             out.push(
                                 Parsed {
-                                    value: NodeFn { head: pos, ret: ret, throws_clause: thrown.value },
+                                    value: NodeFn { head: pos, ret: ret, throws_: thrown.value },
                                     end: thrown.end,
                                 },
                             );
                         }
                     }
                     out.push(
-                        Parsed {
-                            value: NodeFn { head: pos, ret: ret, throws_clause: null },
-                            end: next,
-                        },
+                        Parsed { value: NodeFn { head: pos, ret: ret, throws_: null }, end: next },
                     );
                     if (out.length() >= MAX_PARSES) {
                         break;
@@ -345,7 +342,7 @@ function owner_of(union: Union, owner: Owner, pipe: int) -> Owner? throws never 
             if (in_ret != null) {
                 return in_ret;
             }
-            let thrown = member.throws_clause;
+            let thrown = member.throws_;
             if (thrown != null) {
                 let in_throws = owner_of(thrown, Owner { head: member.head, in_throws: true }, pipe);
                 if (in_throws != null) {
@@ -392,7 +389,7 @@ function render_node(items: Item[], node: Node) -> string throws never {
                 _ => baml.sys.panic("functions index head items"),
             };
             let out = `${params} -> ${render_operand(items, fn_node.ret)}`;
-            let thrown = fn_node.throws_clause;
+            let thrown = fn_node.throws_;
             if (thrown != null) {
                 out = `${out} throws ${render_operand(items, thrown)}`;
             }

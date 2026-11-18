@@ -910,7 +910,7 @@ function ascription_type_expr(patterns: Pattern[], sub: int) -> TypeExpr? throws
                 })
                 .reduce(
                     (a, b) -> {
-                        text_range_cover(a, b)
+                        a.cover(b)
                     },
                     variants[0].span,
                 );
@@ -1769,25 +1769,5 @@ function strip_raw_string_delimiters(text: string) -> string? throws never {
         rest.slice(0, rest.length() - 1)
     } else {
         null
-    }
-}
-
-// needs foundation: text_size::TextRange::cover. The smallest range
-// containing both.
-function text_range_cover(
-    a: root.syntax.TextRange,
-    b: root.syntax.TextRange,
-) -> root.syntax.TextRange throws never {
-    root.syntax.TextRange {
-        start: if (a.start < b.start) {
-            a.start
-        } else {
-            b.start
-        },
-        end: if (a.end > b.end) {
-            a.end
-        } else {
-            b.end
-        },
     }
 }

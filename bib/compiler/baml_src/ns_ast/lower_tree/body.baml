@@ -1017,7 +1017,9 @@ function literal_token(ctx: LoweringContext, v: View, token: int) -> Expr throws
             }
         },
         root.syntax.TokenKind.Float => {
-            ExprLiteral { value: root.base.LiteralFloat { value: normalize_float_literal(text) } }
+            ExprLiteral {
+                value: root.base.LiteralFloat { value: root.base.normalize_float_literal(text) },
+            }
         },
         root.syntax.TokenKind.True => ExprLiteral { value: root.base.LiteralBool { value: true } },
         root.syntax.TokenKind.False => ExprLiteral { value: root.base.LiteralBool { value: false } },
@@ -1289,7 +1291,7 @@ function lambda_expr(
     } else {
         null
     };
-    let throws_ty = node.throws_clause?.ty;
+    let throws_ty = node.throws_?.ty;
     let throws_type = if let ty: root.syntax.AnyType = throws_ty {
         lower_type(v, ctx.diags, ty)
     } else {
@@ -1614,12 +1616,12 @@ function unary_expr(
             // `int` stops at `-2^62`, so only that one value folds and a larger one
             // stays a negation (its literal is reported too large).
             let validated = if (direct_int_lit != null) {
-                validate(direct_int_lit)
+                root.base.validate(direct_int_lit)
             } else {
                 null
             };
             if let digits: (int, string) = validated {
-                if (digits_value(digits.1, digits.0) == INT_MIN_MAGNITUDE) {
+                if (root.base.digits_value(digits.1, digits.0) == INT_MIN_MAGNITUDE) {
                     return ctx.alloc_expr(
                         ExprLiteral { value: root.base.LiteralInt { value: int.min_value() } },
                         span,

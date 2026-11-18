@@ -145,7 +145,7 @@ function lower_literal(
                     }
                 },
                 root.syntax.TokenKind.Float => {
-                    let text = normalize_float_literal(text);
+                    let text = root.base.normalize_float_literal(text);
                     root.base.LiteralFloat {
                         value: if (negated) {
                             `-${text}`
@@ -178,7 +178,7 @@ function string_token_value(text: string) -> string throws never {
     if (trimmed.starts_with("\"") && trimmed.ends_with("\"") && trimmed.length() >= 2) {
         root.base.unescape_string_literal(trimmed.slice(1, trimmed.length() - 1))
     } else {
-        trim_start_matches(trimmed, "\"")
+        root.base.trim_start_matches(trimmed, "\"")
     }
 }
 
@@ -186,7 +186,7 @@ function string_token_value(text: string) -> string throws never {
 // The text of a template between its opener and closer. Rust takes the node
 // id; here its `span`.
 function backtick_interior(cx: View, span: root.syntax.TokenRange) -> string throws never {
-    trim_end_matches(trim_start_matches(cx.text_of(span), "`"), "`")
+    root.base.trim_end_matches(root.base.trim_start_matches(cx.text_of(span), "`"), "`")
 }
 
 // port: baml_compiler2_ast/src/lower_tree/types.rs::lower_function @ d9be6853b
@@ -209,7 +209,7 @@ function lower_function(
         FunctionTypeParam { name: name, optional: optional, ty: ty }
     });
     let ret = lower_type_or_missing(cx, diags, id.ret);
-    let throws_ = match (id.throws_clause?.ty) {
+    let throws_ = match (id.throws_?.ty) {
         let ty: root.syntax.AnyType => lower_type(cx, diags, ty),
         _ => null,
     };
@@ -260,28 +260,4 @@ function lower_qualified(
         },
         span: span,
     }
-}
-
-// needs foundation: `str::trim_start_matches` with a string pattern.
-function trim_start_matches(text: string, pattern: string) -> string throws never {
-    let rest = text;
-    while (rest.starts_with(pattern)) {
-        rest = rest.slice(pattern.length(), rest.length());
-    }
-    rest
-}
-
-// needs foundation: `str::trim_end_matches` with a string pattern.
-function trim_end_matches(text: string, pattern: string) -> string throws never {
-    let rest = text;
-    while (rest.ends_with(pattern)) {
-        rest = rest.slice(0, rest.length() - pattern.length());
-    }
-    rest
-}
-
-// needs foundation: baml_base/src/num_lit.rs::normalize_float_literal. A float
-// literal's text without its `_` digit separators.
-function normalize_float_literal(text: string) -> string throws never {
-    text.replace_all("_", "")
 }

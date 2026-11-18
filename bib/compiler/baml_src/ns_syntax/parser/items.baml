@@ -825,7 +825,7 @@ class Signature {
     generics: GenericParamList?,
     params: ParamList | Missing,
     ret: ReturnType | Missing,
-    throws_clause: ThrowsClause?,
+    throws_: ThrowsClause?,
     // Whether a `{` body may be an LLM body: not after `-> {` (the brace is
     // the body, and `client` text inside must not masquerade as an LLM field)
     // nor after a missing return type.
@@ -876,7 +876,7 @@ function signature(p: Parser, kw: int) -> Signature throws never {
             generics: generics,
             params: missing,
             ret: missing,
-            throws_clause: null,
+            throws_: null,
             allow_llm_body: false,
         };
     }
@@ -904,7 +904,7 @@ function signature(p: Parser, kw: int) -> Signature throws never {
     };
 
     let throws_kw = p.cur.eat(TokenKind.Throws);
-    let throws_clause = if (throws_kw != null) {
+    let throws_ = if (throws_kw != null) {
         parse_throws_clause(p, throws_kw)
     } else {
         null
@@ -916,7 +916,7 @@ function signature(p: Parser, kw: int) -> Signature throws never {
         generics: generics,
         params: params,
         ret: ret,
-        throws_clause: throws_clause,
+        throws_: throws_,
         allow_llm_body: allow_llm_body,
     }
 }
@@ -941,7 +941,7 @@ function function_def(p: Parser, mark: Mark, docs: DocPart[], kw: int) -> Functi
         generics: sig.generics,
         params: sig.params,
         ret: sig.ret,
-        throws_clause: sig.throws_clause,
+        throws_: sig.throws_,
         body: body,
     }
 }
@@ -969,7 +969,7 @@ function interface_method(
             generics: sig.generics,
             params: sig.params,
             ret: sig.ret,
-            throws_clause: sig.throws_clause,
+            throws_: sig.throws_,
             body: body,
         };
     }
@@ -984,7 +984,7 @@ function interface_method(
         generics: sig.generics,
         params: sig.params,
         ret: sig.ret,
-        throws_clause: sig.throws_clause,
+        throws_: sig.throws_,
         semi: semi,
     }
 }
@@ -1353,7 +1353,7 @@ function interface_def(
     // Interfaces do not extend each other: `requires` says implementors must
     // also implement the listed interfaces.
     let requires_kw = p.cur.eat(TokenKind.Requires);
-    let requires_clause = if (requires_kw != null) {
+    let requires_ = if (requires_kw != null) {
         parse_requires_clause(p, requires_kw)
     } else {
         null
@@ -1366,7 +1366,7 @@ function interface_def(
             kw: kw,
             name: name,
             generics: generics,
-            requires_clause: requires_clause,
+            requires_: requires_,
             l: l,
             members: [],
             r: l,
@@ -1424,7 +1424,7 @@ function interface_def(
         kw: kw,
         name: name,
         generics: generics,
-        requires_clause: requires_clause,
+        requires_: requires_,
         l: l,
         members: members,
         r: r,
@@ -2006,7 +2006,7 @@ function removed_legacy_test(p: Parser, kw: int) -> RemovedItem throws never {
     let name_range = p.cur.error_range();
     p.removed(
         "Legacy test declarations were removed. Use an expression-body test with a quoted name, for example: `test \"Name\" { assert.equal(Foo(...), expected) }`.",
-        text_range_cover(start, name_range),
+        start.cover(name_range),
     );
     let head = p.cur.range_from(p.cur.mark());
     let name = p.eat_name(IDENT);
@@ -2401,81 +2401,5 @@ function diagnose_header_comments(p: Parser) -> void throws never {
         if (unowned) {
             p.error(HEADER_COMMENT_MISPLACED, p.cur.token_range(idx));
         }
-    }
-}
-
-// ----- needs foundation -------------------------------------------------------------------------------
-
-// needs foundation: baml_syntax/src/nodes/items.rs::DirectiveKind::named @ d9be6853b
-// The directive `//baml:<name>` names, if any.
-function directive_kind_named(name: string) -> DirectiveKind? throws never {
-    match (name.trim_end()) {
-        "mut_self" => DirectiveKind.MutSelf,
-        "vm" => DirectiveKind.Vm,
-        "mut_vm" => DirectiveKind.MutVm,
-        "may_yield" => DirectiveKind.MayYield,
-        "fallible" => DirectiveKind.Fallible,
-        "tagged_string" => DirectiveKind.TaggedString,
-        "trace_passthrough" => DirectiveKind.TracePassthrough,
-        "local_twin" => DirectiveKind.LocalTwin,
-        _ => null,
-    }
-}
-
-// needs foundation: baml_syntax/src/nodes/items.rs::DirectiveKind::trace_hook_value @ d9be6853b
-// What follows `baml:$trace` in a comment of either spelling
-// (`/// baml:$trace=...`, `//baml:$trace=...`), if the comment is a trace
-// hook.
-function trace_hook_value(comment: string) -> string? throws never {
-    let slashes = 0;
-    while (comment.at(slashes) == "/") {
-        slashes += 1;
-    }
-    let rest = comment.slice(slashes, comment.length()).trim();
-    let prefix = "baml:$trace";
-    if (!rest.starts_with(prefix)) {
-        return null;
-    }
-    rest.slice(prefix.length(), rest.length())
-}
-
-// needs foundation: baml_syntax/src/nodes/items.rs::DirectiveKind::trace_hook_path @ d9be6853b
-// The hook a trace value names: `=a.b.c`, each segment an identifier.
-function trace_hook_path(value: string) -> string? throws never {
-    let trimmed = value.trim_start();
-    if (!trimmed.starts_with("=")) {
-        return null;
-    }
-    let path = trimmed.slice(1, trimmed.length()).trim();
-    let is_path = path.length() > 0
-        && path.split(".").every((segment) -> {
-            let chars = segment.chars();
-            chars.length() > 0
-                && (chars[0] == "_" || chars[0].is_ascii_alphabetic())
-                && chars.every((c) -> {
-                    c == "_" || c.is_ascii_alphanumeric()
-                })
-        });
-    if (is_path) {
-        path
-    } else {
-        null
-    }
-}
-
-// needs foundation: text_size::TextRange::cover. The smallest range covering
-// both.
-function text_range_cover(a: TextRange, b: TextRange) -> TextRange throws never {
-    TextRange {
-        start: if (a.start < b.start) {
-            a.start
-        } else {
-            b.start
-        },
-        end: if (a.end > b.end) {
-            a.end
-        } else {
-            b.end
-        },
     }
 }

@@ -844,7 +844,7 @@ function parse_lambda_expr(
     } else {
         ok(any_type(p))
     };
-    let throws_clause = if let kw: int = p.cur.eat(TokenKind.Throws) {
+    let throws_ = if let kw: int = p.cur.eat(TokenKind.Throws) {
         parse_throws_clause(p, kw)
     } else {
         null
@@ -856,7 +856,7 @@ function parse_lambda_expr(
         params: params,
         arrow: arrow,
         ret: ret,
-        throws_clause: throws_clause,
+        throws_: throws_,
         body: body,
     }
 }
@@ -1227,13 +1227,4 @@ function operand(p: Parser, r: Restrictions) -> AnyExpr | Missing throws never {
         return expr(p, r);
     }
     p.missing("expression")
-}
-
-// needs foundation: Rust's `Result::ok` for a `T | Missing` position: the
-// node, or null when the position was left empty.
-function ok<T>(value: T | Missing) -> T? throws never {
-    match (value) {
-        let _missing: Missing => null,
-        let node: T => node,
-    }
 }

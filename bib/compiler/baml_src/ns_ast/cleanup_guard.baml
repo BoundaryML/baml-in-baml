@@ -15,7 +15,9 @@
 // `self` alone. Whether it *is* one is decided on its checked signature; a
 // guarded method that turns out malformed is an error (E0144).
 function reads_as_finalizer(func: FunctionDef) -> bool throws never {
-    func.name == CLEANUP_METHOD && func.params.length() == 1 && func.params[0].name == "self"
+    func.name == root.base.CLEANUP_METHOD
+        && func.params.length() == 1
+        && func.params[0].name == "self"
 }
 
 // port: baml_compiler2_ast/src/cleanup_guard.rs::maybe_inject_cleanup_guard @ d9be6853b
@@ -76,7 +78,3 @@ function inject_cleanup_guard(
     let guard_stmt = stmt(StmtExpr { value: guard });
     expr(ExprBlock { stmts: [guard_stmt], tail_expr: orig_root })
 }
-
-// needs foundation: baml_base/src/lib.rs::CLEANUP_METHOD. The reserved
-// magic-method name for the BEP-042 finalizer.
-const CLEANUP_METHOD: string = "cleanup";

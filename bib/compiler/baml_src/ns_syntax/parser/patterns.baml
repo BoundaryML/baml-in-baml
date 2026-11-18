@@ -62,7 +62,7 @@ function union_rest(p: Parser, first: AnyPattern, r: Restrictions) -> AnyPattern
     if (!arms) {
         return first;
     }
-    let mark = pattern_mark(p, first);
+    let mark = p.mark_of(node_span(first));
     UnionPattern { span: p.span_from(mark), first: first, arms: arms }
 }
 
@@ -329,22 +329,4 @@ function type_pattern(
         return ty;
     }
     TypePattern { span: p.span_from(mark), ty: ty }
-}
-
-// needs foundation: Rust's `p.mark_of_any(&pattern)`. A field shared by
-// every member of a union is not readable through the union (E0007: no common
-// interface declares `span`), so the span is read per member.
-function pattern_mark(p: Parser, pattern: AnyPattern) -> Mark throws never {
-    let span = match (pattern) {
-        let x: BindingPattern => x.span,
-        let x: WildcardPattern => x.span,
-        let x: DestructurePattern => x.span,
-        let x: ArrayPattern => x.span,
-        let x: TypePattern => x.span,
-        let x: ParenPattern => x.span,
-        let x: TuplePattern => x.span,
-        let x: UnionPattern => x.span,
-        let x: Bogus => x.span,
-    };
-    p.mark_of(span)
 }

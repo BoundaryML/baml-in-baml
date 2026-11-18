@@ -20,7 +20,7 @@ function lower_from_type_name_with_generic_args(
         generic_args: generic_args,
         associated_type_bindings: associated_type_bindings,
     };
-    let alias = compiler_alias_by_spelling(name);
+    let alias = root.types.compiler_alias_by_spelling(name);
     if (alias == null) {
         let kind: TypeExprKind = match (name) {
             "_" => TypeExprKindInfer {},
@@ -44,26 +44,28 @@ function lower_from_type_name_with_generic_args(
         return TypeExpr { kind: TypeExprKindUnknown {}, span: span };
     }
     let kind: TypeExprKind = match (alias.target) {
-        AliasTarget.Int => TypeExprKindInt {},
-        AliasTarget.Bigint => TypeExprKindBigint {},
-        AliasTarget.Float => TypeExprKindFloat {},
-        AliasTarget.String => TypeExprKindString {},
-        AliasTarget.Bool => TypeExprKindBool {},
-        AliasTarget.Null => TypeExprKindNull {},
-        AliasTarget.Uint8Array => TypeExprKindUint8Array {},
-        AliasTarget.Image => TypeExprKindMedia { kind: root.base.MediaKind.Image },
-        AliasTarget.Audio => TypeExprKindMedia { kind: root.base.MediaKind.Audio },
-        AliasTarget.Video => TypeExprKindMedia { kind: root.base.MediaKind.Video },
-        AliasTarget.Pdf => TypeExprKindMedia { kind: root.base.MediaKind.Pdf },
-        AliasTarget.Never => TypeExprKindNever {},
+        root.types.AliasTarget.Int => TypeExprKindInt {},
+        root.types.AliasTarget.Bigint => TypeExprKindBigint {},
+        root.types.AliasTarget.Float => TypeExprKindFloat {},
+        root.types.AliasTarget.String => TypeExprKindString {},
+        root.types.AliasTarget.Bool => TypeExprKindBool {},
+        root.types.AliasTarget.Null => TypeExprKindNull {},
+        root.types.AliasTarget.Uint8Array => TypeExprKindUint8Array {},
+        root.types.AliasTarget.Image => TypeExprKindMedia { kind: root.base.MediaKind.Image },
+        root.types.AliasTarget.Audio => TypeExprKindMedia { kind: root.base.MediaKind.Audio },
+        root.types.AliasTarget.Video => TypeExprKindMedia { kind: root.base.MediaKind.Video },
+        root.types.AliasTarget.Pdf => TypeExprKindMedia { kind: root.base.MediaKind.Pdf },
+        root.types.AliasTarget.Never => TypeExprKindNever {},
         // `void` is the unit type's second spelling: it denotes `null` in every
         // position, so it lowers to the very same node.
-        AliasTarget.Void => TypeExprKindNull {},
-        AliasTarget.Unknown => TypeExprKindUnknown {},
-        AliasTarget.Type => TypeExprKindType {},
+        root.types.AliasTarget.Void => TypeExprKindNull {},
+        root.types.AliasTarget.Unknown => TypeExprKindUnknown {},
+        root.types.AliasTarget.Type => TypeExprKindType {},
         // Arity checked above: exactly a key and a value.
-        AliasTarget.Map => TypeExprKindMap { key: generic_args[0], value: generic_args[1] },
-        AliasTarget.Json => {
+        root.types.AliasTarget.Map => {
+            TypeExprKindMap { key: generic_args[0], value: generic_args[1] }
+        },
+        root.types.AliasTarget.Json => {
             TypeExprKindPath {
                 path: root.base.Path.compiler(
                     alias.definition ?? baml.sys.panic("json has an alias declaration"),
@@ -72,8 +74,8 @@ function lower_from_type_name_with_generic_args(
                 associated_type_bindings: associated_type_bindings,
             }
         },
-        AliasTarget.Future => path,
-        AliasTarget.List => baml.sys.panic("arrays use postfix syntax"),
+        root.types.AliasTarget.Future => path,
+        root.types.AliasTarget.List => baml.sys.panic("arrays use postfix syntax"),
     };
     TypeExpr { kind: kind, span: span }
 }
@@ -153,8 +155,8 @@ function check_wildcard_type(
                 check_wildcard_type(p.ty, context, span, diags);
             }
             check_wildcard_type(function_type.ret, context, span, diags);
-            if let throws_clause: TypeExpr = function_type.throws_ {
-                check_wildcard_type(throws_clause, context, span, diags);
+            if let throws_: TypeExpr = function_type.throws_ {
+                check_wildcard_type(throws_, context, span, diags);
             }
         },
         let projection: TypeExprKindAssociatedTypeProjection => {
@@ -165,115 +167,5 @@ function check_wildcard_type(
         },
         // Primitives and other leaves cannot contain a wildcard.
         _ => {},
-    }
-}
-
-// needs foundation: baml_type/src/compiler_aliases.rs, the part the type-name
-// table reads: each named spelling's target, arity and (for `json`) its
-// declaration. `AliasTarget::Primitive(PrimitiveType)` is flattened into the
-// primitive variants; `List` stays although no named spelling reaches it.
-enum AliasTarget {
-    Int,
-    Bigint,
-    Float,
-    String,
-    Bool,
-    Null,
-    Uint8Array,
-    Image,
-    Audio,
-    Video,
-    Pdf,
-    List,
-    Map,
-    Future,
-    Type,
-    Json,
-    Void,
-    Never,
-    Unknown,
-}
-
-// needs foundation: compiler_aliases::CompilerAlias, the fields read here.
-// `definition` is the declaration as the compiler spells it.
-class CompilerAlias {
-    target: AliasTarget,
-    arity: int,
-    definition: string[]?,
-}
-
-// needs foundation: compiler_aliases::by_spelling over `ALL`'s
-// `Spelling::Named` entries (the postfix array has no named spelling).
-function compiler_alias_by_spelling(spelling: string) -> CompilerAlias? throws never {
-    match (spelling) {
-        "int" => CompilerAlias { target: AliasTarget.Int, arity: 0, definition: ["baml", "Int"] },
-        "bigint" => {
-            CompilerAlias { target: AliasTarget.Bigint, arity: 0, definition: ["baml", "Bigint"] }
-        },
-        "float" => {
-            CompilerAlias { target: AliasTarget.Float, arity: 0, definition: ["baml", "Float"] }
-        },
-        "string" => {
-            CompilerAlias { target: AliasTarget.String, arity: 0, definition: ["baml", "String"] }
-        },
-        "bool" => CompilerAlias { target: AliasTarget.Bool, arity: 0, definition: ["baml", "Bool"] },
-        "null" => CompilerAlias { target: AliasTarget.Null, arity: 0, definition: ["baml", "Null"] },
-        "uint8array" => {
-            CompilerAlias {
-                target: AliasTarget.Uint8Array,
-                arity: 0,
-                definition: ["baml", "Uint8Array"],
-            }
-        },
-        "image" => {
-            CompilerAlias {
-                target: AliasTarget.Image,
-                arity: 0,
-                definition: ["baml", "media", "Image"],
-            }
-        },
-        "audio" => {
-            CompilerAlias {
-                target: AliasTarget.Audio,
-                arity: 0,
-                definition: ["baml", "media", "Audio"],
-            }
-        },
-        "video" => {
-            CompilerAlias {
-                target: AliasTarget.Video,
-                arity: 0,
-                definition: ["baml", "media", "Video"],
-            }
-        },
-        "pdf" => {
-            CompilerAlias {
-                target: AliasTarget.Pdf,
-                arity: 0,
-                definition: ["baml", "media", "Pdf"],
-            }
-        },
-        "map" => CompilerAlias { target: AliasTarget.Map, arity: 2, definition: ["baml", "Map"] },
-        "baml.future.Future" => {
-            CompilerAlias {
-                target: AliasTarget.Future,
-                arity: 2,
-                definition: ["baml", "future", "Future"],
-            }
-        },
-        "reflect.Type" => {
-            CompilerAlias { target: AliasTarget.Type, arity: 0, definition: ["reflect", "Type"] }
-        },
-        "json" => {
-            CompilerAlias {
-                target: AliasTarget.Json,
-                arity: 0,
-                definition: ["baml", "json", "json"],
-            }
-        },
-        "void" => CompilerAlias { target: AliasTarget.Void, arity: 0, definition: null },
-        "never" => CompilerAlias { target: AliasTarget.Never, arity: 0, definition: null },
-        "unknown" => CompilerAlias { target: AliasTarget.Unknown, arity: 0, definition: null },
-        _ => null,
     }
 }
