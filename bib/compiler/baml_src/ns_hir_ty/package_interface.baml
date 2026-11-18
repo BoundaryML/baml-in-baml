@@ -7,11 +7,16 @@
 // Every declaration `root_id` re-exports, by its defining identity, to the
 // (namespace, name) path it is exported under.
 // Restructured: Rust's `IndexMap<DeclName, (Vec<Name>, Name)>` is a list of
-// (declaration, namespace, name) in insertion order; a `DeclName` is not a
-// map key.
+// (declaration, namespace, name) in insertion order.
+// Rust walks `package_interface(db, root).reexports`. For a root compiled
+// from source that interface is `fold_package_interface`'s, which builds
+// `reexports` empty: only an interface read from a blob carries re-exports
+// (`import_interface`), and no root is served from one here
+// (`root.hir.is_served_from_interface`). Seeded stdlib blobs are exports of
+// a source fold, so theirs are empty too. The answer is always empty.
 function reexport_paths(
     db: root.hir.Db,
     root_id: int,
 ) -> (root.types.DeclName, string[], string)[] throws never {
-    baml.sys.panic("reexport_paths: package interfaces are not ported")
+    []
 }
