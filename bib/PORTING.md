@@ -382,6 +382,9 @@ Open items:
   witness on a non-literal type; no corpus case reaches it so far. If one
   does, decide between matching Rust's `Int`-style output and spelling it
   (`int`).
+- `register_class_bounds` (infer, U3) walks a class's generic bounds in
+  frame order; Rust walks an FxHashMap. Obligation registration order, and
+  so diagnostic push order, could differ. Same kind as the next item.
 - `InferenceTable::take_solved_class_bounds` walks roots in index order;
   Rust walks its FxHashMap's order. Its one consumer (infer.rs ~15528)
   replays bounds; check the order does not leak into diagnostics.
@@ -475,3 +478,8 @@ annotations; baml_tests/src/type_spec/harness.rs) as BAML tests.
 The one difference is `anyfunction` (E0153 `reflect.AnyFunction` is a
 compiler builtin and cannot be implemented by hand): see the stdlib open
 item. Each gate takes ~80 s.
+- TIR ports read the Rust in the fork's tree, which mirrors upstream past
+  `BASE` (e.g. #5715 changed infer.rs and infer/*). The oracle toolchain is
+  built from that tree, so the code and the oracle agree; the `// port: ...
+  @ d9be6853b` headers are nominal for TIR. Advance `BASE` when the TIR gate
+  passes.
