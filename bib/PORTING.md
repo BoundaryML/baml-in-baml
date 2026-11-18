@@ -378,3 +378,14 @@ Open items:
   package interface even for source packages) before K1's declaration gate.
 - `json_inhabit` `solve` and `decl_cycles` `productive_aliases` are
   quadratic in chain length, as in Rust (a 3,000-class chain: 114 s on the VM).
+- `ty_debug` (Rust's derived `Debug` of `Ty`, `family_stubs.baml`) panics.
+  exhaustiveness's `write_type_witness` falls back to it for a type-test
+  witness on a non-literal type; no corpus case reaches it so far. If one
+  does, decide between matching Rust's `Int`-style output and spelling it
+  (`int`).
+- `InferenceTable::take_solved_class_bounds` walks roots in index order;
+  Rust walks its FxHashMap's order. Its one consumer (infer.rs ~15528)
+  replays bounds; check the order does not leak into diagnostics.
+- exhaustiveness's test helpers (`viewpoint`, `qtn`, `class_ty`,
+  `USER_ROOT`, ...) are free functions in `hir_ty`; a later port of
+  `test_heads.rs` must reuse them, not redefine them.
