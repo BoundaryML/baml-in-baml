@@ -656,6 +656,16 @@ Oracles (all text from `pretty.rs`, byte for byte):
 Every printed MIR is post-optimization: the snapshot gates open only once
 lowering AND `optimize` are in.
 
+Status (2026-11-18): every unit merged (U0 to U7); `baml check` clean,
+`baml test` 627/627 (escape 54 of 60, optimizer 15 Rust tests, U5's three
+hand-built bodies match Rust at O0/O1/O2). Left: the compiler2_mir harness
+and corpus `mir.snap` (byte for byte), and the stubs `ty_debug`,
+`concrete_callee_target`, `extern_function_package`, RuntimeTy
+`strip_null`/Display/Debug, TYPETAG constants' home, the mounted lane.
+Open decisions: `hotswap_enabled()` (escape.baml) is always false until it
+is a `Db` input; `verify_mir` runs after every optimization (Rust: debug
+builds only).
+
 Order: unit 0 alone (ir.rs, builder.rs, inference_provider.rs,
 iteration.rs, lib.rs, lower.rs 1-104, 1682-1917, 2381-2538, and one stub
 file per unit), then in parallel:
