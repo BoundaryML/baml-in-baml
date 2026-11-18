@@ -186,7 +186,12 @@ def main() -> int:
                 "mirrored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             }
             needs_port = bool(layers & ported)
-            tag = ("PORT  " if needs_port else "absorb") if entry["port"] else "mirror"
+            key = f"pr{entry['pr']}" if entry["pr"] else sha[:12]
+            # Ported before upstream merged it: the done record already exists.
+            ported_ahead = needs_port and (DONE / f"{key}.md").exists()
+            if ported_ahead:
+                needs_port = False
+            tag = ("PORT  " if needs_port else "ahead " if ported_ahead else "absorb") if entry["port"] else "mirror"
             print(f"  {tag} {sha[:10]} {subject}  {entry['classes']}")
             if args.dry_run:
                 continue
@@ -215,11 +220,6 @@ def main() -> int:
                     print("    resolve by hand: git merge --no-ff " + sha, file=sys.stderr)
                     return 2
 
-            key = f"pr{entry['pr']}" if entry["pr"] else sha[:12]
-            ported_ahead = needs_port and (DONE / f"{key}.md").exists()
-            if ported_ahead:
-                # Ported before upstream merged it: the done record already exists.
-                needs_port = False
             entry["status"] = (
                 ("port-pending" if needs_port else "ported-ahead" if ported_ahead else "absorbed")
                 if entry["port"] else "mirrored"
