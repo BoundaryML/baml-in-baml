@@ -644,10 +644,11 @@ class SemanticIndexBuilder {
                     }),
                 );
             },
-            // divergence?: a class literal that names a field twice
-            // (`Pair { a: null, a: 1 }`) compiles without a diagnostic and the last
-            // value wins (marked BUG upstream); it needs the check class patterns
-            // make with `DuplicatePatternField`.
+            // Upstream BUG, ported as is by decision (2026-11-18): a class literal
+            // that names a field twice (`Pair { a: null, a: 1 }`) compiles without a
+            // diagnostic and the last value wins. Fixed upstream, it arrives here as
+            // a port task; it needs the check class patterns make with
+            // `DuplicatePatternField`.
             let e: root.ast.ExprObject => {
                 walk_all(
                     e.fields.map((field) -> {
