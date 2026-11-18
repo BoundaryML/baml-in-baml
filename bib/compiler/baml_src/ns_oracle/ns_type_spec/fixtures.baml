@@ -3,8 +3,9 @@
 // Directory-driven type conformance checks, read in place from upstream's
 // `type_spec/fixtures/`. Every conforming fixture must satisfy its caret
 // annotations and clean-by-default error channel; only SNAPSHOT_EXAMPLES
-// render a full inferred-node dump, compared byte for byte with upstream's
-// insta snapshot (header stripped).
+// render a full inferred-node dump, compared with upstream's insta snapshot
+// as `insta::assert_snapshot!` compares them (`snapshot_body`,
+// `snapshot_matches`).
 //
 //   baml run oracle.type_spec.type_spec_summary
 //
@@ -15,7 +16,9 @@
 //   only and counts as its failure, with the panic message.
 // - The `conforming_fixtures` test is a function returning the report; the
 //   test below asserts it is clean and `type_spec_summary` prints it.
-//   `insta::assert_snapshot!` is the byte comparison in `conforming_fixtures`.
+//   `insta::assert_snapshot!` is `snapshot_body` plus `snapshot_matches`
+//   (ports of insta 1.47.2, the version upstream locks), checked in
+//   `TypeSpecReport.failed_snapshots`.
 //
 // Not ported: `bounded_pool_preserves_order_and_results` (it tests the rayon
 // pool, which has no counterpart).
@@ -84,7 +87,8 @@ test "snapshot examples are valid" {
         assert.is_true(!names.has(example.0));
         names[example.0] = true;
         assert.is_true(example.1.trim().length() > 0);
-        assert.is_true(baml.fs.exists(`${fixtures_root()}/${example.0}.baml`));
+        let fixture = `${fixtures_root()}/${example.0}.baml`;
+        assert.is_true(baml.fs.exists(fixture) && baml.fs.metadata(fixture).is_file);
     }
     let expected = SNAPSHOT_EXAMPLES
         .map((example) -> {
@@ -114,14 +118,15 @@ function fixtures_root() -> string throws never {
 // port: baml_tests/src/type_spec/fixtures.rs::fixture_paths @ d9be6853b
 // The `.baml` files directly in `dir`, sorted. A missing directory is an
 // empty one when `allow_empty` (`pending/` disappears with its last promoted
-// fixture).
+// fixture). Rust's `extension() == "baml"`: a name ending `.baml` with a
+// non-empty stem (`.baml` alone has no extension).
 function fixture_paths(dir: string, allow_empty: bool) -> string[] throws baml.errors.Io {
     if (allow_empty && !baml.fs.exists(dir)) {
         return [];
     }
     let paths = baml.fs.read_dir(dir)
         .filter((entry) -> {
-            entry.name.ends_with(".baml")
+            entry.name.ends_with(".baml") && entry.name.length() > 5
         })
         .map((entry) -> {
             `${dir}/${entry.name}`
@@ -166,18 +171,79 @@ class TypeSpecReport {
 
     function failed_snapshots(self) -> SnapshotResult[] throws never {
         self.snapshots.filter((s) -> {
-            s.expected != s.ours
+            !snapshot_matches(s.expected, s.ours)
         })
     }
 }
 
-// The body of an insta `.snap` file: everything after its `---` header.
+// port: insta-1.47.2/src/snapshot.rs::Snapshot::from_file
+// The text body of an insta `.snap` file. A first line `---` opens a YAML
+// header that runs to the next line that is `---` (trailing whitespace
+// ignored); any other first line starts a legacy header that runs to the
+// first blank line. The body is the remaining lines as `BufRead::lines`
+// yields them (`\n` or `\r\n` stripped), joined by `\n`.
+// Not ported: parsing the header's YAML (only `snapshot_kind: binary`, which
+// no type_spec golden uses, changes the comparison), so a header that is
+// not valid YAML is not an error here. An unclosed YAML header panics: insta
+// reads the whole file as the header, then fails to parse it or compares an
+// empty body, which no non-empty dump matches.
 function snapshot_body(snap: string) -> string throws never {
-    let parts = snap.split("---\n");
-    if (parts.length() < 3 || parts[0] != "") {
-        baml.sys.panic("snapshot has no insta header");
+    let lines = snap.split("\n");
+    // `split` leaves a trailing empty piece after a final newline; `lines` does not.
+    if (lines.at(-1) == "") {
+        lines.pop();
     }
-    parts.slice(2, parts.length()).join("---\n")
+    let at = 1;
+    if (lines.length() > 0 && lines[0].trim_end() == "---") {
+        while (true) {
+            if (at >= lines.length()) {
+                baml.sys.panic("snapshot has an unclosed insta header");
+            }
+            at += 1;
+            if (lines[at - 1].trim_end() == "---") {
+                break;
+            }
+        }
+    } else {
+        while (at < lines.length()) {
+            at += 1;
+            if (lines[at - 1].trim_end() == "") {
+                break;
+            }
+        }
+    }
+    lines.slice(at, lines.length())
+        .map((line) -> {
+            if (line.ends_with("\r")) {
+                line.slice(0, line.length() - 1)
+            } else {
+                line
+            }
+        })
+        .join("\n")
+}
+
+// port: insta-1.47.2/src/snapshot.rs::TextSnapshotContents::normalize
+// A file snapshot's contents as insta compares them: trailing whitespace
+// dropped, `\r\n` read as `\n`.
+function snapshot_normalize(contents: string) -> string throws never {
+    contents.trim_end().replace_all("\r\n", "\n")
+}
+
+// port: insta-1.47.2/src/snapshot.rs::impl PartialEq for SnapshotContents
+// Whether a stored snapshot body and a new value match, for text file
+// snapshots: `matches_latest` (equal after `snapshot_normalize`), else
+// `matches_legacy` (also ignoring leading `\r`/`\n` and then one leading
+// `---\n`).
+function snapshot_matches(stored: string, value: string) -> bool throws never {
+    let legacy = (contents: string) -> string {
+        let out = snapshot_normalize(contents);
+        while (out.starts_with("\r") || out.starts_with("\n")) {
+            out = out.slice(1, out.length());
+        }
+        root.base.strip_prefix(out, "---\n") ?? out
+    };
+    snapshot_normalize(stored) == snapshot_normalize(value) || legacy(stored) == legacy(value)
 }
 
 // port: baml_tests/src/type_spec/fixtures.rs::conforming_fixtures @ d9be6853b
@@ -242,7 +308,7 @@ function type_spec_summary() -> string throws baml.errors.Io | baml.errors.Parse
             .join("\n")
     });
     let snapshots = report.failed_snapshots().map((s) -> {
-        `snapshot ${s.name} differs:\n--- upstream\n${s.expected}--- ours\n${s.ours}`
+        `snapshot ${s.name} differs:\n--- upstream\n${s.expected}\n--- ours\n${s.ours}`
     });
     head.concat(fixtures).concat(snapshots).join("\n")
 }
