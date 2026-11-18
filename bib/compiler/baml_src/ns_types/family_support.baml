@@ -12,13 +12,6 @@ enum FunctionParamMode {
     Optional,
 }
 
-// port: baml_type/src/param.rs::ParamTy @ d9be6853b
-// A generic parameter: its position in the declaring item's list and name.
-class ParamTy {
-    index: int,
-    name: string,
-}
-
 // port: the `Not<Member>` errors of the conversion matrix, as one class.
 // A narrowing met a variant the target member does not include.
 class NarrowError {
