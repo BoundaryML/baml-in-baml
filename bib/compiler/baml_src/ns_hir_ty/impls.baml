@@ -973,12 +973,13 @@ function impls_for_type_cached(
                     db.ty_memo.impl_type_keys.viewers[type_key],
                 )
             ) {
-                for (let facts in package_impl_candidates(db, package)) {
+                package_impl_candidates(db, package, null, (facts) -> {
                     let accepted = impls_for_type_candidate(db, facts, concrete, eq);
                     if (accepted != null) {
                         out.push(accepted);
                     }
-                }
+                    false
+                });
             }
             out
         },
@@ -1042,23 +1043,103 @@ function impls_for_type_candidate(
     CachedResolvedImpl { block: facts.block, bindings: bindings }
 }
 
+// One resolved impl block and its position in the package's block list.
+class ImplCandidate {
+    position: int,
+    facts: ResolvedImplFacts,
+}
+
+// Speed, not a Rust type: a package's impl blocks whose facts are final,
+// visited so far in block order (`scanned` blocks), the resolved ones kept
+// all together and by interface. Blocks whose facts are still provisional
+// (inside a cycle) are never cached.
+class ImplCandidateCache {
+    scanned: int,
+    resolved: ImplCandidate[],
+    by_interface: map<string, ImplCandidate[]>,
+}
+
+function impl_interface_key(name: root.types.DeclName) -> string throws never {
+    `${name.pkg}|${name.namespace.join(".")}|${name.name}`
+}
+
 // port: baml_compiler2_hir_ty/src/impls.rs::package_impl_candidates @ d9be6853b
-// Every impl block of `package` whose header resolved. Restructured: the
-// source lane only (see the file header). Lazy, as Rust's iterator is: a
-// search that stops at its first match must not resolve the facts of the
-// blocks after it (a block's facts can depend on the search itself).
+// Every impl block of `package` whose header resolved, in block order,
+// handed to `visit` until it returns true (then this returns true).
+// Restructured, for speed:
+// - The source lane only (see the file header).
+// - A visitor instead of Rust's lazy iterator. Like the iterator it stops
+//   at the visitor's first `true` and computes `impl_facts` only for the
+//   blocks it reaches, in order, so the same blocks are resolved first, and
+//   a search never resolves the blocks past its match (their facts can
+//   depend on the search).
+// - `interface_`, when given, skips the blocks implementing another
+//   interface, which every caller's visitor rejects first. Only blocks
+//   already cached (their facts final, so in Rust a memo hit with no effect)
+//   are skipped that way; past the cache, every block is visited in order.
+// Positions are walked explicitly: a visitor may extend the cache (a nested
+// search of the same package), and the walk neither skips nor repeats a
+// block.
 function package_impl_candidates(
     db: root.hir.Db,
     package: int,
-) -> baml.iter.Iterator<Item = ResolvedImplFacts, Error = never> throws never {
-    baml.iter.ArrayIterator.new(package_impl_locs(db, package)).iter().filter_map((block) -> {
-        let facts = impl_header_resolution_resolved(impl_facts(db, block));
-        if (facts != null) {
-            ResolvedImplFacts { block: block, facts: facts }
-        } else {
-            null
+    interface_: root.types.DeclName?,
+    visit: (ResolvedImplFacts) -> bool,
+) -> bool {
+    let caches = db.ty_memo.impl_candidate_caches;
+    if (!caches.has(package)) {
+        caches[package] = ImplCandidateCache { scanned: 0, resolved: [], by_interface: {} };
+    }
+    let cache = caches[package];
+    let key = if (interface_ != null) { impl_interface_key(interface_) } else { "" };
+    let locs = package_impl_locs(db, package);
+    let position = 0;
+    let cursor = 0;
+    while (true) {
+        if (position < cache.scanned) {
+            let cached = if (interface_ != null) { cache.by_interface.get(key) ?? [] } else { cache.resolved };
+            while (cursor < cached.length() && cached[cursor].position < position) {
+                cursor += 1;
+            }
+            if (cursor < cached.length() && cached[cursor].position < cache.scanned) {
+                let candidate = cached[cursor];
+                cursor += 1;
+                position = candidate.position + 1;
+                if (visit(candidate.facts)) {
+                    return true;
+                }
+                continue;
+            }
+            position = cache.scanned;
+            continue;
         }
-    })
+        if (position >= locs.length()) {
+            return false;
+        }
+        let block = locs[position];
+        let resolved = impl_header_resolution_resolved(impl_facts(db, block));
+        let facts = if (resolved != null) { ResolvedImplFacts { block: block, facts: resolved } } else { null };
+        if (position == cache.scanned && db.ty_memo.impl_facts.values.has(block)) {
+            cache.scanned = position + 1;
+            if (facts != null) {
+                let candidate = ImplCandidate { position: position, facts: facts };
+                cache.resolved.push(candidate);
+                let interface_key = impl_interface_key(facts.facts.interface_.reference.name);
+                if (!cache.by_interface.has(interface_key)) {
+                    cache.by_interface[interface_key] = [];
+                }
+                cache.by_interface[interface_key].push(candidate);
+            }
+        }
+        position += 1;
+        if (
+            facts != null
+                && (interface_ == null || facts.facts.interface_.reference.name == interface_)
+                && visit(facts)
+        ) {
+            return true;
+        }
+    }
 }
 
 // port: baml_compiler2_hir_ty/src/impls.rs::impl_candidates @ d9be6853b
@@ -1504,14 +1585,12 @@ function has_potential_custom_equals(
         root.types.OpenTy => baml.sys.panic("eligibility receiver is closed"),
     };
     for (let package in search_roots(db, concrete, equals)) {
-        for (let facts in package_impl_candidates(db, package)) {
-            if (
-                facts.facts.interface_.reference.name == equals.name
-                    && ResolvedImpl { facts: facts, bindings: {} }.provided_method(db, "eq") != null
-                    && heads_may_overlap(db, package, facts.facts.for_ty_pattern, closed)
-            ) {
-                return true;
-            }
+        let found = package_impl_candidates(db, package, equals.name, (facts) -> {
+            ResolvedImpl { facts: facts, bindings: {} }.provided_method(db, "eq") != null
+                && heads_may_overlap(db, package, facts.facts.for_ty_pattern, closed)
+        });
+        if (found) {
+            return true;
         }
     }
     false
@@ -1705,15 +1784,15 @@ function resolve_within_depth(
     in_progress.push((head, interface_));
     let resolved: ResolvedImpl? = null;
     for (let package in search_roots(db, head, interface_)) {
-        for (let facts in package_impl_candidates(db, package)) {
+        let found = package_impl_candidates(db, package, interface_.name, (facts) -> {
             let bindings = match_impl_head(db, facts, head, interface_, eq);
             if (bindings == null || !bounds_hold(db, facts, bindings, depth, in_progress)) {
-                continue;
+                return false;
             }
             resolved = ResolvedImpl { facts: facts, bindings: bindings };
-            break;
-        }
-        if (resolved != null) {
+            true
+        });
+        if (found) {
             break;
         }
     }

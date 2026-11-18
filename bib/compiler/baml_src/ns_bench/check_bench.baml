@@ -30,3 +30,33 @@ function check_dir(dir: string) -> CheckBench throws baml.errors.Io | baml.error
         check_ms: checked.elapsed().to_milliseconds(),
     }
 }
+
+// The quick loop: load the whole corpus as one project but check only every
+// `every`-th file (`check_file` on each, as `check_with` would). Whole-project
+// costs (impl candidates, package items, the stdlib) are paid as in the full
+// run; only the per-file work shrinks.
+function check_sample(dir: string, every: int = 15) -> CheckBench throws baml.errors.Io | baml.errors.ParseError {
+    let files: map<string, string> = {};
+    for (let path in baml.glob.new("**/*.baml").scan(dir)) {
+        files[path] = baml.fs.read(`${dir}/${path}`);
+    }
+    let started = baml.time.Instant.now();
+    let db = root.stdlib_db();
+    let stdlib_ms = started.elapsed().to_milliseconds();
+    let checked = baml.time.Instant.now();
+    let workspace = root.db.add_root(db, "", root.base.SourceRootKind.Workspace, null, []);
+    for (let path in files.keys()) {
+        root.db.add_file(db, workspace, path, files[path]);
+    }
+    let file_ids = db.source_root(workspace).files;
+    let count = 0;
+    for (let i = 0; i < file_ids.length(); i += every) {
+        count += root.check_file(db, file_ids[i]).length();
+    }
+    CheckBench {
+        files: (file_ids.length() + every - 1) / every,
+        diagnostics: count,
+        stdlib_ms: stdlib_ms,
+        check_ms: checked.elapsed().to_milliseconds(),
+    }
+}

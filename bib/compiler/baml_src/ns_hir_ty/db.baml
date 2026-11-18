@@ -77,6 +77,9 @@ class TyMemos {
     // impls.rs::impls_for_type_cached (key: `impl_type_keys`)
     impls_for_type_cached: root.hir.TrackedMemo<CachedResolvedImpl[]>,
     impl_type_keys: ImplTypeKeys,
+    // Speed, not a Rust query: each package's impl candidates with final
+    // facts, in block order (impls.baml `package_impl_candidates`).
+    impl_candidate_caches: map<int, ImplCandidateCache>,
     // callable.rs::callable_throws (key: function loc)
     callable_throws: root.hir.TrackedMemo<CallableThrows>,
     // callable.rs::function_signature_ty (key: function loc)
@@ -139,6 +142,7 @@ class TyMemos {
             package_impl_locs: root.hir.TrackedMemo.new("package_impl_locs"),
             impls_for_type_cached: root.hir.TrackedMemo.new("impls_for_type_cached"),
             impl_type_keys: ImplTypeKeys.new(),
+            impl_candidate_caches: {},
             callable_throws: root.hir.TrackedMemo.new("callable_throws"),
             function_signature_ty: root.hir.TrackedMemo.new("function_signature_ty"),
             infer_function_body: root.hir.TrackedMemo.new("infer_function_body"),
