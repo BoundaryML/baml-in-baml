@@ -218,7 +218,7 @@ function lower_optional_method_call(
         ctx.builder.branch(operand_copy_local(test_local), bb_null, bb_call);
 
         ctx.builder.set_current_block(bb_call);
-        lower_call_with_callee(ctx, expr_id, callee, member_call, args, dest);
+        lower_call_with_callee(ctx, expr_id, callee, member_call, args, place_clone(dest));
         if (!ctx.builder.is_current_terminated()) {
             ctx.builder.goto(bb_join);
         }
@@ -245,7 +245,7 @@ function lower_normalized_callee_operand(
         if (ctx.body.exprs[callee] is root.ast.ExprOptionalMemberAccess) {
             let ty = expr_ty(ctx, callee);
             let tmp = ctx.builder.declare_local(ty);
-            lower_member_access(ctx, callee, member.base, member.member, PlaceLocal { value: tmp });
+            lower_member_access_with_base(ctx, callee, member.base, member.member, PlaceLocal { value: tmp });
             return operand_copy_local(tmp);
         }
     }
@@ -704,13 +704,13 @@ function lower_call_with_callee_intrinsics(
         if (is_container_length && arg_operands.length() > 0) {
             let receiver_operand = arg_operands[0];
             let place = match (receiver_operand) {
-                let copy: OperandCopy => copy.value,
-                let move: OperandMove => move.value,
+                let copy: OperandCopy => place_clone(copy.value),
+                let move: OperandMove => place_clone(move.value),
                 OperandConstant => {
                     let tmp = ctx.builder.declare_local(root.types.TyUnknown {});
                     ctx.builder.assign(
                         PlaceLocal { value: tmp },
-                        RvalueUse { value: receiver_operand },
+                        RvalueUse { value: operand_clone(receiver_operand) },
                     );
                     PlaceLocal { value: tmp }
                 },
@@ -830,7 +830,7 @@ function lower_call_with_callee_emit(
 
     let argument_layout = call_argument_layout(ctx, expr_id, arg_operands.length());
     // Type-arg operands lead the value-arg operands.
-    let all_arg_operands_for_call = type_arg_operands.concat(arg_operands);
+    let all_arg_operands_for_call = type_arg_operands.concat(arg_operands).map(operand_clone);
 
     // `baml.future.__await_any(futures)` lowers to an `AwaitAny` suspend
     // point (like `await`), not a call. Its single value arg is the array of
@@ -1525,7 +1525,7 @@ function emit_scoped_type_binding(
         let satisfied = ctx.builder.declare_local(root.types.TyBool {});
         ctx.builder.assign(
             PlaceLocal { value: satisfied },
-            RvalueSatisfiesBound { ty: bound_type, bound: bound_template },
+            RvalueSatisfiesBound { ty: operand_clone(bound_type), bound: bound_template },
         );
         let next = ctx.builder.create_block();
         ctx.builder.branch(operand_copy_local(satisfied), next, miss);

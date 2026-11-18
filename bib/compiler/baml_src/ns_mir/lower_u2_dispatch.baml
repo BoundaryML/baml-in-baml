@@ -465,7 +465,7 @@ function emit_item_call_type_keyed(
             generic.type_args.length(),
             layout,
             expr_ty(ctx, expr_id),
-            dest,
+            place_clone(dest),
         );
         return;
     }
@@ -744,7 +744,7 @@ function emit_resolved_indirect_call(
     let target = ctx.builder.create_block();
     match (dest) {
         PlaceLocal => {
-            ctx.builder.call_with_type_args(callee_op, arg_operands, 0, dest, target);
+            ctx.builder.call_with_type_args(callee_op, arg_operands, 0, place_clone(dest), target);
             ctx.builder.set_call_layout(argument_layout);
             ctx.builder.set_current_block(target);
         },
@@ -760,7 +760,7 @@ function emit_resolved_indirect_call(
             );
             ctx.builder.set_call_layout(argument_layout);
             ctx.builder.set_current_block(target);
-            ctx.builder.assign(dest, RvalueUse { value: operand_copy_local(tmp) });
+            ctx.builder.assign(place_clone(dest), RvalueUse { value: operand_copy_local(tmp) });
         },
     }
 }
@@ -939,7 +939,7 @@ function mir_interface_declares_method(
     let interface_ = root.hir_ty.interface_ref_of(ctx.db, iface_qtn)
         ?? return false;
     root.hir_ty.interface_requires_closure(ctx.db, interface_).some((required) -> {
-        root.hir_ty.interface_member(ctx.db, required, method) is DeclaredMemberMethod
+        root.hir_ty.interface_member(ctx.db, required, method) is root.hir_ty.DeclaredMemberMethod
     })
 }
 
@@ -962,7 +962,7 @@ function interface_declares(
     ctx: LoweringContext,
     iface_tn: root.types.DeclName,
     member: string,
-) -> DeclaredMember? throws never {
+) -> root.hir_ty.DeclaredMember? throws never {
     decl_interface_declares(ctx, iface_tn, member)
 }
 
@@ -972,7 +972,7 @@ function decl_interface_declares(
     ctx: LoweringContext,
     iface_decl: root.types.DeclName,
     member: string,
-) -> DeclaredMember? throws never {
+) -> root.hir_ty.DeclaredMember? throws never {
     let interface_ = root.hir_ty.interface_ref_of(ctx.db, iface_decl)
         ?? return null;
     root.hir_ty.interface_member(ctx.db, interface_, member)
@@ -993,10 +993,10 @@ function resolve_interface_member(
     view: InterfaceTypeView,
     member: string,
 ) -> InterfaceMember throws never {
-    let found = (declaring: InterfaceTypeView, declared: DeclaredMember) -> InterfaceMember {
+    let found = (declaring: InterfaceTypeView, declared: root.hir_ty.DeclaredMember) -> InterfaceMember {
         match (declared) {
-            DeclaredMemberMethod => InterfaceMemberMethod { declaring: declaring },
-            let field: DeclaredMemberField => {
+            root.hir_ty.DeclaredMemberMethod => InterfaceMemberMethod { declaring: declaring },
+            let field: root.hir_ty.DeclaredMemberField => {
                 InterfaceMemberField { declaring: declaring, index: field.index }
             },
         }

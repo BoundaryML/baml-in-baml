@@ -118,8 +118,8 @@ function package_lowering_data(db: root.hir.Db, pkg_id: int) -> PackageLoweringD
         let method_names: map<string, bool> = {};
         let all_pkgs = [pkg_id].concat(root.hir.package_dependency_closure(db, pkg_id));
         for (let pkg in all_pkgs) {
-            for (let interface_ in package_interfaces(db, pkg)) {
-                for (let name in interface_method_names(db, interface_)) {
+            for (let interface_ in root.hir_ty.package_interfaces(db, pkg)) {
+                for (let name in root.hir_ty.interface_method_names(db, interface_)) {
                     method_names[name] = true;
                 }
             }

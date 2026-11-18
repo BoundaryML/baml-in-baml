@@ -164,7 +164,7 @@ function emit_direct_structural_call(
         null
     };
     let call_dest = if (dest is PlaceLocal) {
-        dest
+        place_clone(dest)
     } else {
         PlaceLocal { value: ctx.builder.declare_local(result_ty) }
     };
@@ -173,7 +173,7 @@ function emit_direct_structural_call(
         OperandConstant { value: ConstantFunction { value: func } },
         args,
         ntypeargs,
-        call_dest,
+        place_clone(call_dest),
         resume,
     );
     ctx.builder.set_call_layout(call_layout);
@@ -241,11 +241,22 @@ function emit_virtual_call_with_value_operands(
                     if (rendering != null) {
                         match (rendering) {
                             PrimitiveRendering.Itself => {
-                                ctx.builder.assign(dest, RvalueUse { value: value_ops[0] });
+                                ctx.builder.assign(
+                                    place_clone(dest),
+                                    RvalueUse { value: value_ops[0] },
+                                );
                             },
                             PrimitiveRendering.Formatted => {
                                 let func = lang_function(ctx, root.base.LangPackage.Baml, [], "_to_string_primitive");
-                                emit_direct_structural_call(ctx, func, value_ops, 0, layout, root.types.TyString {}, dest);
+                                emit_direct_structural_call(
+                                    ctx,
+                                    func,
+                                    value_ops,
+                                    0,
+                                    layout,
+                                    root.types.TyString {},
+                                    place_clone(dest),
+                                );
                             },
                         }
                         return true;
@@ -275,7 +286,7 @@ function emit_virtual_call_with_value_operands(
                     native_type_arg_count,
                     layout,
                     expr_ty(ctx, expr_id),
-                    dest,
+                    place_clone(dest),
                 );
                 return true;
             }
@@ -345,7 +356,17 @@ function emit_virtual_call_with_value_operands(
     let iface_template = tir2_interface_to_template(iface_tn, iface_type_args, iface_assoc, runtime(ctx), generic_params);
     let result_ty = expr_ty(ctx, expr_id);
     let argument_layout = call_argument_layout(ctx, expr_id, all_args.length() - ntypeargs);
-    emit_virtual_call_with_operands(ctx, iface_template, method, all_args, ntypeargs, self_arg, argument_layout, result_ty, dest);
+    emit_virtual_call_with_operands(
+        ctx,
+        iface_template,
+        method,
+        all_args,
+        ntypeargs,
+        self_arg,
+        argument_layout,
+        result_ty,
+        place_clone(dest),
+    );
     true
 }
 
@@ -375,7 +396,15 @@ function emit_virtual_call_with_operands(
         call_dest = PlaceLocal { value: tmp };
         projection_dest = dest;
     }
-    ctx.builder.virtual_call(iface, method, args, ntypeargs, self_arg, call_dest, resume);
+    ctx.builder.virtual_call(
+        iface,
+        method,
+        args,
+        ntypeargs,
+        self_arg,
+        place_clone(call_dest),
+        resume,
+    );
     ctx.builder.set_call_layout(argument_layout);
     ctx.builder.set_current_block(resume);
     if (projection_dest != null) {
@@ -558,7 +587,7 @@ function emit_virtual_field_access(
     dest: Place,
 ) -> void throws never {
     ctx.builder.assign(
-        dest,
+        place_clone(dest),
         RvalueVirtualFieldAccess {
             iface: iface,
             receiver: operand_copy_local(recv_local),
@@ -583,7 +612,7 @@ function virtual_field_assign_view(
     if (recorded != null) {
         return recorded.0;
     }
-    interface_receiver_for_field_access(ctx, base, field)
+    interface_dispatch_target_for_expr_member(ctx, base, field)
 }
 
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::virtual_field_assign_target @ d9be6853b
