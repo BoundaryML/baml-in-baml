@@ -370,3 +370,11 @@ types) after K4; then the full Type gate.
 
 Port the memoized Hash-eligibility walk (impls.rs `hash_eligible`), not the
 code at `BASE`: it is 80% of check time there.
+
+Open items:
+- `hir_ty.reexport_paths` is a panicking stub (render.baml's
+  `Viewpoint::reexport_path`). It is reached whenever the viewer has no edge
+  to the declaring package. Decide its source-only answer (Rust derives a
+  package interface even for source packages) before K1's declaration gate.
+- `json_inhabit` `solve` and `decl_cycles` `productive_aliases` are
+  quadratic in chain length, as in Rust (a 3,000-class chain: 114 s on the VM).
