@@ -576,3 +576,13 @@ safe mechanical passes, each re-checked against all three:
    rest by hand: unused here can mean used by MIR later.
 6. The two map-order notes (`register_class_bounds`,
    `take_solved_class_bounds`).
+
+## type_spec suites (2026-11-18)
+
+The rest of upstream's `type_spec` module is ported (`ns_oracle/ns_type_spec/`):
+`tables` 16/16, `sweep` 1/1 (matches its snapshot: 0 channel entries, 0
+panics over `baml_src`), `pattern_corpus` 4/4, `coherence` 9/9 (+5
+`orphan_check` tests). Full verification on main after the merges: `baml
+test` 541/541 (10 min with `--test-timeout`; the sweep alone is ~8 min),
+type_spec 173/173 fixtures, 355/355 annotations, 5/5 snapshots, Type gate 0
+mismatches on every corpus.
