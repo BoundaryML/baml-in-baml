@@ -1,8 +1,7 @@
 // port: baml_syntax/src/lexer/tests.rs @ d9be6853b
 // The table-style asserts, carried over by a one-off script. Tests built
-// on loops or helpers are ported by hand below the generated ones.
+// on loops or helpers are in lexer_loop_test.baml.
 
-// not ported (no table asserts): every_fixed_spelling_lexes_to_its_kind
 test "composites that are not tokens split" {
     assert.equal(lexed("a ?? b"), ["Word a", "Question ?", "Question ?", "Word b"]);
     assert.equal(lexed("x >> 1"), ["Word x", "Greater >", "Greater >", "Integer 1"]);
@@ -134,7 +133,6 @@ test "line comments sharing the directive prefix" {
     assert.equal(lexed("///x", trivia = true), ["DocComment ///x"]);
 }
 
-// line_comments_sharing_the_directive_prefix: 1 assert(s) not in table form, not ported
 
 test "stray hash" {
     assert.equal(
@@ -227,7 +225,6 @@ test "backtick templates" {
     );
 }
 
-// backtick_templates: 4 assert(s) not in table form, not ported
 
 test "multi tick templates" {
     assert.equal(
@@ -282,9 +279,6 @@ test "newline tokens" {
     assert.equal(lexed(" \t ", trivia = true), ["Whitespace  \t "]);
 }
 
-// not ported (no table asserts): token_indices_line_up
-// not ported (no table asserts): corpus_kinds_fit
-// not ported (no table asserts): random_input_round_trips
 // Test helper, port of `toks` and `sig` at the top of lexer/tests.rs:
 // "Kind text" for each token of `text`, trivia only when asked for.
 function lexed(text: string, trivia: bool = false) -> string[] throws never {
