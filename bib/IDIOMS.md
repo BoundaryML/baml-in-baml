@@ -136,3 +136,14 @@ the checked-in output. Change the spec, then from `bib/compiler`:
 - The generator runs only while the project checks. If a spec change breaks
   `family.baml` or `family_support.baml`, move both aside, regenerate, and put
   `family_support.baml` back.
+
+## Generic unions and Result
+
+- BAML type aliases take no generic parameters. A Rust generic enum becomes
+  generic variant classes, and each instantiation in use gets its own alias:
+  `type MemberResolution = MemberResolutionField<Ty> | ...;` and
+  `type WorkingMemberResolution = MemberResolutionField<int> | ...;`.
+- A Rust `Result<T, E>` returned from a function that may be a stub (or whose
+  error is a plain enum) is `T | E`: a stub that declares `throws E` but
+  never throws gets an "extraneous throws" warning (E0097). Elsewhere, use
+  `throws`.
