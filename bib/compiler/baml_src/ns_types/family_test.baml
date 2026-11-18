@@ -59,3 +59,12 @@ test "interning shares equal subtrees and propagates flags" {
     assert.is_true(!pool.has(a, HAS_INFER));
     assert.equal(resolve_ty(pool, a), sample(true));
 }
+
+test "types order as Rust's derived Ord: variant order, then fields" {
+    let foo = TyClass { name: class_name("Foo"), args: [] };
+    let foo_int = TyClass { name: class_name("Foo"), args: [TyInt {}] };
+    let bar = TyClass { name: class_name("Bar"), args: [TyString {}] };
+    let tys: Ty[] = [TyList { elem: TyInt {} }, foo_int, TyString {}, bar, TyInt {}, foo, TyNever {}];
+    tys.sort_by(cmp_ty);
+    assert.equal(tys, [TyInt {}, TyString {}, bar, foo, foo_int, TyList { elem: TyInt {} }, TyNever {}]);
+}

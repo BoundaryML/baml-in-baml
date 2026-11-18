@@ -129,6 +129,10 @@ the checked-in output. Change the spec, then from `bib/compiler`:
   (Rust's `(Name, Ty)` pair; tuples are not hashable).
 - Each member names its head type in the spec; conversions exist only between
   members at the same head.
+- Rust's derived `Ord` is generated as `cmp_<member>` / `cmp_<satellite>`
+  (variant declaration order, then fields); payload orders are in
+  `ns_types/ord.baml`. Sort with `xs.sort_by(cmp_ty)` where Rust uses a
+  `BTreeSet<Ty>` or `.sort()`.
 - The generator runs only while the project checks. If a spec change breaks
   `family.baml` or `family_support.baml`, move both aside, regenerate, and put
   `family_support.baml` back.

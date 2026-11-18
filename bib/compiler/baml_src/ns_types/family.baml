@@ -4498,6 +4498,1216 @@ function children_ty_template(t: TyTemplate) -> TyTemplate[] {
     }
 }
 
+// == Ordering ==============================================================
+
+// The variant's position in declaration order.
+function variant_index_ty(t: Ty) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        TyLiteral => 8,
+        TyClass => 9,
+        TyInterface => 10,
+        TyEnum => 11,
+        TyEnumVariant => 12,
+        TyList => 13,
+        TyMap => 14,
+        TyUnion => 15,
+        TyFunction => 16,
+        TyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyTypeAlias => 22,
+        TyTypeVar => 23,
+        TyAssociatedTypeProjection => 24,
+        TyUnknown => 25,
+        TyNever => 26,
+        TyError => 27,
+        TyTuple => 31,
+    }
+}
+
+// port: the derived Ord of Ty.
+function cmp_ty(a: Ty, b: Ty) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_ty(a).cmp(variant_index_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: TyLiteral, let y: TyLiteral) => {
+            let o0 = cmp_literal(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_freshness(x.freshness, y.freshness)
+        },
+        (let x: TyClass, let y: TyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_ty)
+        },
+        (let x: TyInterface, let y: TyInterface) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_list(x.args, y.args, cmp_ty);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_list(x.associated_types, y.associated_types, cmp_associated_type)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyEnumVariant, let y: TyEnumVariant) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            x.variant.cmp(y.variant)
+        },
+        (let x: TyList, let y: TyList) => {
+            cmp_ty(x.elem, y.elem)
+        },
+        (let x: TyMap, let y: TyMap) => {
+            let o0 = cmp_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_ty(x.value, y.value)
+        },
+        (let x: TyUnion, let y: TyUnion) => {
+            cmp_list(x.members, y.members, cmp_ty)
+        },
+        (let x: TyFunction, let y: TyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_ty(x.throws_, y.throws_)
+        },
+        (let x: TyFuture, let y: TyFuture) => {
+            let o0 = cmp_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_ty(x.error, y.error)
+        },
+        (let x: TyTypeAlias, let y: TyTypeAlias) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyTypeVar, let y: TyTypeVar) => {
+            cmp_param_ty(x.param, y.param)
+        },
+        (let x: TyAssociatedTypeProjection, let y: TyAssociatedTypeProjection) => {
+            let o0 = cmp_ty(x.base, y.base);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_interface_constraint(x.interface_, y.interface_);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            x.member.cmp(y.member)
+        },
+        (let x: TyTuple, let y: TyTuple) => {
+            cmp_list(x.items, y.items, cmp_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// port: the derived Ord of FunctionParamTy.
+function cmp_function_param_ty(
+    a: FunctionParamTy,
+    b: FunctionParamTy,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_optional_string(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_ty(a.ty, b.ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_function_param_mode(a.mode, b.mode)
+}
+
+// port: the derived Ord of InterfaceConstraint.
+function cmp_interface_constraint(
+    a: InterfaceConstraint,
+    b: InterfaceConstraint,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_decl_name(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_list(a.generics, b.generics, cmp_ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_list(a.associated_types, b.associated_types, cmp_associated_type)
+}
+
+// port: the derived Ord of AssociatedType.
+function cmp_associated_type(
+    a: AssociatedType,
+    b: AssociatedType,
+) -> baml.ops.Ordering throws never {
+    let o0 = a.name.cmp(b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    cmp_ty(a.ty, b.ty)
+}
+
+// The variant's position in declaration order.
+function variant_index_lowering_ty(t: LoweringTy) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        TyLiteral => 8,
+        LoweringTyClass => 9,
+        LoweringTyInterface => 10,
+        TyEnum => 11,
+        TyEnumVariant => 12,
+        LoweringTyList => 13,
+        LoweringTyMap => 14,
+        LoweringTyUnion => 15,
+        LoweringTyFunction => 16,
+        LoweringTyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyTypeAlias => 22,
+        TyTypeVar => 23,
+        LoweringTyAssociatedTypeProjection => 24,
+        TyUnknown => 25,
+        TyNever => 26,
+        TyError => 27,
+        TyInfer => 28,
+        LoweringTyTuple => 31,
+    }
+}
+
+// port: the derived Ord of LoweringTy.
+function cmp_lowering_ty(a: LoweringTy, b: LoweringTy) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_lowering_ty(a).cmp(variant_index_lowering_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: TyLiteral, let y: TyLiteral) => {
+            let o0 = cmp_literal(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_freshness(x.freshness, y.freshness)
+        },
+        (let x: LoweringTyClass, let y: LoweringTyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_lowering_ty)
+        },
+        (let x: LoweringTyInterface, let y: LoweringTyInterface) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_list(x.args, y.args, cmp_lowering_ty);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_list(x.associated_types, y.associated_types, cmp_lowering_associated_type)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyEnumVariant, let y: TyEnumVariant) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            x.variant.cmp(y.variant)
+        },
+        (let x: LoweringTyList, let y: LoweringTyList) => {
+            cmp_lowering_ty(x.elem, y.elem)
+        },
+        (let x: LoweringTyMap, let y: LoweringTyMap) => {
+            let o0 = cmp_lowering_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_lowering_ty(x.value, y.value)
+        },
+        (let x: LoweringTyUnion, let y: LoweringTyUnion) => {
+            cmp_list(x.members, y.members, cmp_lowering_ty)
+        },
+        (let x: LoweringTyFunction, let y: LoweringTyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_lowering_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_lowering_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_lowering_ty(x.throws_, y.throws_)
+        },
+        (let x: LoweringTyFuture, let y: LoweringTyFuture) => {
+            let o0 = cmp_lowering_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_lowering_ty(x.error, y.error)
+        },
+        (let x: TyTypeAlias, let y: TyTypeAlias) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyTypeVar, let y: TyTypeVar) => {
+            cmp_param_ty(x.param, y.param)
+        },
+        (let x: LoweringTyAssociatedTypeProjection, let y: LoweringTyAssociatedTypeProjection) => {
+            let o0 = cmp_lowering_ty(x.base, y.base);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_lowering_interface_constraint(x.interface_, y.interface_);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            x.member.cmp(y.member)
+        },
+        (let x: LoweringTyTuple, let y: LoweringTyTuple) => {
+            cmp_list(x.items, y.items, cmp_lowering_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// port: the derived Ord of LoweringFunctionParamTy.
+function cmp_lowering_function_param_ty(
+    a: LoweringFunctionParamTy,
+    b: LoweringFunctionParamTy,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_optional_string(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_lowering_ty(a.ty, b.ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_function_param_mode(a.mode, b.mode)
+}
+
+// port: the derived Ord of LoweringInterfaceConstraint.
+function cmp_lowering_interface_constraint(
+    a: LoweringInterfaceConstraint,
+    b: LoweringInterfaceConstraint,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_decl_name(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_list(a.generics, b.generics, cmp_lowering_ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_list(a.associated_types, b.associated_types, cmp_lowering_associated_type)
+}
+
+// port: the derived Ord of LoweringAssociatedType.
+function cmp_lowering_associated_type(
+    a: LoweringAssociatedType,
+    b: LoweringAssociatedType,
+) -> baml.ops.Ordering throws never {
+    let o0 = a.name.cmp(b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    cmp_lowering_ty(a.ty, b.ty)
+}
+
+// The variant's position in declaration order.
+function variant_index_runtime_ty(t: RuntimeTy) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        TyLiteral => 8,
+        RuntimeTyClass => 9,
+        RuntimeTyInterface => 10,
+        TyEnum => 11,
+        TyEnumVariant => 12,
+        RuntimeTyList => 13,
+        RuntimeTyMap => 14,
+        RuntimeTyUnion => 15,
+        RuntimeTyFunction => 16,
+        RuntimeTyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyTypeAlias => 22,
+        TyTypeVar => 23,
+        RuntimeTyAssociatedTypeProjection => 24,
+        TyUnknown => 25,
+        TyNever => 26,
+        RuntimeTyTuple => 31,
+    }
+}
+
+// port: the derived Ord of RuntimeTy.
+function cmp_runtime_ty(a: RuntimeTy, b: RuntimeTy) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_runtime_ty(a).cmp(variant_index_runtime_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: TyLiteral, let y: TyLiteral) => {
+            let o0 = cmp_literal(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_freshness(x.freshness, y.freshness)
+        },
+        (let x: RuntimeTyClass, let y: RuntimeTyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_runtime_ty)
+        },
+        (let x: RuntimeTyInterface, let y: RuntimeTyInterface) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_list(x.args, y.args, cmp_runtime_ty);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_list(x.associated_types, y.associated_types, cmp_runtime_associated_type)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyEnumVariant, let y: TyEnumVariant) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            x.variant.cmp(y.variant)
+        },
+        (let x: RuntimeTyList, let y: RuntimeTyList) => {
+            cmp_runtime_ty(x.elem, y.elem)
+        },
+        (let x: RuntimeTyMap, let y: RuntimeTyMap) => {
+            let o0 = cmp_runtime_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_runtime_ty(x.value, y.value)
+        },
+        (let x: RuntimeTyUnion, let y: RuntimeTyUnion) => {
+            cmp_list(x.members, y.members, cmp_runtime_ty)
+        },
+        (let x: RuntimeTyFunction, let y: RuntimeTyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_runtime_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_runtime_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_runtime_ty(x.throws_, y.throws_)
+        },
+        (let x: RuntimeTyFuture, let y: RuntimeTyFuture) => {
+            let o0 = cmp_runtime_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_runtime_ty(x.error, y.error)
+        },
+        (let x: TyTypeAlias, let y: TyTypeAlias) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyTypeVar, let y: TyTypeVar) => {
+            cmp_param_ty(x.param, y.param)
+        },
+        (let x: RuntimeTyAssociatedTypeProjection, let y: RuntimeTyAssociatedTypeProjection) => {
+            let o0 = cmp_runtime_ty(x.base, y.base);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_runtime_interface_constraint(x.interface_, y.interface_);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            x.member.cmp(y.member)
+        },
+        (let x: RuntimeTyTuple, let y: RuntimeTyTuple) => {
+            cmp_list(x.items, y.items, cmp_runtime_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// port: the derived Ord of RuntimeFunctionParamTy.
+function cmp_runtime_function_param_ty(
+    a: RuntimeFunctionParamTy,
+    b: RuntimeFunctionParamTy,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_optional_string(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_runtime_ty(a.ty, b.ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_function_param_mode(a.mode, b.mode)
+}
+
+// port: the derived Ord of RuntimeInterfaceConstraint.
+function cmp_runtime_interface_constraint(
+    a: RuntimeInterfaceConstraint,
+    b: RuntimeInterfaceConstraint,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_decl_name(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_list(a.generics, b.generics, cmp_runtime_ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_list(a.associated_types, b.associated_types, cmp_runtime_associated_type)
+}
+
+// port: the derived Ord of RuntimeAssociatedType.
+function cmp_runtime_associated_type(
+    a: RuntimeAssociatedType,
+    b: RuntimeAssociatedType,
+) -> baml.ops.Ordering throws never {
+    let o0 = a.name.cmp(b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    cmp_runtime_ty(a.ty, b.ty)
+}
+
+// The variant's position in declaration order.
+function variant_index_codegen_ty(t: CodegenTy) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        TyLiteral => 8,
+        CodegenTyClass => 9,
+        CodegenTyInterface => 10,
+        TyEnum => 11,
+        TyEnumVariant => 12,
+        CodegenTyList => 13,
+        CodegenTyMap => 14,
+        CodegenTyUnion => 15,
+        CodegenTyFunction => 16,
+        CodegenTyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyTypeAlias => 22,
+        TyTypeVar => 23,
+        TyUnknown => 25,
+        TyNever => 26,
+        CodegenTyTuple => 31,
+    }
+}
+
+// port: the derived Ord of CodegenTy.
+function cmp_codegen_ty(a: CodegenTy, b: CodegenTy) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_codegen_ty(a).cmp(variant_index_codegen_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: TyLiteral, let y: TyLiteral) => {
+            let o0 = cmp_literal(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_freshness(x.freshness, y.freshness)
+        },
+        (let x: CodegenTyClass, let y: CodegenTyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_codegen_ty)
+        },
+        (let x: CodegenTyInterface, let y: CodegenTyInterface) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_list(x.args, y.args, cmp_codegen_ty);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_list(x.associated_types, y.associated_types, cmp_codegen_associated_type)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyEnumVariant, let y: TyEnumVariant) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            x.variant.cmp(y.variant)
+        },
+        (let x: CodegenTyList, let y: CodegenTyList) => {
+            cmp_codegen_ty(x.elem, y.elem)
+        },
+        (let x: CodegenTyMap, let y: CodegenTyMap) => {
+            let o0 = cmp_codegen_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_codegen_ty(x.value, y.value)
+        },
+        (let x: CodegenTyUnion, let y: CodegenTyUnion) => {
+            cmp_list(x.members, y.members, cmp_codegen_ty)
+        },
+        (let x: CodegenTyFunction, let y: CodegenTyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_codegen_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_codegen_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_codegen_ty(x.throws_, y.throws_)
+        },
+        (let x: CodegenTyFuture, let y: CodegenTyFuture) => {
+            let o0 = cmp_codegen_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_codegen_ty(x.error, y.error)
+        },
+        (let x: TyTypeAlias, let y: TyTypeAlias) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyTypeVar, let y: TyTypeVar) => {
+            cmp_param_ty(x.param, y.param)
+        },
+        (let x: CodegenTyTuple, let y: CodegenTyTuple) => {
+            cmp_list(x.items, y.items, cmp_codegen_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// port: the derived Ord of CodegenFunctionParamTy.
+function cmp_codegen_function_param_ty(
+    a: CodegenFunctionParamTy,
+    b: CodegenFunctionParamTy,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_optional_string(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_codegen_ty(a.ty, b.ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_function_param_mode(a.mode, b.mode)
+}
+
+// port: the derived Ord of CodegenInterfaceConstraint.
+function cmp_codegen_interface_constraint(
+    a: CodegenInterfaceConstraint,
+    b: CodegenInterfaceConstraint,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_decl_name(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_list(a.generics, b.generics, cmp_codegen_ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_list(a.associated_types, b.associated_types, cmp_codegen_associated_type)
+}
+
+// port: the derived Ord of CodegenAssociatedType.
+function cmp_codegen_associated_type(
+    a: CodegenAssociatedType,
+    b: CodegenAssociatedType,
+) -> baml.ops.Ordering throws never {
+    let o0 = a.name.cmp(b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    cmp_codegen_ty(a.ty, b.ty)
+}
+
+// The variant's position in declaration order.
+function variant_index_realized_ty(t: RealizedTy) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        TyLiteral => 8,
+        RealizedTyClass => 9,
+        RealizedTyInterface => 10,
+        TyEnum => 11,
+        TyEnumVariant => 12,
+        RealizedTyList => 13,
+        RealizedTyMap => 14,
+        RealizedTyUnion => 15,
+        RealizedTyFunction => 16,
+        RealizedTyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyTypeAlias => 22,
+        TyUnknown => 25,
+        TyNever => 26,
+        RealizedTyTuple => 31,
+    }
+}
+
+// port: the derived Ord of RealizedTy.
+function cmp_realized_ty(a: RealizedTy, b: RealizedTy) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_realized_ty(a).cmp(variant_index_realized_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: TyLiteral, let y: TyLiteral) => {
+            let o0 = cmp_literal(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_freshness(x.freshness, y.freshness)
+        },
+        (let x: RealizedTyClass, let y: RealizedTyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_realized_ty)
+        },
+        (let x: RealizedTyInterface, let y: RealizedTyInterface) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_list(x.args, y.args, cmp_realized_ty);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_list(x.associated_types, y.associated_types, cmp_realized_associated_type)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyEnumVariant, let y: TyEnumVariant) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            x.variant.cmp(y.variant)
+        },
+        (let x: RealizedTyList, let y: RealizedTyList) => {
+            cmp_realized_ty(x.elem, y.elem)
+        },
+        (let x: RealizedTyMap, let y: RealizedTyMap) => {
+            let o0 = cmp_realized_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_realized_ty(x.value, y.value)
+        },
+        (let x: RealizedTyUnion, let y: RealizedTyUnion) => {
+            cmp_list(x.members, y.members, cmp_realized_ty)
+        },
+        (let x: RealizedTyFunction, let y: RealizedTyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_realized_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_realized_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_realized_ty(x.throws_, y.throws_)
+        },
+        (let x: RealizedTyFuture, let y: RealizedTyFuture) => {
+            let o0 = cmp_realized_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_realized_ty(x.error, y.error)
+        },
+        (let x: TyTypeAlias, let y: TyTypeAlias) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: RealizedTyTuple, let y: RealizedTyTuple) => {
+            cmp_list(x.items, y.items, cmp_realized_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// port: the derived Ord of RealizedFunctionParamTy.
+function cmp_realized_function_param_ty(
+    a: RealizedFunctionParamTy,
+    b: RealizedFunctionParamTy,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_optional_string(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_realized_ty(a.ty, b.ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_function_param_mode(a.mode, b.mode)
+}
+
+// port: the derived Ord of RealizedInterfaceConstraint.
+function cmp_realized_interface_constraint(
+    a: RealizedInterfaceConstraint,
+    b: RealizedInterfaceConstraint,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_decl_name(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_list(a.generics, b.generics, cmp_realized_ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_list(a.associated_types, b.associated_types, cmp_realized_associated_type)
+}
+
+// port: the derived Ord of RealizedAssociatedType.
+function cmp_realized_associated_type(
+    a: RealizedAssociatedType,
+    b: RealizedAssociatedType,
+) -> baml.ops.Ordering throws never {
+    let o0 = a.name.cmp(b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    cmp_realized_ty(a.ty, b.ty)
+}
+
+// The variant's position in declaration order.
+function variant_index_concrete_ty(t: ConcreteTy) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        ConcreteTyClass => 9,
+        TyEnum => 11,
+        ConcreteTyList => 13,
+        ConcreteTyMap => 14,
+        ConcreteTyFunction => 16,
+        ConcreteTyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyNever => 26,
+        ConcreteTyTuple => 31,
+    }
+}
+
+// port: the derived Ord of ConcreteTy.
+function cmp_concrete_ty(a: ConcreteTy, b: ConcreteTy) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_concrete_ty(a).cmp(variant_index_concrete_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: ConcreteTyClass, let y: ConcreteTyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_runtime_ty)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: ConcreteTyList, let y: ConcreteTyList) => {
+            cmp_runtime_ty(x.elem, y.elem)
+        },
+        (let x: ConcreteTyMap, let y: ConcreteTyMap) => {
+            let o0 = cmp_runtime_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_runtime_ty(x.value, y.value)
+        },
+        (let x: ConcreteTyFunction, let y: ConcreteTyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_runtime_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_runtime_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_runtime_ty(x.throws_, y.throws_)
+        },
+        (let x: ConcreteTyFuture, let y: ConcreteTyFuture) => {
+            let o0 = cmp_runtime_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_runtime_ty(x.error, y.error)
+        },
+        (let x: ConcreteTyTuple, let y: ConcreteTyTuple) => {
+            cmp_list(x.items, y.items, cmp_runtime_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// The variant's position in declaration order.
+function variant_index_concrete_realized_ty(t: ConcreteRealizedTy) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        ConcreteRealizedTyClass => 9,
+        TyEnum => 11,
+        ConcreteRealizedTyList => 13,
+        ConcreteRealizedTyMap => 14,
+        ConcreteRealizedTyFunction => 16,
+        ConcreteRealizedTyFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyNever => 26,
+        ConcreteRealizedTyTuple => 31,
+    }
+}
+
+// port: the derived Ord of ConcreteRealizedTy.
+function cmp_concrete_realized_ty(
+    a: ConcreteRealizedTy,
+    b: ConcreteRealizedTy,
+) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_concrete_realized_ty(a).cmp(variant_index_concrete_realized_ty(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: ConcreteRealizedTyClass, let y: ConcreteRealizedTyClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_realized_ty)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: ConcreteRealizedTyList, let y: ConcreteRealizedTyList) => {
+            cmp_realized_ty(x.elem, y.elem)
+        },
+        (let x: ConcreteRealizedTyMap, let y: ConcreteRealizedTyMap) => {
+            let o0 = cmp_realized_ty(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_realized_ty(x.value, y.value)
+        },
+        (let x: ConcreteRealizedTyFunction, let y: ConcreteRealizedTyFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_realized_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_realized_ty(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_realized_ty(x.throws_, y.throws_)
+        },
+        (let x: ConcreteRealizedTyFuture, let y: ConcreteRealizedTyFuture) => {
+            let o0 = cmp_realized_ty(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_realized_ty(x.error, y.error)
+        },
+        (let x: ConcreteRealizedTyTuple, let y: ConcreteRealizedTyTuple) => {
+            cmp_list(x.items, y.items, cmp_realized_ty)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// The variant's position in declaration order.
+function variant_index_ty_template(t: TyTemplate) -> int throws never {
+    match (t) {
+        TyInt => 0,
+        TyBigint => 1,
+        TyFloat => 2,
+        TyString => 3,
+        TyBool => 4,
+        TyNull => 5,
+        TyUint8Array => 6,
+        TyMedia => 7,
+        TyLiteral => 8,
+        TyTemplateClass => 9,
+        TyTemplateInterface => 10,
+        TyEnum => 11,
+        TyEnumVariant => 12,
+        TyTemplateList => 13,
+        TyTemplateMap => 14,
+        TyTemplateUnion => 15,
+        TyTemplateFunction => 16,
+        TyTemplateFuture => 17,
+        TyRustType => 18,
+        TyType => 19,
+        TyResource => 20,
+        TyPromptAst => 21,
+        TyTypeAlias => 22,
+        TyTemplateAssociatedTypeProjection => 24,
+        TyUnknown => 25,
+        TyNever => 26,
+        TyTypeArgRef => 29,
+        TyTemplateTuple => 31,
+    }
+}
+
+// port: the derived Ord of TyTemplate.
+function cmp_ty_template(a: TyTemplate, b: TyTemplate) -> baml.ops.Ordering throws never {
+    let by_variant = variant_index_ty_template(a).cmp(variant_index_ty_template(b));
+    if (by_variant != baml.ops.Ordering.Equal) {
+        return by_variant;
+    }
+    match (a, b) {
+        (let x: TyMedia, let y: TyMedia) => {
+            cmp_media_kind(x.kind, y.kind)
+        },
+        (let x: TyLiteral, let y: TyLiteral) => {
+            let o0 = cmp_literal(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_freshness(x.freshness, y.freshness)
+        },
+        (let x: TyTemplateClass, let y: TyTemplateClass) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_list(x.args, y.args, cmp_ty_template)
+        },
+        (let x: TyTemplateInterface, let y: TyTemplateInterface) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_list(x.args, y.args, cmp_ty_template);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_list(x.associated_types, y.associated_types, cmp_ty_template_associated_type)
+        },
+        (let x: TyEnum, let y: TyEnum) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyEnumVariant, let y: TyEnumVariant) => {
+            let o0 = cmp_decl_name(x.name, y.name);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            x.variant.cmp(y.variant)
+        },
+        (let x: TyTemplateList, let y: TyTemplateList) => {
+            cmp_ty_template(x.elem, y.elem)
+        },
+        (let x: TyTemplateMap, let y: TyTemplateMap) => {
+            let o0 = cmp_ty_template(x.key, y.key);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_ty_template(x.value, y.value)
+        },
+        (let x: TyTemplateUnion, let y: TyTemplateUnion) => {
+            cmp_list(x.members, y.members, cmp_ty_template)
+        },
+        (let x: TyTemplateFunction, let y: TyTemplateFunction) => {
+            let o0 = cmp_list(x.params, y.params, cmp_ty_template_function_param_ty);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_ty_template(x.ret, y.ret);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            cmp_ty_template(x.throws_, y.throws_)
+        },
+        (let x: TyTemplateFuture, let y: TyTemplateFuture) => {
+            let o0 = cmp_ty_template(x.value, y.value);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            cmp_ty_template(x.error, y.error)
+        },
+        (let x: TyTypeAlias, let y: TyTypeAlias) => {
+            cmp_decl_name(x.name, y.name)
+        },
+        (let x: TyTemplateAssociatedTypeProjection, let y: TyTemplateAssociatedTypeProjection) => {
+            let o0 = cmp_ty_template(x.base, y.base);
+            if (o0 != baml.ops.Ordering.Equal) {
+                return o0;
+            }
+            let o1 = cmp_ty_template_interface_constraint(x.interface_, y.interface_);
+            if (o1 != baml.ops.Ordering.Equal) {
+                return o1;
+            }
+            x.member.cmp(y.member)
+        },
+        (let x: TyTypeArgRef, let y: TyTypeArgRef) => {
+            x.index.cmp(y.index)
+        },
+        (let x: TyTemplateTuple, let y: TyTemplateTuple) => {
+            cmp_list(x.items, y.items, cmp_ty_template)
+        },
+        _ => baml.ops.Ordering.Equal,
+    }
+}
+
+// port: the derived Ord of TyTemplateFunctionParamTy.
+function cmp_ty_template_function_param_ty(
+    a: TyTemplateFunctionParamTy,
+    b: TyTemplateFunctionParamTy,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_optional_string(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_ty_template(a.ty, b.ty);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_function_param_mode(a.mode, b.mode)
+}
+
+// port: the derived Ord of TyTemplateInterfaceConstraint.
+function cmp_ty_template_interface_constraint(
+    a: TyTemplateInterfaceConstraint,
+    b: TyTemplateInterfaceConstraint,
+) -> baml.ops.Ordering throws never {
+    let o0 = cmp_decl_name(a.name, b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    let o1 = cmp_list(a.generics, b.generics, cmp_ty_template);
+    if (o1 != baml.ops.Ordering.Equal) {
+        return o1;
+    }
+    cmp_list(a.associated_types, b.associated_types, cmp_ty_template_associated_type)
+}
+
+// port: the derived Ord of TyTemplateAssociatedType.
+function cmp_ty_template_associated_type(
+    a: TyTemplateAssociatedType,
+    b: TyTemplateAssociatedType,
+) -> baml.ops.Ordering throws never {
+    let o0 = a.name.cmp(b.name);
+    if (o0 != baml.ops.Ordering.Equal) {
+        return o0;
+    }
+    cmp_ty_template(a.ty, b.ty)
+}
+
 // == InferTy pool ==========================================================
 
 // The direct children of `t`, in field order.

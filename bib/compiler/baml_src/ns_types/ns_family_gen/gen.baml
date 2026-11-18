@@ -461,6 +461,101 @@ function interning() -> string {
     [children_fn(pool)].concat(interns).concat(resolves).join("\n")
 }
 
+// `RuntimeFunctionParamTy` -> `runtime_function_param_ty`.
+function snake_case(name: string) -> string {
+    let out: string[] = [];
+    let chars = name.split("");
+    for (let i = 0; i < chars.length(); i += 1) {
+        let c = chars[i];
+        if (c != c.to_lower_case() && i > 0) {
+            out.push("_");
+        }
+        out.push(c.to_lower_case());
+    }
+    out.join("")
+}
+
+// The comparison of an `Opaque` field's type (ord.baml or the built-in
+// `cmp`).
+function opaque_cmp(of: string) -> string {
+    match (of) {
+        "root.base.Literal" => "cmp_literal",
+        "root.base.MediaKind" => "cmp_media_kind",
+        "Freshness" => "cmp_freshness",
+        "FunctionParamMode" => "cmp_function_param_mode",
+        "ParamTy" => "cmp_param_ty",
+        "string?" => "cmp_optional_string",
+        _ => "",
+    }
+}
+
+// `a.f` against `b.f` for field `f` of a value of member `m`.
+function field_cmp(f: Field, m: Member, a: string, b: string) -> string {
+    let x = `${a}.${f.name}`;
+    let y = `${b}.${f.name}`;
+    let child = `cmp_${member_named(m.child).snake}`;
+    match (f.kind) {
+        FieldKind.Child => `${child}(${x}, ${y})`,
+        FieldKind.Children => `cmp_list(${x}, ${y}, ${child})`,
+        FieldKind.Head => `cmp_${snake_case(m.head)}(${x}, ${y})`,
+        FieldKind.Satellite => `cmp_${snake_case(satellite_class(satellite_named(f.of), m))}(${x}, ${y})`,
+        FieldKind.Satellites => `cmp_list(${x}, ${y}, cmp_${snake_case(satellite_class(satellite_named(f.of), m))})`,
+        FieldKind.Opaque => {
+            let fn = opaque_cmp(f.of);
+            if (fn) {
+                `${fn}(${x}, ${y})`
+            } else {
+                `${x}.cmp(${y})`
+            }
+        },
+    }
+}
+
+// The fields of `a` and `b` compared in order: the first that differs decides.
+function fields_cmp(fields: Field[], m: Member, a: string, b: string, indent: string) -> string {
+    let n = fields.length();
+    let lines = fields.map((f) -> { field_cmp(f, m, a, b) });
+    let early: string[] = [];
+    for (let i = 0; i < n - 1; i += 1) {
+        early.push(`${indent}let o${i} = ${lines[i]};\n${indent}if (o${i} != baml.ops.Ordering.Equal) {\n${indent}    return o${i};\n${indent}}\n`);
+    }
+    `${early.join("")}${indent}${lines[n - 1]}\n`
+}
+
+// port: the derived `Ord` of a member enum: variant declaration order, then
+// fields in order.
+function cmp_fn(m: Member) -> string {
+    let vs = variants_of(m);
+    let index_arms = vs.map((v) -> { `        ${class_name(v, m)} => ${FAMILY.variants.find_index((w) -> { w.name == v.name }) ?? 0},\n` }).join("");
+    let field_arms = vs
+        .filter((v) -> { v.fields.length() > 0 })
+        .map((v) -> {
+            let c = class_name(v, m);
+            `        (let x: ${c}, let y: ${c}) => {\n${fields_cmp(v.fields, m, "x", "y", "            ")}        },\n`
+        })
+        .join("");
+    `// The variant's position in declaration order.\nfunction variant_index_${m.snake}(t: ${m.name}) -> int throws never {\n    match (t) {\n${index_arms}    }\n}\n\n`
+        + `// port: the derived Ord of ${m.name}.\nfunction cmp_${m.snake}(a: ${m.name}, b: ${m.name}) -> baml.ops.Ordering throws never {\n`
+        + `    let by_variant = variant_index_${m.snake}(a).cmp(variant_index_${m.snake}(b));\n`
+        + `    if (by_variant != baml.ops.Ordering.Equal) {\n        return by_variant;\n    }\n`
+        + `    match ((a, b)) {\n${field_arms}        _ => baml.ops.Ordering.Equal,\n    }\n}\n`
+}
+
+// port: the derived Ord of a satellite struct.
+function satellite_cmp_fn(s: Satellite, m: Member) -> string {
+    let c = satellite_class(s, m);
+    `// port: the derived Ord of ${c}.\nfunction cmp_${snake_case(c)}(a: ${c}, b: ${c}) -> baml.ops.Ordering throws never {\n${fields_cmp(s.fields, m, "a", "b", "    ")}}\n`
+}
+
+function ordering() -> string {
+    plain_members()
+        .flat_map((m) -> {
+            let sats: string[] = if (deep(m)) { FAMILY.satellites.map((s) -> { satellite_cmp_fn(s, m) }) } else { [] };
+            [cmp_fn(m)].concat(sats)
+        })
+        .join("\n")
+}
+
 function family_source() -> string {
     let header = "// GENERATED from ns_family_gen/spec.baml by `baml run types.family_gen.main`.\n// Do not edit by hand: change the spec and regenerate.\n";
     let section = (title: string) -> string {
@@ -483,6 +578,8 @@ function family_source() -> string {
                 [map_children_fn(m), children_fn(m)]
             })
             .join("\n"),
+        section("Ordering"),
+        ordering(),
         section("InferTy pool"),
         interning(),
     ]
