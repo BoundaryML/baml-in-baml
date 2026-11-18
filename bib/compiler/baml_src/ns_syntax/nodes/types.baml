@@ -25,13 +25,19 @@ type AnyLiteralTypeValue = AnyLiteralTypeValueScalar | BacktickString | Bogus
 class ParenType {
   span: TokenRange,
   l: int,
+  inner: AnyType | Missing,
+  r: int | Missing,
 }
 
 // `(a: A, B) -> R throws E`
 class FunctionType {
   span: TokenRange,
   l: int,
+  params: SepItem<FunctionTypeParam>[],
+  r: int | Missing,
   arrow: int,
+  ret: AnyType | Missing,
+  throws_clause: ThrowsClause?,
 }
 
 // `T`, or `name: T` / `name?: T` for a named (optionally omittable) parameter.
@@ -59,6 +65,7 @@ class ArrayType {
   span: TokenRange,
   inner: AnyType,
   l: int,
+  r: int | Missing,
 }
 
 // `A | B | C` — members are never unions themselves.
@@ -79,6 +86,10 @@ class UnionArm {
 class QualifiedPath {
   span: TokenRange,
   l: int,
+  base: AnyType,
+  as_kw: int,
+  iface: AnyType | Missing,
+  r: int | Missing,
   dot: int | Missing,
   member: Name | Missing,
 }
@@ -86,6 +97,8 @@ class QualifiedPath {
 class TupleType {
   span: TokenRange,
   l: int,
+  elements: SepItem<AnyType>[],
+  r: int | Missing,
 }
 
 // A `Token![LiteralTypeToken]` alternative, as its own node.

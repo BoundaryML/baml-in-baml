@@ -53,7 +53,7 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `p.alloc_to(mark, end, X { .. })` | `X { span: mark.to(end), .. }` |
 | `p.out.get(id).field`, `p.out.list(list)` | `node.field`, the array itself |
 | `p.out.span(id)` / `node_span(id)` | `node.span` |
-| `p.mark_of(id)` / `mark_of_any(&any)` | `p.mark_of(node.span)` (every `Any*` member has `span`) |
+| `p.mark_of(id)` / `mark_of_any(&any)` | `p.mark_of(node.span)` for a concrete node; `p.mark_of(node_span(any))` for an `Any*` union (`nodes/mod.baml`) |
 | `p.cur.eat::<K>()` | `p.cur.eat(TokenKind.K)` → `int?` |
 | `p.cur.eat_in::<S>()`, `eat_set::<S>(set)` | `p.cur.eat_in(SET)` → `int?` |
 | `p.expect::<K>()` | `p.expect(TokenKind.K)` → `int \| Missing` |
@@ -80,4 +80,5 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `loop { .. }` | `while (true) { .. }` |
 | `match` with guards | `match (v) { pat if cond => .., _ => .. }` |
 | `debug_assert!`, `unreachable!` | `baml.sys.panic("..")` only where Rust would really panic; drop debug asserts |
+| several values from one `match` | `let (a, b) = match ..` once the nightly has tuples (upstream #5030, after nightly 20261115); until then a small named class |
 | `format!("..{x}..")` | `` `..${x}..` `` |

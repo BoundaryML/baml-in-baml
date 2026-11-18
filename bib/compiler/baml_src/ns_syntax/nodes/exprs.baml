@@ -95,6 +95,8 @@ class CallExpr {
 class ArgList {
   span: TokenRange,
   l: int,
+  args: SepItem<Arg>[],
+  r: int | Missing,
 }
 
 // `value` or `label = value`.
@@ -121,6 +123,8 @@ class IndexExpr {
   span: TokenRange,
   base: AnyExpr,
   l: int,
+  index: AnyExpr | Missing,
+  r: int | Missing,
 }
 
 // `a?.[i]`
@@ -129,6 +133,8 @@ class OptionalIndexExpr {
   base: AnyExpr,
   qdot: int,
   l: int,
+  index: AnyExpr | Missing,
+  r: int | Missing,
 }
 
 // `` tag`…` ``
@@ -188,6 +194,9 @@ class CatchClause {
   span: TokenRange,
   kw: int,
   l: int | Missing,
+  binding: Name | Missing,
+  trace: TraceBinding?,
+  r: int | Missing,
   lbrace: int | Missing,
   arms: CatchArm[],
   rbrace: int | Missing,
@@ -203,6 +212,8 @@ class CatchArm {
   span: TokenRange,
   pattern: AnyPattern | Missing,
   arrow: int | Missing,
+  body: AnyExpr | Missing,
+  comma: int?,
 }
 
 // `throw payload` — a diverging expression; in statement position it is an
@@ -233,6 +244,8 @@ class ContinueExpr {
 class ParenExpr {
   span: TokenRange,
   l: int,
+  inner: AnyExpr | Missing,
+  r: int | Missing,
 }
 
 // `{ stmt; stmt; tail }` — the tail is the final expression with no `;`,
@@ -288,6 +301,9 @@ type AnyMatchScrutinee = MatchParen | AnyExpr | Bogus
 class MatchParen {
   span: TokenRange,
   l: int,
+  expr: AnyExpr | Missing,
+  ascription: TypeAscription?,
+  r: int | Missing,
 }
 
 class MatchArm {
@@ -295,6 +311,8 @@ class MatchArm {
   pattern: AnyPattern | Missing,
   guard: MatchGuard?,
   arrow: int | Missing,
+  body: AnyExpr | Missing,
+  comma: int?,
 }
 
 class MatchGuard {
@@ -318,6 +336,8 @@ class LambdaExpr {
 class ArrayLiteral {
   span: TokenRange,
   l: int,
+  elements: ArrayElement[],
+  r: int | Missing,
 }
 
 class ArrayElement {
@@ -381,6 +401,8 @@ class SpreadElement {
 class TupleExpr {
   span: TokenRange,
   l: int,
+  elements: SepItem<AnyExpr>[],
+  r: int | Missing,
 }
 
 class TupleFieldExpr {

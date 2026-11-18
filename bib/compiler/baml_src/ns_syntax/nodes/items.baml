@@ -284,6 +284,8 @@ class RemovedItem {
 class GenericParamList {
   span: TokenRange,
   l: int,
+  params: SepItem<GenericParam>[],
+  r: int | Missing,
 }
 
 class GenericParam {
@@ -309,12 +311,16 @@ class BoundArm {
 class GenericArgs {
   span: TokenRange,
   l: int,
+  args: SepItem<AnyType>[],
+  r: int | Missing,
 }
 
 // Type-side `Foo<T, Item = U>`.
 class TypeArgs {
   span: TokenRange,
   l: int,
+  args: SepItem<AnyTypeArg>[],
+  r: int | Missing,
 }
 
 type AnyTypeArg = AnyType | AssocTypeBinding | Bogus
@@ -330,6 +336,8 @@ class AssocTypeBinding {
 class ParamList {
   span: TokenRange,
   l: int,
+  params: SepItem<Param>[],
+  r: int | Missing,
 }
 
 // `name: T = default`. `self` has no type. A parameter written as a bare
@@ -428,6 +436,8 @@ class DottedName {
 class AttrArgs {
   span: TokenRange,
   l: int,
+  args: SepItem<AnyAttrArg>[],
+  r: int | Missing,
 }
 
 type AnyAttrArg = StringLit | BacktickString | JinjaArg | Name | Bogus

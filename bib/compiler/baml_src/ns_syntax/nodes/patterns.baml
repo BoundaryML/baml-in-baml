@@ -45,6 +45,8 @@ class FieldPattern {
 class ArrayPattern {
   span: TokenRange,
   l: int,
+  elements: SepItem<AnyArrayPatternElement>[],
+  r: int | Missing,
   ascription: TypeAscription?,
 }
 
@@ -66,6 +68,8 @@ class TypePattern {
 class ParenPattern {
   span: TokenRange,
   l: int,
+  inner: AnyPattern | Missing,
+  r: int | Missing,
 }
 
 // `A | B | C`
@@ -83,4 +87,6 @@ class PatternArm {
 class TuplePattern {
   span: TokenRange,
   l: int,
+  elements: SepItem<AnyPattern>[],
+  r: int | Missing,
 }

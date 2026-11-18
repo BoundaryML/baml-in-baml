@@ -106,6 +106,8 @@ class ForInHeader {
 class ParenForInHeader {
   span: TokenRange,
   l: int,
+  header: ForInHeader,
+  r: int | Missing,
 }
 
 // `(init; cond; step)` — every part optional, the parentheses required. A
@@ -113,6 +115,12 @@ class ParenForInHeader {
 class CForHeader {
   span: TokenRange,
   l: int | Missing,
+  init: AnyForInit?,
+  semi1: int?,
+  cond: AnyExpr?,
+  semi2: int?,
+  step: AnyForStep?,
+  r: int | Missing,
 }
 
 type AnyForInit = LetStmt | AnyExpr | Bogus
