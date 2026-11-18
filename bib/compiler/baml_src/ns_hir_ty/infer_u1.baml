@@ -648,17 +648,6 @@ function global_initializer(ctx: InferenceContext) -> string? throws never {
     }
 }
 
-// port: baml_compiler2_hir_ty/src/globals.rs::is_source_global @ d9be6853b
-// Whether `binding` is a source global variable: a `let` written at the top
-// level of a file (not a client, not a Session submission's binding). Only
-// these can be annotated, and only their initializers are held to the
-// initializer-is-an-expression rules (no top-level `return`).
-// Placed here until globals.rs is ported (package L), which should move it.
-function is_source_global(db: root.hir.Db, binding: int) -> bool throws never {
-    root.hir.let_data(db, binding).origin == root.ast.LetOrigin.Source
-        && !root.hir.is_session_submission(db, db.let_locs.get(binding).file)
-}
-
 // port: baml_compiler2_hir_ty/src/infer.rs::InferenceContext::suppressed @ d9be6853b
 // Whether reports of `what`'s kind stay quiet at the current point.
 function suppressed(ctx: InferenceContext, what: Suppress) -> bool throws never {
