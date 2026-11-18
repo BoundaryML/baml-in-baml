@@ -46,7 +46,10 @@ function let_type_pending_operand() -> Diagnostic throws never {
 // E0172: a value typed by a body-scoped `let type T = ...` binding would be
 // observable outside the block that binds `T`.
 function scoped_type_escapes_block(name: string) -> Diagnostic throws never {
-    Diagnostic.error(SCOPED_TYPE_ESCAPES_BLOCK, `scoped type \`${name}\` cannot leave the block that binds it`)
+    Diagnostic.error(
+        SCOPED_TYPE_ESCAPES_BLOCK,
+        `scoped type \`${name}\` cannot leave the block that binds it`,
+    )
 }
 
 // port: baml_compiler_diagnostics/src/runtime_type.rs::cannot_construct_reflection_kind @ d9be6853b

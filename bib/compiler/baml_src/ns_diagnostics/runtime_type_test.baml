@@ -19,7 +19,11 @@ test "constructors own code and complete message" {
             "E0001",
             "`let type` cannot bind a class builder's pending type; call `build()` and bind the class it returns",
         ),
-        (scoped_type_escapes_block("Out"), "E0172", "scoped type `Out` cannot leave the block that binds it"),
+        (
+            scoped_type_escapes_block("Out"),
+            "E0172",
+            "scoped type `Out` cannot leave the block that binds it",
+        ),
         (
             cannot_construct_reflection_kind("reflect.Class"),
             "E0001",

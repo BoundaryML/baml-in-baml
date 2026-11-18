@@ -9,6 +9,9 @@
 // Restructured: Rust's `IndexMap<DeclName, (Vec<Name>, Name)>` is a list of
 // (declaration, namespace, name) in insertion order; a `DeclName` is not a
 // map key.
-function reexport_paths(db: root.hir.Db, root_id: int) -> (root.types.DeclName, string[], string)[] throws never {
+function reexport_paths(
+    db: root.hir.Db,
+    root_id: int,
+) -> (root.types.DeclName, string[], string)[] throws never {
     baml.sys.panic("reexport_paths: package interfaces are not ported")
 }

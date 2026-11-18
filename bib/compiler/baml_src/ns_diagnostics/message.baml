@@ -69,7 +69,13 @@ class DiagnosticText {
             }
             let content_start = open + 1;
             if (content_start < i) {
-                highlights.push(DiagnosticMessageHighlight { start: content_start, end: i, kind: DiagnosticMessageKindCode {} });
+                highlights.push(
+                    DiagnosticMessageHighlight {
+                        start: content_start,
+                        end: i,
+                        kind: DiagnosticMessageKindCode {},
+                    },
+                );
             }
             open = null;
         }
@@ -83,7 +89,11 @@ class DiagnosticText {
     }
 
     // port: baml_compiler_diagnostics/src/message.rs::DiagnosticText::identifier @ d9be6853b
-    function identifier(self, value: string, kind: DiagnosticIdentifierKind) -> DiagnosticText throws never {
+    function identifier(
+        self,
+        value: string,
+        kind: DiagnosticIdentifierKind,
+    ) -> DiagnosticText throws never {
         self.fragment(value, DiagnosticMessageKindIdentifier { value: kind })
     }
 
@@ -99,7 +109,11 @@ class DiagnosticText {
 
     // port: baml_compiler_diagnostics/src/message.rs::DiagnosticText::fragment @ d9be6853b
     // `value` in backticks, the inside highlighted as `kind`.
-    function fragment(self, value: string, kind: DiagnosticMessageKind) -> DiagnosticText throws never {
+    function fragment(
+        self,
+        value: string,
+        kind: DiagnosticMessageKind,
+    ) -> DiagnosticText throws never {
         self.text_value = `${self.text_value}\``;
         let start = self.text_value.byte_length();
         self.text_value = `${self.text_value}${value}`;

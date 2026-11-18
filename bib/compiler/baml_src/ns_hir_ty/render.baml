@@ -47,8 +47,17 @@ class Viewpoint {
     // namespace: user-facing rendering as seen from `namespace` of `viewer`'s
     // package; with no namespace, from its root namespace (the view of a
     // reader addressing the package as a whole).
-    function for_namespace(db: root.hir.Db, viewer: int, namespace: string[] = []) -> Viewpoint throws never {
-        Viewpoint { viewer: viewer, namespace: namespace, edges: root.hir.edge_table(db, viewer), db: db }
+    function for_namespace(
+        db: root.hir.Db,
+        viewer: int,
+        namespace: string[] = [],
+    ) -> Viewpoint throws never {
+        Viewpoint {
+            viewer: viewer,
+            namespace: namespace,
+            edges: root.hir.edge_table(db, viewer),
+            db: db,
+        }
     }
 
     // port: baml_compiler2_hir_ty/src/render.rs::Viewpoint::for_file @ d9be6853b
@@ -80,11 +89,9 @@ class Viewpoint {
     // port: baml_compiler2_hir_ty/src/render.rs::Viewpoint::edge_name @ d9be6853b
     // The name the viewer reaches `root_id` by, if it has an edge to it.
     function edge_name(self, root_id: int) -> string? throws never {
-        self.edges
-            .find((edge) -> {
-                edge.1 == root_id
-            })
-            ?.0
+        self.edges.find((edge) -> {
+            edge.1 == root_id
+        })?.0
     }
 
     // port: baml_compiler2_hir_ty/src/render.rs::Viewpoint::package_segment @ d9be6853b
@@ -352,7 +359,10 @@ function ty_spell(ty: root.types.Ty, vp: Viewpoint) -> string throws never {
 
 // port: baml_compiler2_hir_ty/src/render.rs::impl Spell for Interface @ d9be6853b
 // An interface constraint spelled as its existential (`Interface::to_ty`).
-function interface_spell(constraint: root.types.InterfaceConstraint, vp: Viewpoint) -> string throws never {
+function interface_spell(
+    constraint: root.types.InterfaceConstraint,
+    vp: Viewpoint,
+) -> string throws never {
     ty_spell(
         root.types.TyInterface {
             name: constraint.name,

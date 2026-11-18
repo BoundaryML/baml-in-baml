@@ -122,9 +122,17 @@ class Annotation {
     is_primary: bool,
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Annotation::primary @ d9be6853b
-    function primary(span: root.base.Span, message: string | DiagnosticText) -> Annotation throws never {
+    function primary(
+        span: root.base.Span,
+        message: string | DiagnosticText,
+    ) -> Annotation throws never {
         let text = diagnostic_text_from(message);
-        Annotation { span: span, message: text.text_value, message_highlights: text.highlights, is_primary: true }
+        Annotation {
+            span: span,
+            message: text.text_value,
+            message_highlights: text.highlights,
+            is_primary: true,
+        }
     }
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Annotation::primary_span @ d9be6853b
@@ -133,9 +141,17 @@ class Annotation {
     }
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Annotation::secondary @ d9be6853b
-    function secondary(span: root.base.Span, message: string | DiagnosticText) -> Annotation throws never {
+    function secondary(
+        span: root.base.Span,
+        message: string | DiagnosticText,
+    ) -> Annotation throws never {
         let text = diagnostic_text_from(message);
-        Annotation { span: span, message: text.text_value, message_highlights: text.highlights, is_primary: false }
+        Annotation {
+            span: span,
+            message: text.text_value,
+            message_highlights: text.highlights,
+            is_primary: false,
+        }
     }
 }
 
@@ -149,9 +165,17 @@ class RelatedInfo {
     file_path: string?,
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::RelatedInfo::new @ d9be6853b
-    function new(span: root.base.Span, message: string | DiagnosticText) -> RelatedInfo throws never {
+    function new(
+        span: root.base.Span,
+        message: string | DiagnosticText,
+    ) -> RelatedInfo throws never {
         let text = diagnostic_text_from(message);
-        RelatedInfo { span: span, message: text.text_value, message_highlights: text.highlights, file_path: null }
+        RelatedInfo {
+            span: span,
+            message: text.text_value,
+            message_highlights: text.highlights,
+            file_path: null,
+        }
     }
 }
 
@@ -170,7 +194,11 @@ class Diagnostic {
     phase: root.hir.DiagnosticPhase,
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Diagnostic::new @ d9be6853b
-    function new(id: string, severity: root.base.Severity, message: string | DiagnosticText) -> Diagnostic throws never {
+    function new(
+        id: string,
+        severity: root.base.Severity,
+        message: string | DiagnosticText,
+    ) -> Diagnostic throws never {
         let text = diagnostic_text_from(message);
         Diagnostic {
             id: id,
@@ -200,7 +228,11 @@ class Diagnostic {
     }
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Diagnostic::with_primary @ d9be6853b
-    function with_primary(self, span: root.base.Span, message: string | DiagnosticText) -> Diagnostic throws never {
+    function with_primary(
+        self,
+        span: root.base.Span,
+        message: string | DiagnosticText,
+    ) -> Diagnostic throws never {
         self.annotations.push(Annotation.primary(span, message));
         self
     }
@@ -212,13 +244,21 @@ class Diagnostic {
     }
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Diagnostic::with_secondary @ d9be6853b
-    function with_secondary(self, span: root.base.Span, message: string | DiagnosticText) -> Diagnostic throws never {
+    function with_secondary(
+        self,
+        span: root.base.Span,
+        message: string | DiagnosticText,
+    ) -> Diagnostic throws never {
         self.annotations.push(Annotation.secondary(span, message));
         self
     }
 
     // port: baml_compiler_diagnostics/src/diagnostic.rs::Diagnostic::with_related @ d9be6853b
-    function with_related(self, span: root.base.Span, message: string | DiagnosticText) -> Diagnostic throws never {
+    function with_related(
+        self,
+        span: root.base.Span,
+        message: string | DiagnosticText,
+    ) -> Diagnostic throws never {
         self.related_info.push(RelatedInfo.new(span, message));
         self
     }
