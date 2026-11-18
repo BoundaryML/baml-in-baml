@@ -22,7 +22,10 @@ enum Axis {
 enum FieldKind {
     Child,
     Children,
+    // A nominal type head (`N`): typed as the member's `head`.
+    Head,
     Name,
+    Media,
     Id,
     LitValue,
     Freshness,
@@ -43,6 +46,12 @@ class Variant {
             f.kind == FieldKind.Child || f.kind == FieldKind.Children
         })
     }
+
+    function has_head(self) -> bool {
+        self.fields.some((f) -> {
+            f.kind == FieldKind.Head
+        })
+    }
 }
 
 // `interned`: children are `int` handles into the hash-cons pool instead of
@@ -51,6 +60,8 @@ class Member {
     name: string,
     // Function-name stem (`narrow_ty_to_runtime_ty`).
     snake: string,
+    // The type a nominal head (`N`) is: the member's `head:` in family.rs.
+    head: string,
     axes: Axis[],
     interned: bool,
 }
@@ -88,6 +99,10 @@ function nest(name: string, axis: Axis, fields: Field[]) -> Variant {
     Variant { name: name, axis: axis, fields: fields }
 }
 
+// Every member is headed by `DeclName`: the frontend (HIR through emit) uses
+// each member at `DeclName`; `TypeName` heads appear only on the runtime side.
+// A member needed at another head is another entry here.
+//
 // Full scale: the 32 variants of family.rs. Satellite positions
 // (FunctionParamTy, Interface, associated-type pairs) are modelled as child
 // lists of the same arity.
@@ -111,20 +126,20 @@ const FAMILY: Family = Family {
         leaf("Bool", Axis.Concrete),
         leaf("Null", Axis.Concrete),
         leaf("Uint8Array", Axis.Concrete),
-        nest("Media", Axis.Concrete, [f("kind", FieldKind.Name)]),
+        nest("Media", Axis.Concrete, [f("kind", FieldKind.Media)]),
         nest(
             "Literal",
             Axis.Literal,
             [f("value", FieldKind.LitValue), f("freshness", FieldKind.Freshness)],
         ),
-        nest("Class", Axis.Concrete, [f("name", FieldKind.Name), children("args")]),
+        nest("Class", Axis.Concrete, [f("name", FieldKind.Head), children("args")]),
         nest(
             "Interface",
             Axis.Abstract,
-            [f("name", FieldKind.Name), children("args"), children("assoc")],
+            [f("name", FieldKind.Head), children("args"), children("assoc")],
         ),
-        nest("Enum", Axis.Concrete, [f("name", FieldKind.Name)]),
-        nest("EnumVariant", Axis.Literal, [f("name", FieldKind.Name), f("variant", FieldKind.Name)]),
+        nest("Enum", Axis.Concrete, [f("name", FieldKind.Head)]),
+        nest("EnumVariant", Axis.Literal, [f("name", FieldKind.Head), f("variant", FieldKind.Name)]),
         nest("List", Axis.Concrete, [child("elem")]),
         nest("Map", Axis.Concrete, [child("key"), child("value")]),
         nest("Union", Axis.Abstract, [children("members")]),
@@ -134,7 +149,7 @@ const FAMILY: Family = Family {
         leaf("Type", Axis.Concrete),
         leaf("Resource", Axis.Concrete),
         leaf("PromptAst", Axis.Concrete),
-        nest("TypeAlias", Axis.Special, [f("name", FieldKind.Name)]),
+        nest("TypeAlias", Axis.Special, [f("name", FieldKind.Head)]),
         nest("TypeVar", Axis.Typevar, [f("name", FieldKind.Name)]),
         nest(
             "Projection",
@@ -150,16 +165,18 @@ const FAMILY: Family = Family {
         nest("Tuple", Axis.Concrete, [children("items")]),
     ],
     members: [
-        Member { name: "Ty", snake: "ty", axes: TY_AXES, interned: false },
+        Member { name: "Ty", snake: "ty", head: "DeclName", axes: TY_AXES, interned: false },
         Member {
             name: "LoweringTy",
             snake: "lowering_ty",
+            head: "DeclName",
             axes: TY_AXES.concat([Axis.Lower]),
             interned: false,
         },
         Member {
             name: "RuntimeTy",
             snake: "runtime_ty",
+            head: "DeclName",
             axes: [
                 Axis.Concrete,
                 Axis.Abstract,
@@ -174,24 +191,28 @@ const FAMILY: Family = Family {
         Member {
             name: "CodegenTy",
             snake: "codegen_ty",
+            head: "DeclName",
             axes: [Axis.Concrete, Axis.Abstract, Axis.Literal, Axis.Never, Axis.Typevar, Axis.Special],
             interned: false,
         },
         Member {
             name: "RealizedTy",
             snake: "realized_ty",
+            head: "DeclName",
             axes: [Axis.Concrete, Axis.Abstract, Axis.Literal, Axis.Never, Axis.Special],
             interned: false,
         },
         Member {
             name: "ConcreteTy",
             snake: "concrete_ty",
+            head: "DeclName",
             axes: [Axis.Concrete, Axis.Never],
             interned: false,
         },
         Member {
             name: "TyTemplate",
             snake: "ty_template",
+            head: "DeclName",
             axes: [
                 Axis.Concrete,
                 Axis.Abstract,
@@ -206,6 +227,7 @@ const FAMILY: Family = Family {
         Member {
             name: "InferTy",
             snake: "infer_ty",
+            head: "DeclName",
             axes: TY_AXES.concat([Axis.Infer]),
             interned: true,
         },

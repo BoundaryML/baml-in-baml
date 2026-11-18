@@ -456,9 +456,9 @@ function edge_path(db: Db, owner: int, target: int) -> (int, string, int)[]? thr
 // `target` as `owner` locates it: the edge names of the shortest edge path,
 // empty for `owner` itself. Panics when no edge path reaches `target` (the
 // same internal invariant as `DependencyTable.slot`).
-function edge_spelling(db: Db, owner: int, target: int) -> EdgePath throws never {
+function edge_spelling(db: Db, owner: int, target: int) -> root.types.EdgePath throws never {
     let path = edge_path(db, owner, target) ?? baml.sys.panic(unreachable_package_message(db, owner, target));
-    EdgePath {
+    root.types.EdgePath {
         value: path.map((hop) -> {
             hop.1
         }),
@@ -469,7 +469,7 @@ function edge_spelling(db: Db, owner: int, target: int) -> EdgePath throws never
 // The package `path` locates from `owner`: each edge followed through the
 // edge table of the package it leaves (the inverse of `edge_spelling`). Null
 // when a hop names an edge the package it leaves does not have.
-function edge_target(db: Db, owner: int, path: EdgePath) -> int? throws never {
+function edge_target(db: Db, owner: int, path: root.types.EdgePath) -> int? throws never {
     let current = owner;
     for (let edge in path.value) {
         current
@@ -484,17 +484,29 @@ function edge_target(db: Db, owner: int, path: EdgePath) -> int? throws never {
 // port: baml_compiler2_hir/src/package.rs::located_head @ d9be6853b
 // A compile-time head as `owner` locates it: its declaring package by edge
 // path. Panics as `edge_spelling` does.
-function located_head(db: Db, owner: int, decl: DeclName) -> PathName throws never {
-    PathName { pkg: edge_spelling(db, owner, decl.pkg), namespace: decl.namespace, name: decl.name }
+function located_head(
+    db: Db,
+    owner: int,
+    decl: root.types.DeclName,
+) -> root.types.PathName throws never {
+    root.types.PathName {
+        pkg: edge_spelling(db, owner, decl.pkg),
+        namespace: decl.namespace,
+        name: decl.name,
+    }
 }
 
 // port: baml_compiler2_hir/src/package.rs::resolve_located @ d9be6853b
 // The compile-time head a located name denotes from `owner` (the inverse of
 // `located_head`). Null when its path leaves `owner`'s edges.
-function resolve_located(db: Db, owner: int, name: PathName) -> DeclName? throws never {
+function resolve_located(
+    db: Db,
+    owner: int,
+    name: root.types.PathName,
+) -> root.types.DeclName? throws never {
     let declaring = edge_target(db, owner, name.pkg)
         ?? return null;
-    DeclName { pkg: declaring, namespace: name.namespace, name: name.name }
+    root.types.DeclName { pkg: declaring, namespace: name.namespace, name: name.name }
 }
 
 // port: baml_compiler2_hir/src/package.rs::DependencyTable @ d9be6853b
@@ -506,7 +518,7 @@ class DependencyTable {
     owner_root: int,
     // Slot `k + 1`: the root it binds, and the hop (via slot, edge) that
     // located it.
-    entries: (int, DepSlot, string)[],
+    entries: (int, root.types.DepSlot, string)[],
 
     // port: baml_compiler2_hir/src/package.rs::DependencyTable::new @ d9be6853b
     function new(owner: int) -> DependencyTable throws never {
@@ -524,9 +536,9 @@ class DependencyTable {
     // direct edge to is located through the nearest package that does, the
     // path interned hop by hop. Panics when no edge path from the owner
     // reaches `root_id` (an internal invariant, not an input error).
-    function slot(self, db: Db, root_id: int) -> DepSlot throws never {
+    function slot(self, db: Db, root_id: int) -> root.types.DepSlot throws never {
         if (root_id == self.owner_root) {
-            return DEP_SLOT_SELF;
+            return root.types.DEP_SLOT_SELF;
         }
         let found = self.existing(root_id);
         if (found != null) {
@@ -539,7 +551,7 @@ class DependencyTable {
                 continue;
             }
             let via = if (hop.0 == self.owner_root) {
-                DEP_SLOT_SELF
+                root.types.DEP_SLOT_SELF
             } else {
                 self.existing(hop.0)
                     ?? baml.sys.panic("a path's parent is interned before its child")
@@ -550,17 +562,17 @@ class DependencyTable {
     }
 
     // port: baml_compiler2_hir/src/package.rs::DependencyTable::existing @ d9be6853b
-    function existing(self, root_id: int) -> DepSlot? throws never {
+    function existing(self, root_id: int) -> root.types.DepSlot? throws never {
         let index = self.entries.find_index((entry) -> {
             entry.0 == root_id
         })
             ?? return null;
-        DepSlot.of_dependency_index(index)
+        root.types.DepSlot.of_dependency_index(index)
     }
 
     // port: baml_compiler2_hir/src/package.rs::DependencyTable::root_of @ d9be6853b
     // The root bound to `slot`.
-    function root_of(self, slot: DepSlot) -> int throws never {
+    function root_of(self, slot: root.types.DepSlot) -> int throws never {
         match (slot.dependency_index()) {
             null => self.owner_root,
             let index: int => self.entries[index].0,
@@ -584,16 +596,16 @@ class DependencyTable {
         self,
         db: Db,
         digest: (int) -> uint8array throws never,
-    ) -> Locator[] throws never {
+    ) -> root.types.Locator[] throws never {
         let lang = lang_roots(db);
         self.entries.map((entry) -> {
             let (let entry_root, let via, let edge) = entry;
             if (!via.is_self()) {
-                return LocatorTransitive { via: via, edge: edge };
+                return root.types.LocatorTransitive { via: via, edge: edge };
             }
             match (lang.package_of(entry_root)) {
-                let language: root.base.LangPackage => LocatorPrelude { value: language },
-                null => LocatorDirect { edge: edge, digest: digest(entry_root) },
+                let language: root.base.LangPackage => root.types.LocatorPrelude { value: language },
+                null => root.types.LocatorDirect { edge: edge, digest: digest(entry_root) },
             }
         })
     }
@@ -603,85 +615,3 @@ class DependencyTable {
 function unreachable_package_message(db: Db, owner: int, target: int) -> string throws never {
     `package \`${db.source_root(owner).path}\` names package \`${db.source_root(target).path}\`, which no edge path from it reaches`
 }
-
-// needs foundation: baml_type's `wire` (`Digest`, `DepSlot`, `Locator`,
-// `EdgePath`) and `names` (`QualifiedTypeName`, `DeclName`, `PathName`), as
-// far as this file uses them. They belong with a port of `baml_type`.
-
-// port: baml_type/src/wire.rs::DepSlot @ d9be6853b
-// A slot in an artifact's dependency table. Slot 0 is the artifact's own
-// package and is never stored; slot `k >= 1` is `dependencies[k - 1]`.
-class DepSlot {
-    value: int,
-
-    // port: baml_type/src/wire.rs::DepSlot::is_self @ d9be6853b
-    function is_self(self) -> bool throws never {
-        self.value == 0
-    }
-
-    // port: baml_type/src/wire.rs::DepSlot::of_dependency_index @ d9be6853b
-    // The slot for entry `index` of a dependency table.
-    function of_dependency_index(index: int) -> DepSlot throws never {
-        DepSlot { value: index + 1 }
-    }
-
-    // port: baml_type/src/wire.rs::DepSlot::dependency_index @ d9be6853b
-    // The dependency-table entry this slot names; null for the own package.
-    function dependency_index(self) -> int? throws never {
-        if (self.value == 0) {
-            null
-        } else {
-            self.value - 1
-        }
-    }
-}
-
-// port: baml_type/src/wire.rs::DepSlot::SELF @ d9be6853b
-// The artifact's own package.
-const DEP_SLOT_SELF: DepSlot = DepSlot { value: 0 };
-
-// port: baml_type/src/wire.rs::Locator @ d9be6853b
-// One entry of an artifact's dependency table: how the owner reaches the
-// package bound to the slot, and what binds it there.
-type Locator = LocatorDirect | LocatorPrelude | LocatorTransitive;
-
-// A direct dependency: `edge` in the owner's edge table, bound only to a
-// package whose interface payload has `digest` (SHA-256, Rust's `Digest`).
-class LocatorDirect {
-    edge: string,
-    digest: uint8array,
-}
-
-// A language package, by identity.
-class LocatorPrelude {
-    value: root.base.LangPackage,
-}
-
-// A transitive root: `edge` in the edge table of the package bound to `via`.
-class LocatorTransitive {
-    via: DepSlot,
-    edge: string,
-}
-
-// port: baml_type/src/wire.rs::EdgePath @ d9be6853b
-// A package located by the edge names that reach it from an artifact's
-// owning package, hop by hop; empty for the owning package itself.
-class EdgePath {
-    value: string[],
-}
-
-// port: baml_type/src/names.rs::QualifiedTypeName @ d9be6853b
-// A declaration's package (by key `P`), namespace path and short name.
-class QualifiedTypeName<P> {
-    pkg: P,
-    namespace: string[],
-    name: string,
-}
-
-// port: baml_type/src/names.rs::DeclName @ d9be6853b
-// The compiler's qualified name: the declaring package is its root id.
-type DeclName = QualifiedTypeName<int>;
-
-// port: baml_type/src/names.rs::PathName @ d9be6853b
-// A qualified name whose declaring package is an `EdgePath` from its owner.
-type PathName = QualifiedTypeName<EdgePath>;

@@ -53,11 +53,33 @@ function subset(a: Member, b: Member) -> bool {
     })
 }
 
-// Leaf variants (no nested positions) are one class shared by every member,
-// so a leaf needs no conversion; a nesting variant is a class per member
-// whose child fields are typed as that member.
+// The distinct heads of the members that include `v`.
+function heads_of(v: Variant) -> string[] {
+    let heads: string[] = [];
+    for (let m in FAMILY.members) {
+        if (has(m, v) && !heads.includes(m.head)) {
+            heads.push(m.head);
+        }
+    }
+    heads
+}
+
+// A variant with no nested positions, and no head or one head across its
+// members, is one class shared by every member, so it needs no conversion.
+// Any other variant is a class per member: child fields are typed as that
+// member, a head field as its head.
+function per_member(v: Variant) -> bool {
+    v.nests() || (v.has_head() && heads_of(v).length() > 1)
+}
+
+// Members are comparable (convertible) only at the same head, as in Rust,
+// where the conversion matrix is between members at one `N`.
+function comparable(a: Member, b: Member) -> bool {
+    a.head == b.head && (subset(a, b) || subset(b, a))
+}
+
 function class_name(v: Variant, m: Member) -> string {
-    if (v.nests()) {
+    if (per_member(v)) {
         `${m.name}${v.name}`
     } else {
         `Ty${v.name}`
@@ -73,7 +95,9 @@ function field_type(f: Field, m: Member) -> string {
     match (f.kind) {
         FieldKind.Child => child_ty,
         FieldKind.Children => `${child_ty}[]`,
+        FieldKind.Head => m.head,
         FieldKind.Name => "string",
+        FieldKind.Media => "root.base.MediaKind",
         FieldKind.Id => "int",
         FieldKind.LitValue => "LitValue",
         FieldKind.Freshness => "Freshness",
@@ -92,10 +116,16 @@ function class_decl(v: Variant, m: Member) -> string {
 function leaf_classes() -> string {
     FAMILY.variants
         .filter((v) -> {
-            !v.nests()
+            !per_member(v)
         })
         .map((v) -> {
-            class_decl(v, FAMILY.members[0])
+            class_decl(
+                v,
+                FAMILY.members.find((m) -> {
+                    has(m, v)
+                })
+                    ?? FAMILY.members[0],
+            )
         })
         .join("\n")
 }
@@ -104,7 +134,7 @@ function member_decls(m: Member) -> string {
     let vs = variants_of(m);
     let classes = vs
         .filter((v) -> {
-            v.nests()
+            per_member(v)
         })
         .map((v) -> {
             class_decl(v, m)
@@ -161,13 +191,13 @@ function convert_arms(from: Member, to: Member, conv: Conv, wrap: string) -> str
     });
     let leaves = leaf_arm(
         kept.filter((v) -> {
-            !v.nests()
+            !per_member(v)
         }),
         wrap,
     );
     let nested = kept
         .filter((v) -> {
-            v.nests()
+            per_member(v)
         })
         .map((v) -> {
             let built = rebuild(v, to, conv);
@@ -225,7 +255,7 @@ function conversions() -> string {
         .flat_map((a) -> {
             ms
                 .filter((b) -> {
-                    a.name != b.name && (subset(a, b) || subset(b, a))
+                    a.name != b.name && comparable(a, b)
                 })
                 .map((b) -> {
                     convert_fn(a, b)
@@ -334,14 +364,18 @@ function flag_consts() -> string {
 function interning() -> string {
     let pool = interned_member();
     let ms = deep_members().filter((m) -> {
-        subset(m, pool)
+        m.head == pool.head && subset(m, pool)
     });
     let interns = ms.map((m) -> {
         intern_fn(m, pool)
     });
-    let resolves = deep_members().map((m) -> {
-        resolve_fn(m, pool)
-    });
+    let resolves = deep_members()
+        .filter((m) -> {
+            m.head == pool.head
+        })
+        .map((m) -> {
+            resolve_fn(m, pool)
+        });
     [flag_consts(), flags_fn(pool)].concat(interns).concat(resolves).join("\n")
 }
 

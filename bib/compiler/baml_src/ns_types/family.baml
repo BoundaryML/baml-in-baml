@@ -25,7 +25,7 @@ class TyUint8Array {
 }
 
 class TyMedia {
-    kind: string,
+    kind: root.base.MediaKind,
 }
 
 class TyLiteral {
@@ -34,11 +34,11 @@ class TyLiteral {
 }
 
 class TyEnum {
-    name: string,
+    name: DeclName,
 }
 
 class TyEnumVariant {
-    name: string,
+    name: DeclName,
     variant: string,
 }
 
@@ -55,7 +55,7 @@ class TyPromptAst {
 }
 
 class TyTypeAlias {
-    name: string,
+    name: DeclName,
 }
 
 class TyTypeVar {
@@ -85,12 +85,12 @@ class TyTypeArgRef {
 // -- Ty --------------------------------------------------------------------
 
 class TyClass {
-    name: string,
+    name: DeclName,
     args: Ty[],
 }
 
 class TyInterface {
-    name: string,
+    name: DeclName,
     args: Ty[],
     assoc: Ty[],
 }
@@ -162,12 +162,12 @@ type Ty = TyInt
 // -- LoweringTy ------------------------------------------------------------
 
 class LoweringTyClass {
-    name: string,
+    name: DeclName,
     args: LoweringTy[],
 }
 
 class LoweringTyInterface {
-    name: string,
+    name: DeclName,
     args: LoweringTy[],
     assoc: LoweringTy[],
 }
@@ -240,12 +240,12 @@ type LoweringTy = TyInt
 // -- RuntimeTy -------------------------------------------------------------
 
 class RuntimeTyClass {
-    name: string,
+    name: DeclName,
     args: RuntimeTy[],
 }
 
 class RuntimeTyInterface {
-    name: string,
+    name: DeclName,
     args: RuntimeTy[],
     assoc: RuntimeTy[],
 }
@@ -316,12 +316,12 @@ type RuntimeTy = TyInt
 // -- CodegenTy -------------------------------------------------------------
 
 class CodegenTyClass {
-    name: string,
+    name: DeclName,
     args: CodegenTy[],
 }
 
 class CodegenTyInterface {
-    name: string,
+    name: DeclName,
     args: CodegenTy[],
     assoc: CodegenTy[],
 }
@@ -385,12 +385,12 @@ type CodegenTy = TyInt
 // -- RealizedTy ------------------------------------------------------------
 
 class RealizedTyClass {
-    name: string,
+    name: DeclName,
     args: RealizedTy[],
 }
 
 class RealizedTyInterface {
-    name: string,
+    name: DeclName,
     args: RealizedTy[],
     assoc: RealizedTy[],
 }
@@ -453,7 +453,7 @@ type RealizedTy = TyInt
 // -- ConcreteTy ------------------------------------------------------------
 
 class ConcreteTyClass {
-    name: string,
+    name: DeclName,
     args: ConcreteTy[],
 }
 
@@ -505,12 +505,12 @@ type ConcreteTy = TyInt
 // -- TyTemplate ------------------------------------------------------------
 
 class TyTemplateClass {
-    name: string,
+    name: DeclName,
     args: TyTemplate[],
 }
 
 class TyTemplateInterface {
-    name: string,
+    name: DeclName,
     args: TyTemplate[],
     assoc: TyTemplate[],
 }
@@ -581,12 +581,12 @@ type TyTemplate = TyInt
 // -- InferTy ---------------------------------------------------------------
 
 class InferTyClass {
-    name: string,
+    name: DeclName,
     args: int[],
 }
 
 class InferTyInterface {
-    name: string,
+    name: DeclName,
     args: int[],
     assoc: int[],
 }
