@@ -2544,3 +2544,92 @@ function literal_base(literal: root.base.Literal) -> root.types.InferTy throws n
         root.base.LiteralBool => root.types.TyBool {},
     }
 }
+
+// added by U5: `infer_catch` and `infer_match` snapshot the flow overlay
+// (Rust's `self.flow.clone()`), and BAML maps have no copy method.
+// port: baml_compiler2_hir_ty/src/infer/flow.rs::Flow (derived Clone) @ d9be6853b
+function copy_flow(flow: root.hir_ty.infer.Flow) -> root.hir_ty.infer.Flow throws never {
+    let out: root.hir_ty.infer.Flow = {};
+    for (let binding in flow.keys()) {
+        out.set(binding, flow[binding]);
+    }
+    out
+}
+
+// added by U5: the catch-coverage and throws-contract judgements read throw
+// facts as Rust's `BTreeSet<Ty>`; these two flatteners (from throw_facts.rs
+// and package_interface.rs, which are not ported) and the set builder they
+// share stand in for them.
+// port: Rust's `BTreeSet<Ty>` built from an iterator: sorted by the derived
+// `Ord` (`cmp_ty`), equal elements kept once.
+function ty_btree_set(tys: root.types.Ty[]) -> root.types.Ty[] throws never {
+    let out: root.types.Ty[] = [];
+    for (let ty in tys.concat([]).sort_by(root.types.cmp_ty)) {
+        let last = out.at(out.length() - 1);
+        if (last == null || root.types.cmp_ty(last, ty) != baml.ops.Ordering.Equal) {
+            out.push(ty);
+        }
+    }
+    out
+}
+
+// port: baml_compiler2_hir_ty/src/throw_facts.rs::flatten_declared_ty_to_facts @ d9be6853b
+// Flatten a DECLARED `throws` clause into its leaf facts: union members
+// flattened, literal members widened to their primitives, `never` dropped.
+// Restructured: the `BTreeSet` is a sorted, duplicate-free array, and the
+// nested `collect_widened_leaf_types` pushes onto `out`.
+function flatten_declared_ty_to_facts(ty: root.types.Ty) -> root.types.Ty[] throws never {
+    let out: root.types.Ty[] = [];
+    collect_widened_leaf_types(ty, out);
+    ty_btree_set(out)
+}
+
+// port: baml_compiler2_hir_ty/src/throw_facts.rs::collect_widened_leaf_types @ d9be6853b
+function collect_widened_leaf_types(ty: root.types.Ty, out: root.types.Ty[]) -> void throws never {
+    match (ty) {
+        let u: root.types.TyUnion => {
+            for (let member in u.members) {
+                collect_widened_leaf_types(member, out);
+            }
+        },
+        let l: root.types.TyLiteral => {
+            let widened: root.types.Ty = match (l.value) {
+                root.base.LiteralInt => root.types.TyInt {},
+                root.base.LiteralBigint => root.types.TyBigint {},
+                root.base.LiteralFloat => root.types.TyFloat {},
+                root.base.LiteralString => root.types.TyString {},
+                root.base.LiteralBool => root.types.TyBool {},
+            };
+            out.push(widened);
+        },
+        root.types.TyNever => {},
+        _ => {
+            out.push(ty);
+        },
+    }
+}
+
+// port: baml_compiler2_hir_ty/src/package_interface.rs::flatten_ty_to_facts @ d9be6853b
+// Decompose a throws surface into its leaf facts (union members flattened,
+// `never` dropped: the empty set IS `never`). Restructured as
+// `flatten_declared_ty_to_facts`.
+function flatten_ty_to_facts(ty: root.types.Ty) -> root.types.Ty[] throws never {
+    let out: root.types.Ty[] = [];
+    collect_leaf_types(ty, out);
+    ty_btree_set(out)
+}
+
+// port: baml_compiler2_hir_ty/src/package_interface.rs::collect_leaf_types @ d9be6853b
+function collect_leaf_types(ty: root.types.Ty, out: root.types.Ty[]) -> void throws never {
+    match (ty) {
+        let u: root.types.TyUnion => {
+            for (let member in u.members) {
+                collect_leaf_types(member, out);
+            }
+        },
+        root.types.TyNever => {},
+        _ => {
+            out.push(ty);
+        },
+    }
+}
