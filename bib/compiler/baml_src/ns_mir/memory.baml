@@ -234,21 +234,21 @@ function walk_rvalue_type_slots(
     f: (int) -> void throws never,
 ) -> void throws never {
     match (rvalue) {
-        let r: RvalueArray => ty_template_for_each_type_arg_ref(r.element_ty, f),
+        let r: RvalueArray => root.types.ty_template_for_each_type_arg_ref(r.element_ty, f),
         let r: RvalueMap => {
-            ty_template_for_each_type_arg_ref(r.key_ty, f);
-            ty_template_for_each_type_arg_ref(r.value_ty, f);
+            root.types.ty_template_for_each_type_arg_ref(r.key_ty, f);
+            root.types.ty_template_for_each_type_arg_ref(r.value_ty, f);
         },
         let r: RvalueAggregate => {
             match (r.kind) {
                 let k: AggregateKindClass => {
                     for (let template in k.type_arg_templates) {
-                        ty_template_for_each_type_arg_ref(template, f);
+                        root.types.ty_template_for_each_type_arg_ref(template, f);
                     }
                 },
                 let k: AggregateKindTuple => {
                     for (let template in k.element_templates) {
-                        ty_template_for_each_type_arg_ref(template, f);
+                        root.types.ty_template_for_each_type_arg_ref(template, f);
                     }
                 },
                 AggregateKindArray => {},
@@ -256,37 +256,37 @@ function walk_rvalue_type_slots(
         },
         let r: RvalueIsType => type_test_for_each_type_arg_ref(r.test_, f),
         let r: RvalueSatisfiesBound => {
-            root.types.ty_template_interface_constraint_for_each_type_arg_ref(r.bound, f)
+            root.types.ty_template_interface_for_each_type_arg_ref(r.bound, f)
         },
         let r: RvalueMakeClosure => {
             for (let template in r.type_arg_templates) {
-                ty_template_for_each_type_arg_ref(template, f);
+                root.types.ty_template_for_each_type_arg_ref(template, f);
             }
         },
         let r: RvalueMakeGenericFunction => {
             for (let template in r.type_arg_templates) {
-                ty_template_for_each_type_arg_ref(template, f);
+                root.types.ty_template_for_each_type_arg_ref(template, f);
             }
         },
         let r: RvalueMakeGenericFunctionFromValue => {
             for (let template in r.type_arg_templates) {
-                ty_template_for_each_type_arg_ref(template, f);
+                root.types.ty_template_for_each_type_arg_ref(template, f);
             }
         },
         let r: RvalueMakeVirtualBoundMethod => {
-            root.types.ty_template_interface_constraint_for_each_type_arg_ref(r.iface, f);
+            root.types.ty_template_interface_for_each_type_arg_ref(r.iface, f);
             for (let template in r.type_args) {
-                ty_template_for_each_type_arg_ref(template, f);
+                root.types.ty_template_for_each_type_arg_ref(template, f);
             }
         },
         let r: RvalueMakeVirtualFunction => {
-            ty_template_for_each_type_arg_ref(r.self_ty, f);
-            root.types.ty_template_interface_constraint_for_each_type_arg_ref(r.iface, f);
+            root.types.ty_template_for_each_type_arg_ref(r.self_ty, f);
+            root.types.ty_template_interface_for_each_type_arg_ref(r.iface, f);
         },
         let r: RvalueVirtualFieldAccess => {
-            root.types.ty_template_interface_constraint_for_each_type_arg_ref(r.iface, f)
+            root.types.ty_template_interface_for_each_type_arg_ref(r.iface, f)
         },
-        let r: RvalueLoadType => ty_template_for_each_type_arg_ref(r.value, f),
+        let r: RvalueLoadType => root.types.ty_template_for_each_type_arg_ref(r.value, f),
         RvalueUse
             | RvalueBinaryOp
             | RvalueUnaryOp
@@ -304,7 +304,7 @@ function walk_rvalue_type_slots(
                 BoundFrameReceiver => {},
                 let explicit: BoundFrameExplicit => {
                     for (let template in explicit.value) {
-                        ty_template_for_each_type_arg_ref(template, f);
+                        root.types.ty_template_for_each_type_arg_ref(template, f);
                     }
                 },
             }
@@ -321,7 +321,7 @@ function walk_statement_type_slots(
     match (kind) {
         let s: StatementKindAssign => walk_rvalue_type_slots(s.value, f),
         let s: StatementKindVirtualFieldStore => {
-            root.types.ty_template_interface_constraint_for_each_type_arg_ref(s.iface, f)
+            root.types.ty_template_interface_for_each_type_arg_ref(s.iface, f)
         },
         // A `BindType` operand is a type value in a local, not a slot read.
         StatementKindDrop | StatementKindFreshCell | StatementKindIntrinsic | StatementKindNop => {},
@@ -337,7 +337,7 @@ function walk_terminator_type_slots(
     match (terminator) {
         let t: TerminatorNarrowBind => type_test_for_each_type_arg_ref(t.test_, f),
         let t: TerminatorVirtualCall => {
-            root.types.ty_template_interface_constraint_for_each_type_arg_ref(t.iface, f)
+            root.types.ty_template_interface_for_each_type_arg_ref(t.iface, f)
         },
         // Call type arguments are `LoadType` temps, read where they are
         // defined. A spawned plan carries its future's types as values.

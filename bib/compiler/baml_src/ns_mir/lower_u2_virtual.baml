@@ -842,7 +842,7 @@ function resolve_implements_target_view(
     let target_data = root.hir.interface_data(ctx.db, target_loc);
     let class_generic_params = root.hir_ty.class_generic_frame(ctx.db, class_loc);
     let target_generic_params = root.hir_ty.interface_declared_params(ctx.db, target_loc);
-    let target_qtn = qualify_def(ctx.db, root.hir.DefinitionInterface { value: target_loc }, target_data.name);
+    let target_qtn = root.hir_ty.qualify_def(ctx.db, root.hir.DefinitionInterface { value: target_loc }, target_data.name);
     let target_args = lower_ref_interface_target_args(
         ctx.db,
         target_store,

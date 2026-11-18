@@ -1258,7 +1258,7 @@ function check_intrinsic(ctx: LoweringContext, callee: int) -> IntrinsicOp? thro
                 if (builtin.value == root.ast.BuiltinKind.Intrinsic) {
                     let pkg = root.hir.file_package(ctx.db, ctx.db.function_locs.get(func_loc).file);
                     if (
-                        !lang(ctx).is_(root.base.LangPackage.Log, pkg.root_id)
+                        !root.hir.lang_roots(ctx.db).is_(root.base.LangPackage.Log, pkg.root_id)
                             || pkg.namespace_path.length() != 0
                     ) {
                         return null;
@@ -1548,7 +1548,7 @@ function emit_scoped_type_binding(
 // before the VM binds it. The VM unwraps `reflect.Type` and the kind views
 // itself; any other `reflect.TypeView` does not reach it as a `type` value.
 function type_operand_needs_as_type(ctx: LoweringContext, ty: root.types.Ty) -> bool throws never {
-    let lang = lang(ctx);
+    let lang = root.hir.lang_roots(ctx.db);
     let unwrapped_by_vm = (member: root.types.Ty) -> bool {
         match (member) {
             root.types.TyType | root.types.TyNever => true,
@@ -1575,7 +1575,7 @@ function type_operand_as_type(
     if (operand_ty == null || !type_operand_needs_as_type(ctx, operand_ty)) {
         return value;
     }
-    let reflect = lang(ctx).get(root.base.LangPackage.Reflect);
+    let reflect = root.hir.lang_roots(ctx.db).get(root.base.LangPackage.Reflect);
     if (reflect == null) {
         throw internal_error(
             ctx,

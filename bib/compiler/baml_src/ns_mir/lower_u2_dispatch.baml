@@ -540,7 +540,7 @@ function interface_type_name(
     ctx: LoweringContext,
     interface_: int,
 ) -> root.types.DeclName throws never {
-    qualify_def(
+    root.hir_ty.qualify_def(
         ctx.db,
         root.hir.DefinitionInterface { value: interface_ },
         root.hir.interface_data(ctx.db, interface_).name,
