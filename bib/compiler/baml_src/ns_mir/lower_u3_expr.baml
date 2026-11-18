@@ -212,7 +212,7 @@ function lower_expr(
         let e: root.ast.ExprMap => lower_expr_map(ctx, expr_id, e.entries, dest),
         let e: root.ast.ExprObject => lower_object(ctx, expr_id, e.fields, e.spreads, dest),
         let e: root.ast.ExprMemberAccess => {
-            lower_member_access(ctx, expr_id, e.base, e.member, dest)
+            lower_member_access_with_base(ctx, expr_id, e.base, e.member, dest)
         },
         let e: root.ast.ExprUpcast => {
             // `.as<I>` is a static type projection. The runtime

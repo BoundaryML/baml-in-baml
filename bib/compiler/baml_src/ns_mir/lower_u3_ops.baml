@@ -13,9 +13,8 @@
 //   `kind` in `arith_primitive`, `orderable` in
 //   `ordering_uses_primitive_opcode`) are the free functions
 //   `equality_prim_class`, `arith_primitive_kind` and `orderable`.
-// - `RuntimeTy::strip_null` (baml_type, not ported) appears only as
-//   `index_ty != index_ty.strip_null()`, which holds exactly for a union
-//   with a `null` member and a non-null one: `runtime_ty_is_nullable_union`.
+// - `RuntimeTy::strip_null` is `root.types.runtime_ty_strip_null`
+//   (`ns_types/template_stubs_u3.baml`).
 
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::convert_binop @ d9be6853b
 function convert_binop(op: root.ast.BinaryOp) -> BinOp? throws never {
@@ -864,7 +863,7 @@ function lower_optional_member_access(
         ctx.builder.branch(operand_copy_local(test_local), chain_null, bb_access);
 
         ctx.builder.set_current_block(bb_access);
-        lower_member_access_with_base(ctx, expr_id, base, field, dest, operand_copy_local(base_local));
+        lower_member_access_with_base(ctx, expr_id, base, field, dest, cached_base = operand_copy_local(base_local));
         // No join of our own: the OptionalChain handler makes it.
     } else {
         // Standalone (no wrapping OptionalChain): own null and join blocks.
@@ -874,7 +873,7 @@ function lower_optional_member_access(
         ctx.builder.branch(operand_copy_local(test_local), bb_null, bb_access);
 
         ctx.builder.set_current_block(bb_access);
-        lower_member_access_with_base(ctx, expr_id, base, field, dest, operand_copy_local(base_local));
+        lower_member_access_with_base(ctx, expr_id, base, field, dest, cached_base = operand_copy_local(base_local));
         if (!ctx.builder.is_current_terminated()) {
             ctx.builder.goto(bb_join);
         }
@@ -957,7 +956,7 @@ function lower_optional_index_access(
     // Lower the index once and reuse it for both the null check and the
     // access, so a side-effectful subscript isn't evaluated twice.
     let index_op = lower_to_operand(ctx, index);
-    if (runtime_ty_is_nullable_union(index_ty)) {
+    if (index_ty != root.types.runtime_ty_strip_null(index_ty)) {
         let is_null = RvalueBinaryOp {
             op: BinOp.Eq,
             left: index_op,
@@ -970,28 +969,6 @@ function lower_optional_index_access(
         ctx.builder.set_current_block(bb_real);
     }
     emit_index_access(ctx, base_op, base_ty, index_op, index_ty, dest);
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_optional_index_access @ d9be6853b
-// Its test `index_ty != index_ty.strip_null()` (`RuntimeTy::strip_null` is
-// baml_type's, not ported): `strip_null` changes a union with a `null`
-// member and a non-null one (and nothing else), so that is exactly when the
-// two differ.
-function runtime_ty_is_nullable_union(ty: root.types.RuntimeTy) -> bool throws never {
-    match (ty) {
-        let union_: root.types.RuntimeTyUnion => {
-            let null_count = union_.members
-                .filter((m) -> {
-                    match (m) {
-                        root.types.TyNull => true,
-                        _ => false,
-                    }
-                })
-                .length();
-            null_count > 0 && null_count < union_.members.length()
-        },
-        _ => false,
-    }
 }
 
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_optional_call @ d9be6853b
