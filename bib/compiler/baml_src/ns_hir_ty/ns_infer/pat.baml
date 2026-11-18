@@ -156,7 +156,7 @@ function infer_match(
             outcome.matched_ty
         };
 
-        let saved_flow = root.hir_ty.copy_flow(ctx.flow);
+        let saved_flow = copy_flow(ctx.flow);
         if (scrut_binding != null) {
             ctx.flow.set(scrut_binding, narrow_ty);
         }

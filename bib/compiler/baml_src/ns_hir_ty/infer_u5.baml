@@ -10,7 +10,7 @@
 //   infer.baml; interned types are `int`s into `ctx.table.pool`.
 // - Rust's `BTreeSet<baml_type::Ty>` of throw facts is a sorted,
 //   duplicate-free array (`ty_btree_set`, infer.baml).
-// - Snapshots of the flow overlay copy the map (`copy_flow`, infer.baml).
+// - Snapshots of the flow overlay copy the map (`copy_flow`, ns_infer/flow.baml).
 
 // port: baml_compiler2_hir_ty/src/infer.rs::InferenceContext::infer_catch @ d9be6853b
 // `base catch (e) { arms }` / `catch_all` / `catch_all_panics`: narrowing on
@@ -32,7 +32,7 @@ function infer_catch(
     let pool = ctx.table.pool;
     // An exception can leave the base at any point, and a handler may
     // assign outer locals (including through a defer at its block exit).
-    let entry_flow = copy_flow(ctx.flow);
+    let entry_flow = root.hir_ty.infer.copy_flow(ctx.flow);
     let writes = root.hir_ty.infer.assigned_bindings(ctx, body, base);
     for (let arm in clause.arms) {
         let arm_writes = root.hir_ty.infer.assigned_bindings(ctx, body, body.catch_arms[arm].body);
@@ -194,7 +194,7 @@ function infer_catch(
         };
         // The clause binding NARROWS to the arm's matched type inside the
         // arm body.
-        let arm_entry_flow = copy_flow(ctx.flow);
+        let arm_entry_flow = root.hir_ty.infer.copy_flow(ctx.flow);
         let binding = binding_for_pattern(ctx, clause.binding);
         if (binding != null) {
             ctx.flow.set(binding, outcome.matched_ty);

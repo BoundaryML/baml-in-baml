@@ -2545,17 +2545,6 @@ function literal_base(literal: root.base.Literal) -> root.types.InferTy throws n
     }
 }
 
-// added by U5: `infer_catch` and `infer_match` snapshot the flow overlay
-// (Rust's `self.flow.clone()`), and BAML maps have no copy method.
-// port: baml_compiler2_hir_ty/src/infer/flow.rs::Flow (derived Clone) @ d9be6853b
-function copy_flow(flow: root.hir_ty.infer.Flow) -> root.hir_ty.infer.Flow throws never {
-    let out: root.hir_ty.infer.Flow = {};
-    for (let binding in flow.keys()) {
-        out.set(binding, flow[binding]);
-    }
-    out
-}
-
 // added by U5: the catch-coverage and throws-contract judgements read throw
 // facts as Rust's `BTreeSet<Ty>`; these two flatteners (from throw_facts.rs
 // and package_interface.rs, which are not ported) and the set builder they
