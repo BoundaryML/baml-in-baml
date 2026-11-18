@@ -20,14 +20,6 @@ function parse(text: string) -> Parse throws never {
   Parse { tree: tree, tokens: input.tokens, errors: p.out.errors }
 }
 
-// The text of a parse diagnostic. (A tuple, `let (code, headline, label) =
-// match ...`, once the nightly toolchain has tuples.)
-class ParseDiagnosticText {
-  code: string,
-  headline: string,
-  label: string,
-}
-
 // port: baml_compiler_diagnostics/src/to_diagnostic.rs::typed_parse_error_diagnostic.
 // The diagnostic for a parse error in `file`, in the shape
 // `reflect.Package.compile` reports. The ids predate the typed parser: an
@@ -35,39 +27,23 @@ class ParseDiagnosticText {
 // directive problem E0105.
 function parse_error_diagnostic(error: ParseError, file: string) -> reflect.Diagnostic throws never {
   let range = parse_error_range(error);
-  let text = match (error) {
-    let e: UnexpectedToken => ParseDiagnosticText {
-      code: "E0010",
-      headline: "unexpected token",
-      label: `expected \`${e.expected}\`, found \`${e.found}\``,
-    },
-    let e: UnexpectedEof => ParseDiagnosticText {
-      code: "E0009",
-      headline: "unexpected end of file",
-      label: `expected \`${e.expected}\`, found end of file`,
-    },
-    let e: InvalidSyntax => ParseDiagnosticText { code: "E0010", headline: "invalid syntax", label: e.message },
-    let e: AmbiguousUnion => ParseDiagnosticText {
-      code: "E0175",
-      headline: AMBIGUOUS_UNION_MESSAGE,
-      label: ambiguous_union_label(e.groupings),
-    },
-    let e: RemovedFeature => ParseDiagnosticText { code: "E0098", headline: "removed language feature", label: e.message },
-    let e: InvalidStringEscape => ParseDiagnosticText {
-      code: "E0109",
-      headline: root.base.escape_issue_message(e.issue),
-      label: root.base.escape_issue_label(e.issue),
-    },
-    let e: InvalidDirective => ParseDiagnosticText { code: "E0105", headline: e.message, label: "invalid directive" },
+  let (let code, let headline, let label) = match (error) {
+    let e: UnexpectedToken => ("E0010", "unexpected token", `expected \`${e.expected}\`, found \`${e.found}\``),
+    let e: UnexpectedEof => ("E0009", "unexpected end of file", `expected \`${e.expected}\`, found end of file`),
+    let e: InvalidSyntax => ("E0010", "invalid syntax", e.message),
+    let e: AmbiguousUnion => ("E0175", AMBIGUOUS_UNION_MESSAGE, ambiguous_union_label(e.groupings)),
+    let e: RemovedFeature => ("E0098", "removed language feature", e.message),
+    let e: InvalidStringEscape => ("E0109", root.base.escape_issue_message(e.issue), root.base.escape_issue_label(e.issue)),
+    let e: InvalidDirective => ("E0105", e.message, "invalid directive"),
   };
   reflect.Diagnostic {
-    code: text.code,
+    code: code,
     span: reflect.Span { file: file, start: range.start, end: range.end },
-    message: `${text.headline}: ${text.label}`,
+    message: `${headline}: ${label}`,
     severity: "error",
     phase: "parse",
-    headline: text.headline,
-    primary_label: text.label,
+    headline: headline,
+    primary_label: label,
     message_highlights: [],
     annotations: [],
     related_info: [],

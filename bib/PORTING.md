@@ -251,7 +251,11 @@ Parse diagnostics compared file by file with the Rust compiler (`root.oracle.cor
 | `baml_tests/baml_src` | 604/617 |
 | stdlib (`baml_builtins2/baml_std`) | 128/128 |
 
-All 22 mismatches are files whose expected output changed in upstream #5030
+With the oracle built from the fork at `BASE` (`baml toolchain use
+<fork>/baml_language/target/release/baml-cli`): **967/967 files match**.
+
+With nightly 20261115 as the oracle it was 945/967: all 22 mismatches were
+files whose expected output changed in upstream #5030
 (tuples, merged 2026-11-16). The oracle was nightly 20261115, which predates
 it; the port follows `BASE`, which includes it. **The oracle must be the Rust
 compiler at `BASE`**, not the installed nightly: build `baml-cli` from the fork

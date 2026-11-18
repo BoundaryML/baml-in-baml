@@ -42,6 +42,8 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | fieldless enum | `enum` |
 | `usize`/`u32` | `int` |
 | `HashSet<T>` | `map<T, bool>` |
+| map keyed by a tuple `(A, B)` | `map<A, map<B, V>>` (tuples are not `baml.Hash` yet) |
+| arena + `Idx<T>` (AST and later) | `T[]` + `int` id: later stages key results by id |
 | `&str` / `String` | `string` |
 | `&[T]` / `&mut Vec<T>` out-param | `T[]` (arrays are shared, so pushes are seen by the caller) |
 
@@ -80,5 +82,5 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `loop { .. }` | `while (true) { .. }` |
 | `match` with guards | `match (v) { pat if cond => .., _ => .. }` |
 | `debug_assert!`, `unreachable!` | `baml.sys.panic("..")` only where Rust would really panic; drop debug asserts |
-| several values from one `match` | `let (a, b) = match ..` once the nightly has tuples (upstream #5030, after nightly 20261115); until then a small named class |
+| several values from one `match`, Rust tuples `(a, b)` | tuples: `let (let a, let b) = match ..`; `t.0`; patterns `(let a, _)` (needs a toolchain with upstream #5030) |
 | `format!("..{x}..")` | `` `..${x}..` `` |

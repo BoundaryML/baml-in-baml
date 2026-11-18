@@ -1,5 +1,2 @@
 [package]
 name = "bib-compiler"
-
-[toolchain]
-channel = "nightly"
