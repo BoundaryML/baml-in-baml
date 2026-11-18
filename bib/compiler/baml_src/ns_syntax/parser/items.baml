@@ -1566,22 +1566,10 @@ function impl_members(p: Parser) -> AnyImplMember[] throws never {
         }
         let member_mark = p.cur.mark();
         let before = p.cur.pos;
-        // The attempt's `Err`: the error the member's `Bogus` reports.
-        let failure: ParseError? = null;
-        let member = p.attempt((p) -> {
-            match (impl_member(p, member_mark)) {
-                let error: ParseError => {
-                    failure = error;
-                    null
-                },
-                let parsed: AnyImplMember => parsed,
-            }
+        members.push(match (p.attempt((p) -> { impl_member(p, member_mark) })) {
+            let error: ParseError => p.bogus_since(member_mark, error),
+            let member: AnyImplMember => member,
         });
-        if (member != null) {
-            members.push(member);
-        } else if let error: ParseError = failure {
-            members.push(p.bogus_since(member_mark, error));
-        }
         // A member that consumed nothing must not be read again here.
         if (p.cur.pos == before && !p.cur.at(TokenKind.RBrace) && !p.cur.at_end()) {
             p.cur.skip();
@@ -1593,8 +1581,8 @@ function impl_members(p: Parser) -> AnyImplMember[] throws never {
 // port: baml_parser/src/items.rs::impl_members (the attempt closure) @ d9be6853b
 // One member of an `implements` body, or the error for a `Bogus` over what
 // it read when a top-level keyword starts here instead.
-// deviation: a named function rather than the closure passed to `attempt`;
-// its `Err` is the `ParseError` member of the result.
+// A named function rather than Rust's closure; its `Err` is the
+// `ParseError` member of the result.
 function impl_member(p: Parser, member_mark: Mark) -> AnyImplMember | ParseError throws never {
     let docs = leading_docs(p);
     // An `implements` body has no attributes of its own: the docs before a

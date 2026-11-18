@@ -168,14 +168,14 @@ class Parser {
     // ----- speculation -----------------------------------------------------------------
 
     // port: Parser::attempt. Parse with `f`, deciding afterwards: the nodes it
-    // registered are kept when it returns a value and dropped when it returns
-    // null. The tokens it consumed stay consumed either way and the diagnostics
-    // it reported stay reported; the null is for the caller to put a `Bogus`
-    // over the same tokens. Attempts nest.
-    function attempt<T>(self, f: (Parser) -> T? throws never) -> T? throws never {
+    // registered are kept when it returns a node and dropped when it returns a
+    // `ParseError` (Rust's `Err`). The tokens it consumed stay consumed either
+    // way and the diagnostics it reported stay reported; the error is for the
+    // caller to put a `Bogus` over the same tokens. Attempts nest.
+    function attempt<T>(self, f: (Parser) -> T | ParseError throws never) -> T | ParseError throws never {
         let mark = self.out.checkpoint();
         let result = f(self);
-        if (result == null) {
+        if (result is ParseError) {
             self.out.rollback(mark, false);
         }
         result

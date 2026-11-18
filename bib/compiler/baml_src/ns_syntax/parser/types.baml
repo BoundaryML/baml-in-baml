@@ -306,23 +306,10 @@ class GroupElement {
 // anything else is an error. No lookahead decides anything a later consume
 // has to trust.
 function paren_group(p: Parser, l: int) -> AnyType throws never {
-    let mark = Mark { idx: l };
-    // deviation: `attempt` drops nodes on null rather than on `Err(e)`, so the
-    // error leaves the closure through a captured local.
-    let error: ParseError? = null;
-    let ty = p.attempt((p) -> {
-        match (paren_group_contents(p, l)) {
-            let e: ParseError => {
-                error = e;
-                null
-            },
-            let t: AnyType => t,
-        }
-    });
-    if (ty != null) {
-        return ty;
+    match (p.attempt((p) -> { paren_group_contents(p, l) })) {
+        let error: ParseError => p.bogus_since(Mark { idx: l }, error),
+        let ty: AnyType => ty,
     }
-    p.bogus_since(mark, error ?? baml.sys.panic("a failed group carries its error"))
 }
 
 // port: baml_parser/src/types.rs::paren_group_contents @ d9be6853b

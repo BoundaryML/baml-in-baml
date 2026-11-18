@@ -66,7 +66,10 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `p.cur.eat_op::<BinaryOp>()` | `p.cur.eat_binary_op()` (also `eat_assign_op`, `at_binary_op`, `at_assign_op`) |
 | `let mut c = p.cur;` (a lookahead copy) | `let c = p.cur.copy();` **always copy**: `p.cur` is a reference |
 | `p.cur = c;` | `p.cur = c;` |
-| `p.attempt(\|p\| -> Result<T, E>)` | `p.attempt((p) -> { ... })` returning `T?` (null = Err) |
+| `p.attempt(\|p\| -> Result<T, ParseError>)` | `p.attempt((p) -> { .. })` with the closure returning `T \| ParseError`; `match` the result |
+| bitflags (`Restrictions::STATEMENT \| NO_CATCH`) | a class of bools: `Restrictions.statement()`, `r.no_catch`, `Restrictions { ...r, no_catch: true }` |
+| `.ok()` on a `T \| Missing` position | `ok(x)` (`ns_syntax/tree.baml`) |
+| Rust std methods the BAML stdlib lacks (`strip_prefix`, `trim_start_matches`, `Vec::extend`) | `ns_base/std.baml` |
 | `p.discard(f)`, `p.probe(f)` | same names |
 | `p.sep_list::<T, S>(close, item)` | `p.sep_list(close, TokenKind.S, item)` |
 | `p.sep1_list::<T, S>(first, item)` | `p.sep1_list(first, TokenKind.S, item)` |
