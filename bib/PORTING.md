@@ -616,6 +616,17 @@ destination.
 | 5 int-keyed seen set; string escape fast path | no gain, reverted | |
 | 6 `KindSet` as a bitset (as in Rust) | 51 s | +134 cyclomatic (the index match) |
 | 7 type interner keyed by a generated string key | 49 s | +18 generated fns |
+| 8 memoized `parse_typed`; `check_file` reads its errors | 49 s (saves a re-parse per file on the full run) | +1 fn |
+| 9 `overlap_alias_map` per package; static alias carrier table | 47 s | +2 cog |
+| 10 `to_plain_closed` cached per pool handle | 42 s | +1 fn |
+| 11 `union_of_tys` cached on Facts | no gain, reverted | |
+
+Full run after iteration 10 (2026-11-18): `check` on all of `baml_src`
+(619 files) **563 s -> 106 s** (5.3x), 193 diagnostics as before; `baml
+test` 541/541 in 3 min (was 10); Type gate 0 mismatches on every corpus;
+type_spec 173/173, 355/355, 5/5. Next lever: normalization and subtyping
+(`canonicalize_union` / `absorb_subtypes`, ~11 s of the sample), which needs
+caches keyed by whole types.
 
 Every kept iteration: type_spec 173/173, 355/355, 5/5. Lessons:
 - The profiler's self time is inflated for tiny, hot functions
