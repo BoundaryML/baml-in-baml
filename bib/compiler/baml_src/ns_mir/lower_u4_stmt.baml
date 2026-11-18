@@ -12,9 +12,9 @@
 // - `lower_lvalue`'s large arms are `lower_lvalue_<arm>` helpers.
 // - `loop_context.take()` saves the old context object and assigns a new
 //   one; the saved object is assigned back (never mutated in place).
-// - `Place` values are never mutated after construction, so Rust's
-//   `dest.clone()` / `value.clone()` share them; `binding.bounds.clone()`
-//   is copied (`concat([])`), as it is stored in `generic_param_bounds`.
+// - No `Place` is cloned here (each `value_place` call builds a fresh
+//   one); `binding.bounds.clone()` is copied (`concat([])`), as it is
+//   stored in `generic_param_bounds`.
 // - `{ty:?}` (a derived `Debug` of a type) in an internal error is
 //   `root.hir_ty.ty_debug` of the widened type.
 

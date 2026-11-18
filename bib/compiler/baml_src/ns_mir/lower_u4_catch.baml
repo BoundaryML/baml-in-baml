@@ -13,6 +13,8 @@
 //   whoever holds the array (a lambda's saved copy) sees what Rust's
 //   `Vec` would.
 // - `baml_type::typetag::X` is `root.types.TYPETAG_X`.
+// - Rust's `dest.clone()` is `place_clone(dest)`: the optimizer rewrites
+//   places in place, so a place in two MIR positions must be two objects.
 // - `classify_pattern_type_tag`'s inline `ascription_ty` match is the same
 //   match as `pattern_narrow_type`, which it calls.
 
@@ -277,7 +279,7 @@ function lower_catch(
     // unwinds to the outer handler again.
     let outer_unwind = ctx.builder.current_unwind;
     ctx.builder.transition_unwind(bb_handler);
-    lower_expr(ctx, base, dest);
+    lower_expr(ctx, base, place_clone(dest));
     if (!ctx.builder.is_current_terminated()) {
         ctx.builder.goto(bb_join);
     }
@@ -303,7 +305,7 @@ function lower_catch(
         ctx,
         error_local,
         switch_arms,
-        dest,
+        place_clone(dest),
         bb_join,
         SwitchOtherwiseCatch {
             error_local: error_local,
@@ -384,7 +386,7 @@ function lower_catch_chain(
         if (error_copy != null) {
             ctx.catch_rethrow_locals.push((error_copy, context_local));
         }
-        lower_expr(ctx, arm.body, dest);
+        lower_expr(ctx, arm.body, place_clone(dest));
         while (ctx.catch_rethrow_locals.length() > rethrow_mark) {
             ctx.catch_rethrow_locals.pop();
         }

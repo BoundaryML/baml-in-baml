@@ -20,8 +20,9 @@
 //   apart, the decimal value the keys within one). `HashMap<usize,
 //   BlockId>` (`arm_blocks`) is `map<int, int>`.
 // - `match_scrutinee.replace(..)` saves the old value and assigns the new;
-//   the saved one is assigned back. `Place`s are never mutated, so
-//   `dest.clone()` shares the place.
+//   the saved one is assigned back. Rust's `dest.clone()` is
+//   `place_clone(dest)` (the optimizer rewrites places in place, so a place
+//   in two MIR positions must be two objects); a move passes `dest` itself.
 
 // The classification state of `try_lower_as_switch`'s arm loop (Rust's
 // locals `switch_kind`, `int_arms`, `otherwise_idx`, `seen_values`).
@@ -90,7 +91,7 @@ function lower_match(
         ctx,
         scrutinee_local,
         switch_arms,
-        dest,
+        place_clone(dest),
         bb_join,
         SwitchOtherwiseMatch { is_exhaustive: is_exhaustive },
         null,
@@ -240,7 +241,7 @@ function try_lower_as_switch(
             ctx.builder.set_current_block(bb_body);
             let (let pattern, let body, _) = arms[arm_idx];
             bind_pattern(ctx, scrutinee, pattern, root.hir.DefinitionSitePatternBinding { value: pattern });
-            lower_expr(ctx, body, dest);
+            lower_expr(ctx, body, place_clone(dest));
             if (!ctx.builder.is_current_terminated()) {
                 ctx.builder.goto(join);
             }
@@ -643,7 +644,7 @@ function lower_match_chain(
                 lower_condition(ctx, guard, bb_guarded, bb_next);
                 ctx.builder.set_current_block(bb_guarded);
             }
-            lower_expr(ctx, arm.body, dest);
+            lower_expr(ctx, arm.body, place_clone(dest));
             if (!ctx.builder.is_current_terminated()) {
                 ctx.builder.goto(join);
             }
@@ -670,7 +671,7 @@ function lower_match_chain(
         lower_condition(ctx, guard, bb_guarded, bb_next);
         ctx.builder.set_current_block(bb_guarded);
     }
-    lower_expr(ctx, arm.body, dest);
+    lower_expr(ctx, arm.body, place_clone(dest));
     if (!ctx.builder.is_current_terminated()) {
         ctx.builder.goto(join);
     }
