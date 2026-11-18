@@ -119,6 +119,8 @@ class Db {
   memo: Memos,
   // The type checker's caches (ns_hir_ty/db.baml).
   ty_memo: root.hir_ty.TyMemos,
+  // MIR lowering's caches (ns_mir/db.baml).
+  mir_memo: root.mir.MirMemos,
   // The tracked-query stack the type checker's cyclic queries share
   // (tracked.baml).
   cycles: Cycles,
@@ -141,6 +143,7 @@ class Db {
       namespaces: NamespaceArena.new(),
       memo: Memos.new(),
       ty_memo: root.hir_ty.TyMemos.new(),
+      mir_memo: root.mir.MirMemos.new(),
       cycles: Cycles.new(),
     }
   }
