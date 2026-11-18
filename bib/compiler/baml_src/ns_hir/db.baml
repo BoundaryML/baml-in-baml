@@ -173,6 +173,8 @@ class Memos {
   // body_type_refs.rs::parameter_defaults_type_refs
   parameter_defaults_type_refs: Memo<BodyTypeRefs>,
   // file_package.rs::file_package
+  // baml_parser queries.rs::parse_typed
+  parse_typed: Memo<root.syntax.Parse>,
   file_package: Memo<PackageInfo>,
   // item_data/classes.rs::class_data
   class_data: Memo<ClassData>,
@@ -276,6 +278,7 @@ class Memos {
       function_body_type_refs: Memo.new(),
       let_body_type_refs: Memo.new(),
       parameter_defaults_type_refs: Memo.new(),
+      parse_typed: Memo.new(),
       file_package: Memo.new(),
       class_data: Memo.new(),
       class_source_map: Memo.new(),

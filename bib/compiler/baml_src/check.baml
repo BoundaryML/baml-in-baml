@@ -52,7 +52,7 @@ function package_level_diagnostics(db: root.hir.Db, package: int) -> reflect.Dia
 // deduplicated.
 function check_file(db: root.hir.Db, file: int) -> reflect.Diagnostic[] throws never {
   let source = db.file(file);
-  let raw_parse_errors = root.syntax.parse(source.text).errors;
+  let raw_parse_errors = root.hir.parse_typed(db, file).errors;
   let parse_errors = raw_parse_errors.map((error) -> {
     root.syntax.parse_error_diagnostic(error, source.path)
   });

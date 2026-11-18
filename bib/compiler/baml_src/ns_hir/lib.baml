@@ -123,8 +123,17 @@ function file_env_var_refs(db: Db, file: int) -> root.ast.EnvVarRef[] throws nev
 
 // needs foundation: baml_parser/src/queries.rs::typed_tree, a tracked query
 // in Rust. Parsed on each call here (only `file_ast` asks, and it is memoized).
+// port: baml_parser/src/queries.rs::parse_typed @ d9be6853b
+// `file`'s parse, tree and errors, once per file.
+function parse_typed(db: Db, file: int) -> root.syntax.Parse throws never {
+    db.memo.parse_typed.get(file, () -> {
+        root.syntax.parse(db.file(file).text)
+    })
+}
+
+// port: baml_parser/src/queries.rs::typed_tree @ d9be6853b
 function typed_tree(db: Db, file: int) -> root.syntax.FileTree throws never {
-    root.syntax.parse(db.file(file).text).tree
+    parse_typed(db, file).tree
 }
 
 // needs foundation: baml_base/src/files.rs::SourceFile::is_session_submission.
