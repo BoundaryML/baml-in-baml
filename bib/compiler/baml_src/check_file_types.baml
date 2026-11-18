@@ -2,13 +2,10 @@
 //
 // The Type-phase part of `check_file`: each body's inference, the per-item
 // declaration checks, type-alias bodies, associated-type bindings and the
-// interface checks, in Rust's order.
-//
-// Not ported yet (package L of the TIR plan; their diagnostics are missing):
-// `llm_output_findings` (E0184), `let_init_io_diagnostics` /
-// `let_init_throw_diagnostics` / `let_init_cycle_diagnostics` (E0158, E0163,
-// E0181, E0182, E0183), `json_attrs` (`@json` errors), and
-// `package_always_null_fields` (E0185).
+// interface checks, in Rust's order: per function the LLM-output warnings
+// (E0184); per let the init effect, cycle and throw diagnostics (E0163,
+// E0181, E0182, E0183); the `@json` attribute errors; the always-null
+// LLM-output fields (E0185).
 
 // port: baml_db/src/check.rs::parse_error_tainted_scopes @ d9be6853b
 // The file scope ids whose inference diagnostics are suppressed: the
@@ -50,7 +47,8 @@ function owner_scope_tainted(
     tainted: map<int, bool>,
     owner: root.hir.BodyOwnerId,
 ) -> bool? throws never {
-    let scope = root.hir.body_scope(db, owner) ?? return null;
+    let scope = root.hir.body_scope(db, owner)
+        ?? return null;
     let idx = db.scopes.get(scope).id;
     if (idx >= index.scopes.length()) {
         return false;
@@ -98,6 +96,7 @@ function check_file_types(
     let vp = root.hir_ty.Viewpoint.for_file(db, file);
     let index = root.hir.file_semantic_index(db, file);
     let error_ = root.hir_ty.DiagnosticSeverity.Error;
+    let warning = root.hir_ty.DiagnosticSeverity.Warning;
 
     // ── 3. Body inference, then the per-item declaration checks ──
     let tainted = parse_error_tainted_scopes(index, parse_errors);
@@ -138,36 +137,156 @@ function check_file_types(
         }
     }
     for (let function_ in root.hir.file_functions(db, file)) {
-        let found = root.hir_ty.parameter_default_diagnostics(db, function_)
-            .concat(root.hir_ty.signature_lowering_diagnostics(db, function_));
+        let found = root.hir_ty.parameter_default_diagnostics(db, function_).concat(
+            root.hir_ty.signature_lowering_diagnostics(db, function_),
+        );
         for (let (let range, let error) in found) {
             out.push(declaration_diagnostic(db, file, vp, range, error, error_));
         }
         for (let diagnostic in root.hir_ty.infer.declaration_diagnostics(db, function_)) {
-            out.push(tir_rendered_to_diagnostic_for_file(db, file, diagnostic.render(db, file, null)));
+            out.push(
+                tir_rendered_to_diagnostic_for_file(db, file, diagnostic.render(db, file, null)),
+            );
         }
-        // Not ported: llm_output_findings (E0184).
+        // LLM OUTPUT warnings: a return-type member a model can never
+        // return (E0184), at the written return type.
+        let findings = root.hir_ty.llm_output_findings(db, function_);
+        if (findings.dropped.length() > 0) {
+            let return_type = root.hir.elaborated_function_data(db, function_).return_type;
+            let range = if (return_type != null) {
+                root.hir.elaborated_function_source_map(db, function_).type_refs.span(return_type)
+            } else {
+                root.hir.function_source_map(db, function_).name_span
+            };
+            let name = root.hir.function_data(db, function_).name;
+            for (let (let member, let no_values) in findings.dropped) {
+                let error = root.hir_ty.TirTypeErrorLlmOutputMemberDropped {
+                    function_: name,
+                    member: member,
+                    no_values: no_values,
+                    kept: findings.kept,
+                };
+                out.push(declaration_diagnostic(db, file, vp, range, error, warning));
+            }
+        }
     }
     for (let function_ in root.hir.file_functions(db, file)) {
         if (root.hir_ty.cleanup_method(db, function_) == root.hir_ty.CleanupMethod.Malformed) {
             out.push(malformed_cleanup_diagnostic(db, file, function_));
         }
     }
+    // TOP-LEVEL DECLARATION effect diagnostics. A parse-tainted let keeps
+    // only its annotation's diagnostics: recovery rebuilds a broken
+    // initializer into some other expression.
     for (let let_ in root.hir.file_lets(db, file)) {
-        // Rust skips the init effect checks for a parse-tainted let; with
-        // those not ported, the annotation diagnostics are all that remain
-        // either way.
-        for (let (let range, let error) in root.hir_ty.let_lowering_diagnostics(db, let_)) {
+        let tainted_decl = owner_scope_tainted(db, index, tainted, root.hir.BodyOwnerIdLet { value: let_ }) == true;
+        let annotation = root.hir_ty.let_lowering_diagnostics(db, let_);
+        if (tainted_decl) {
+            for (let (let range, let error) in annotation) {
+                out.push(declaration_diagnostic(db, file, vp, range, error, error_));
+            }
+            continue;
+        }
+        // An effect error already explains a throw its io would raise, so
+        // the throw (a warning) is reported only on its own.
+        let effects = root.hir_ty.let_init_io_diagnostics(db, let_);
+        let throws_: (root.syntax.TextRange, root.hir_ty.TirTypeError)[] = if (effects.length() == 0) {
+            root.hir_ty.let_init_throw_diagnostics(db, let_)
+        } else {
+            []
+        };
+        let errors = annotation.concat(effects).concat(root.hir_ty.let_init_cycle_diagnostics(db, let_));
+        for (let (let range, let error) in errors) {
             out.push(declaration_diagnostic(db, file, vp, range, error, error_));
         }
-        // Not ported: let_init_io / let_init_cycle / let_init_throw diagnostics.
+        for (let (let range, let error) in throws_) {
+            out.push(declaration_diagnostic(db, file, vp, range, error, warning));
+        }
     }
     for (let class_ in root.hir.file_classes(db, file)) {
         for (let (let range, let error) in root.hir_ty.class_lowering_diagnostics(db, class_)) {
             out.push(declaration_diagnostic(db, file, vp, range, error, error_));
         }
     }
-    // Not ported: `@json` attribute errors, package_always_null_fields (E0185).
+    // `@json` ATTRIBUTE errors: a declaration's own, and each union its types
+    // spell that can't pick a member by tag.
+    let package_root = root.hir.file_package(db, file).root_id;
+    let overrides = root.hir_ty.json_overrides(db, package_root);
+    let json_errors: (root.syntax.TextRange, root.hir_ty.TirTypeError)[] = [];
+    for (let class_ in root.hir.file_classes(db, file)) {
+        let data = root.hir.class_data(db, class_);
+        let head = root.hir_ty.qualify_def(db, root.hir.DefinitionClass { value: class_ }, data.name);
+        json_errors = json_errors.concat(root.hir_ty.class_errors(db, class_, head, overrides));
+        let source_map = root.hir.class_source_map(db, class_);
+        let fields = root.hir_ty.resolve_class_fields(db, class_);
+        for (let i = 0; i < data.fields.length() && i < fields.length(); i += 1) {
+            let error = root.hir_ty.union_error(db, fields[i].1);
+            if (error != null) {
+                json_errors.push((source_map.type_refs.span(data.fields[i].type_ref), error));
+            }
+        }
+    }
+    for (let enum_loc in root.hir.file_enums(db, file)) {
+        let data = root.hir.enum_data(db, enum_loc);
+        let head = root.hir_ty.qualify_def(db, root.hir.DefinitionEnum { value: enum_loc }, data.name);
+        let renames = data.variants.some((variant) -> {
+            variant.attrs.json_rename != null
+        });
+        let interface_ = if (renames) {
+            root.hir_ty.override_of(overrides, head)
+        } else {
+            null
+        };
+        if (interface_ != null) {
+            json_errors.push(
+                (
+                    root.hir.enum_source_map(db, enum_loc).name_span,
+                    root.hir_ty.TirTypeErrorJsonAttributesWithOverride {
+                        name: data.name,
+                        interface_: interface_,
+                    },
+                ),
+            );
+        }
+    }
+    for (let function_ in root.hir.file_functions(db, file)) {
+        let signature = root.hir_ty.function_signature_with_diagnostics(db, function_).signature;
+        let tys = signature.params
+            .map((param) -> {
+                param.ty
+            })
+            .concat([signature.ret]);
+        for (let ty in tys) {
+            let error = root.hir_ty.union_error(db, ty);
+            if (error != null) {
+                json_errors.push((root.hir.function_source_map(db, function_).name_span, error));
+                break;
+            }
+        }
+    }
+    for (let (let range, let error) in json_errors) {
+        out.push(declaration_diagnostic(db, file, vp, range, error, error_));
+    }
+    // LLM OUTPUT field warnings: an optional field an LLM function's output
+    // reaches, which a model can never fill (E0185), at the field's written
+    // type.
+    let always_null = root.hir_ty.package_always_null_fields(db, package_root);
+    if (always_null.length() > 0) {
+        for (let class_ in root.hir.file_classes(db, file)) {
+            let data = root.hir.class_data(db, class_);
+            let head = root.hir_ty.qualify_def(db, root.hir.DefinitionClass { value: class_ }, data.name);
+            let source_map = root.hir.class_source_map(db, class_);
+            for (let field in data.fields) {
+                if (!always_null.includes((head, field.name))) {
+                    continue;
+                }
+                let error = root.hir_ty.TirTypeErrorLlmOutputFieldAlwaysNull { field: field.name };
+                out.push(
+                    declaration_diagnostic(db, file, vp, source_map.type_refs.span(field.type_ref), error, warning),
+                );
+            }
+        }
+    }
     for (let interface_ in root.hir.file_interfaces(db, file)) {
         for (let (let range, let error) in root.hir_ty.interface_lowering_diagnostics(db, interface_)) {
             out.push(declaration_diagnostic(db, file, vp, range, error, error_));
@@ -176,22 +295,27 @@ function check_file_types(
 
     // ── 4. Type-alias bodies ──
     for (let alias in root.hir.file_type_aliases(db, file)) {
-        // Not ported: the alias body's `@json` union error.
-        for (let (let range, let error) in root.hir_ty.type_alias_lowering_diagnostics(db, alias)) {
+        let found = root.hir_ty.type_alias_lowering_diagnostics(db, alias);
+        let untagged = root.hir_ty.union_error(db, root.hir_ty.type_alias_value(db, alias));
+        if (untagged != null) {
+            found = found.concat([(root.hir.type_alias_source_map(db, alias).name_span, untagged)]);
+        }
+        for (let (let range, let error) in found) {
             out.push(declaration_diagnostic(db, file, vp, range, error, error_));
         }
     }
 
     let package = root.hir.file_package(db, file);
-    out = out.concat(
-        validate_associated_type_bindings_in_items(
-            db,
-            file,
-            root.hir.file_ast(db, file).items,
-            root.hir.package_items(db, package.root_id),
-            package.namespace_path,
-        ),
-    );
+    out
+        = out.concat(
+            validate_associated_type_bindings_in_items(
+                db,
+                file,
+                root.hir.file_ast(db, file).items,
+                root.hir.package_items(db, package.root_id),
+                package.namespace_path,
+            ),
+        );
 
     // ── 7. Interface impl and coherence diagnostics ──
     out.concat(check_interfaces(db, file))

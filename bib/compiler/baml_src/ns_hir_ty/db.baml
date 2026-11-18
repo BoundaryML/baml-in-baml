@@ -87,6 +87,24 @@ class TyMemos {
     infer_let_body: root.hir.TrackedMemo<InferenceResult<root.types.Ty>>,
     // infer.rs::infer_parameter_defaults (key: function loc)
     infer_parameter_defaults: root.hir.TrackedMemo<InferenceResult<root.types.Ty>>,
+    // init_io.rs::function_evaluated_calls (key: function loc)
+    function_evaluated_calls: root.hir.TrackedMemo<EvaluatedCalls>,
+    // init_io.rs::let_evaluated_calls (key: let loc)
+    let_evaluated_calls: root.hir.TrackedMemo<EvaluatedCalls>,
+    // globals.rs::let_init_refs (key: let loc)
+    let_init_refs: root.hir.TrackedMemo<InitRefs>,
+    // globals.rs::function_init_refs (key: function loc)
+    function_init_refs: root.hir.TrackedMemo<InitRefs>,
+    // globals.rs::global_init_deps (key: let loc)
+    global_init_deps: root.hir.TrackedMemo<GlobalDeps>,
+    // globals.rs::package_global_init_plan (key: root id)
+    package_global_init_plan: root.hir.TrackedMemo<GlobalInitPlan>,
+    // llm_output.rs::llm_output_findings (key: function loc)
+    llm_output_findings: root.hir.TrackedMemo<LlmOutputFindings>,
+    // llm_output.rs::package_always_null_fields (key: root id)
+    package_always_null_fields: root.hir.TrackedMemo<(root.types.DeclName, string)[]>,
+    // json_attrs.rs::json_overrides (key: root id)
+    json_overrides: root.hir.TrackedMemo<(root.types.DeclName, string)[]>,
     // infer.rs::IN_FLIGHT_LET_OWNERS (Rust's thread-local): the top-level
     // lets whose initializer is being inferred now, by `LetOwnerKey`
     // (file path, then item id; tuples are not map keys).
@@ -126,6 +144,15 @@ class TyMemos {
             infer_function_body: root.hir.TrackedMemo.new("infer_function_body"),
             infer_let_body: root.hir.TrackedMemo.new("infer_let_body"),
             infer_parameter_defaults: root.hir.TrackedMemo.new("infer_parameter_defaults"),
+            function_evaluated_calls: root.hir.TrackedMemo.new("function_evaluated_calls"),
+            let_evaluated_calls: root.hir.TrackedMemo.new("let_evaluated_calls"),
+            let_init_refs: root.hir.TrackedMemo.new("let_init_refs"),
+            function_init_refs: root.hir.TrackedMemo.new("function_init_refs"),
+            global_init_deps: root.hir.TrackedMemo.new("global_init_deps"),
+            package_global_init_plan: root.hir.TrackedMemo.new("package_global_init_plan"),
+            llm_output_findings: root.hir.TrackedMemo.new("llm_output_findings"),
+            package_always_null_fields: root.hir.TrackedMemo.new("package_always_null_fields"),
+            json_overrides: root.hir.TrackedMemo.new("json_overrides"),
             in_flight_let_owners: {},
             body_inferences: 0,
             pool: root.types.InferPool.new(),
