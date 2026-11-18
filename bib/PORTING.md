@@ -483,3 +483,23 @@ item. Each gate takes ~80 s.
   built from that tree, so the code and the oracle agree; the `// port: ...
   @ d9be6853b` headers are nominal for TIR. Advance `BASE` when the TIR gate
   passes.
+
+## Type gate, first run (2026-11-18, after K4)
+
+`baml run oracle.types_gate_summary`: every diagnostic, all phases.
+
+| Corpus | Match | Mismatches | Panicked |
+|---|---|---|---|
+| `broken_syntax` | 28/28 | 0 | 0 |
+| `diagnostic_errors` | 123/136 (+1 known) | 6 | 6 |
+| `parser_stress` | 5/5 | 0 | 0 |
+| `baml_src` (one unit) | 0/1 | 0 | 1 |
+
+Every panic is package L's `global_value_type` stub. Mismatches:
+`trace_call_arguments` (E0002 `trace.Options` unresolved vs our E0007),
+`catch_all_coverage` (missing E0002 `baml.panics.IndexOutOfBounds`),
+`role_marker_interpolation` (`prompt` tag / `role`), `spawn_modifier_operands`
+(interface rendering lists defaulted associated types; a missing
+`baml.spawn.Root` error), `init_io_reachable` (package L), `anyfunction`
+(E0154 and others). Several look like the stdlib-from-source open item.
+Full run: ~2.5 min.
