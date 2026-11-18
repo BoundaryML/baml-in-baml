@@ -9,8 +9,9 @@
 // (`baml_type::interned::pool()`); here the compile's pool is `pool`, so a
 // query that interns reaches it through the Db.
 
-// The `(InterfaceLoc, Name)` keys of `interface_assoc_default` and
-// `interface_assoc_bound`, interned to `int`s.
+// The `(InterfaceLoc, Name)` keys of `interface_assoc_default`,
+// `interface_assoc_bound` and `interface_associated_type_default`, interned
+// to `int`s.
 class AssocMemberKeys {
     index: map<int, map<string, int>>,
     count: int,
@@ -47,6 +48,26 @@ class TyMemos {
     interface_assoc_default: root.hir.TrackedMemo<AssocTypeLowering>,
     // lower.rs::interface_assoc_bound (key: `assoc_members`)
     interface_assoc_bound: root.hir.TrackedMemo<AssocTypeLowering>,
+    // interfaces.rs::package_resolved_aliases (key: root id)
+    package_resolved_aliases: root.hir.TrackedMemo<map<root.types.DeclName, root.types.Ty>>,
+    // interfaces.rs::normalized_alias_map (key: root id)
+    normalized_alias_map: root.hir.TrackedMemo<map<root.types.DeclName, root.types.Ty>>,
+    // interfaces.rs::interface_associated_type_default (key: `assoc_members`)
+    interface_associated_type_default: root.hir.TrackedMemo<(root.types.Ty, TirTypeError[])?>,
+    // interfaces.rs::resolve_interface_fields (key: interface loc)
+    resolve_interface_fields: root.hir.TrackedMemo<root.hir_ty.interfaces.ResolvedInterfaceFields>,
+    // interfaces.rs::resolve_interface_required_methods (key: interface loc)
+    resolve_interface_required_methods: root.hir.TrackedMemo<root.hir_ty.interfaces.ResolvedInterfaceMethod[]>,
+    // impl_rules.rs::impl_data (key: impl loc; `cycle_result`)
+    impl_data: root.hir.TrackedMemo<root.hir_ty.interfaces.ImplData | root.hir_ty.interfaces.ImplDataError>,
+    // impl_rules.rs::impl_data_source_map (key: impl loc)
+    impl_data_source_map: root.hir.TrackedMemo<root.hir_ty.interfaces.ImplDataSourceMap>,
+    // impl_rules.rs::validate_impl_signatures (key: impl loc)
+    validate_impl_signatures: root.hir.TrackedMemo<(TirTypeError, root.hir_ty.interfaces.ImplDiagnosticLocation)[]>,
+    // impl_rules.rs::package_impl_locs (key: root id)
+    package_impl_locs: root.hir.TrackedMemo<int[]>,
+    // coherence.rs::package_coherence_diagnostics (key: root id)
+    package_coherence_diagnostics: root.hir.TrackedMemo<root.hir_ty.interfaces.CoherenceViolation[]>,
     assoc_members: AssocMemberKeys,
     // The compile's interned-type pool (Rust's global `pool()`).
     pool: root.types.InferPool,
@@ -60,6 +81,16 @@ class TyMemos {
             declared_throws: root.hir.TrackedMemo.new("declared_throws"),
             interface_assoc_default: root.hir.TrackedMemo.new("interface_assoc_default"),
             interface_assoc_bound: root.hir.TrackedMemo.new("interface_assoc_bound"),
+            package_resolved_aliases: root.hir.TrackedMemo.new("package_resolved_aliases"),
+            normalized_alias_map: root.hir.TrackedMemo.new("normalized_alias_map"),
+            interface_associated_type_default: root.hir.TrackedMemo.new("interface_associated_type_default"),
+            resolve_interface_fields: root.hir.TrackedMemo.new("resolve_interface_fields"),
+            resolve_interface_required_methods: root.hir.TrackedMemo.new("resolve_interface_required_methods"),
+            impl_data: root.hir.TrackedMemo.new("impl_data"),
+            impl_data_source_map: root.hir.TrackedMemo.new("impl_data_source_map"),
+            validate_impl_signatures: root.hir.TrackedMemo.new("validate_impl_signatures"),
+            package_impl_locs: root.hir.TrackedMemo.new("package_impl_locs"),
+            package_coherence_diagnostics: root.hir.TrackedMemo.new("package_coherence_diagnostics"),
             assoc_members: AssocMemberKeys.new(),
             pool: root.types.InferPool.new(),
         }
