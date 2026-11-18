@@ -80,6 +80,11 @@ class TyMemos {
     // Speed, not a Rust query: each package's impl candidates with final
     // facts, in block order (impls.baml `package_impl_candidates`).
     impl_candidate_caches: map<int, ImplCandidateCache>,
+    // Speed, not a Rust query: `overlap_alias_map` by the owner's package.
+    // Rust caches it per inference context; it reads only the package's
+    // alias closure and the database, so it is the same for every body of a
+    // package.
+    overlap_alias_maps: map<int, map<root.types.DeclName, root.types.Ty>>,
     // callable.rs::callable_throws (key: function loc)
     callable_throws: root.hir.TrackedMemo<CallableThrows>,
     // callable.rs::function_signature_ty (key: function loc)
@@ -143,6 +148,7 @@ class TyMemos {
             impls_for_type_cached: root.hir.TrackedMemo.new("impls_for_type_cached"),
             impl_type_keys: ImplTypeKeys.new(),
             impl_candidate_caches: {},
+            overlap_alias_maps: {},
             callable_throws: root.hir.TrackedMemo.new("callable_throws"),
             function_signature_ty: root.hir.TrackedMemo.new("function_signature_ty"),
             infer_function_body: root.hir.TrackedMemo.new("infer_function_body"),

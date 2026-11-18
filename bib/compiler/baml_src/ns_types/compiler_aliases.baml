@@ -148,18 +148,12 @@ function compiler_alias_by_definition(
     lang: root.base.LangRoots,
     name: root.types.DeclName,
 ) -> root.types.CompilerAlias? throws never {
-    let array = root.types.CompilerAlias {
-        target: root.types.AliasTarget.List,
-        arity: 1,
-        definition: ["baml", "Array"],
-    };
-    let entries = CARRIER_SPELLINGS
-        .map((spelling) -> {
-            root.types.compiler_alias_by_spelling(spelling)
-                ?? baml.sys.panic(`no compiler alias spelled ${spelling}`)
-        })
-        .concat([array]);
-    entries.find((entry) -> {
+    // Every entry's definition lives in a language package: a name outside
+    // them matches none (the common case, answered without the scan).
+    if (lang.package_of(name.pkg) == null) {
+        return null;
+    }
+    CARRIER_ENTRIES.find((entry) -> {
         let definition = entry.definition;
         // port: compiler_aliases.rs::Definition::matches
         if (definition == null) {
@@ -172,6 +166,15 @@ function compiler_alias_by_definition(
         }
     })
 }
+
+// The entries with a carrier declaration, in table order (Rust's static
+// `ALL`), built once.
+const CARRIER_ENTRIES: root.types.CompilerAlias[] = CARRIER_SPELLINGS
+    .map((spelling) -> {
+        root.types.compiler_alias_by_spelling(spelling)
+            ?? baml.sys.panic(`no compiler alias spelled ${spelling}`)
+    })
+    .concat([root.types.CompilerAlias { target: root.types.AliasTarget.List, arity: 1, definition: ["baml", "Array"] }]);
 
 // port: baml_type/src/compiler_aliases.rs::CompilerAlias::class_carrier @ d9be6853b
 // The structural type this entry's class declaration denotes when applied

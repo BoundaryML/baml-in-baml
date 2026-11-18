@@ -800,8 +800,13 @@ function overlap_alias_map(
         return cached;
     }
     let db = ctx.db;
-    let aliases: map<root.types.DeclName, root.types.Ty> = {};
     let pkg = root.hir.file_package(db, ctx.owner_file).root_id;
+    let shared = db.ty_memo.overlap_alias_maps.get(pkg);
+    if (shared != null) {
+        ctx.overlap_aliases = shared;
+        return shared;
+    }
+    let aliases: map<root.types.DeclName, root.types.Ty> = {};
     let packages = [pkg].concat(root.hir.package_dependency_closure(db, pkg));
     for (let pkg_id in packages) {
         let items = root.hir.package_items(db, pkg_id);
@@ -829,6 +834,7 @@ function overlap_alias_map(
         aliases[qtn] = root.types.nf(aliases[qtn], enum_variants);
     }
     ctx.overlap_aliases = aliases;
+    db.ty_memo.overlap_alias_maps[pkg] = aliases;
     aliases
 }
 
