@@ -17,6 +17,6 @@ intent_enabled = true
 # Frontend layers whose BAML version passes its phase gate (bib/MIGRATION.md).
 # Port tasks that touch only unported layers are recorded as `absorbed`.
 # Layers: parse, ast, hir, tir, mir, emit, codegen, diag.
-ported_layers = []
+ported_layers = ["parse", "ast", "hir", "diag"]
 # Re-build pending ports in the BAML frontend. Off until the BAML frontend is bootstrapped.
 port_enabled = false

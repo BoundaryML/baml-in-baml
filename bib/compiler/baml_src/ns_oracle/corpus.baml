@@ -32,12 +32,14 @@ function parse_corpus(
     let paths = baml.glob.new("**/*.baml").scan(dir);
     let mismatches: CorpusMismatch[] = [];
     let known: string[] = [];
+    // One stdlib compile for the whole corpus; each file is its own workspace.
+    let db = if (stage == "hir") { root.stdlib_db() } else { null };
     for (let path in paths) {
         let files = { path: baml.fs.read(`${dir}/${path}`) };
-        let comparison = if (stage == "lowering") {
-            compare_lowering(files)
-        } else {
-            compare_parse(files)
+        let comparison = match (stage) {
+            "lowering" => compare_lowering(files),
+            "hir" => compare_hir(files, db = db),
+            "parse" => compare_parse(files),
         };
         if (comparison.ours != comparison.rust) {
             if (KNOWN_DIFFERENCES.has(path)) {

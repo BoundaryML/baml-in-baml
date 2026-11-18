@@ -284,6 +284,24 @@ Toolchain: upstream canary plus the lazy Hash-eligibility fix (separate PR);
 parser/AST/diagnostics changes between `BASE` and that canary, so it is a
 valid oracle for these two stages.
 
+## HIR gate (2026-11-18)
+
+`check()` builds a `Db` (stdlib from source plus a workspace root) and reports
+parse, lowering and HIR diagnostics. Compared with the Rust compiler's phase
+`parse` + `hir` diagnostics:
+
+| Corpus | Match |
+|---|---|
+| `projects/broken_syntax` | 43/43 |
+| `projects/diagnostic_errors` | 177/178 |
+| `projects/parser_stress` | 5/5 |
+| `baml_tests/baml_src` | 615/619 |
+
+The 5 differences are the accepted 63-bit `int` limit (`KNOWN_DIFFERENCES`).
+`ported_layers` is now `parse`, `ast`, `hir`, `diag`: upstream changes to
+these queue as port tasks. #5634 and #5715 (mirrored after `BASE`, while no
+layer was marked ported) were reviewed by hand: neither needs a port.
+
 ## Agents
 
 - A task is one Rust function (or a small cycle of them) whose callees are ported.
