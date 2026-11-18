@@ -306,7 +306,11 @@ class GroupElement {
 // anything else is an error. No lookahead decides anything a later consume
 // has to trust.
 function paren_group(p: Parser, l: int) -> AnyType throws never {
-    match (p.attempt((p) -> { paren_group_contents(p, l) })) {
+    match (
+        p.attempt((p) -> {
+            paren_group_contents(p, l)
+        })
+    ) {
         let error: ParseError => p.bogus_since(Mark { idx: l }, error),
         let ty: AnyType => ty,
     }
@@ -317,34 +321,23 @@ function paren_group(p: Parser, l: int) -> AnyType throws never {
 // when it is none of them: its elements were parsed for their own diagnostics
 // and are discarded.
 function paren_group_contents(p: Parser, l: int) -> AnyType | ParseError throws never {
-    let mark = Mark { idx: l };
-
     let elements: GroupElement[] = [];
-    let had_named = false;
     if (!p.cur.at(TokenKind.RParen)) {
-        while (true) {
-            let element_mark = p.cur.mark();
-            let name = function_type_param_name(p);
-            let ty = type_expr(p);
-            if (!elements && name == null && !(ty is Missing)) {
-                let as_kw = p.cur.eat(TokenKind.As);
-                if (as_kw != null) {
-                    return qualified_projection(p, l, ty, as_kw);
-                }
+        let first = group_element(p);
+        let first_ty = first.ty;
+        // `as` right after a first unnamed type makes the group a projection;
+        // a comma after the type rules it out.
+        if (first.name == null && first.sep == null && !(first_ty is Missing)) {
+            let as_kw = p.cur.eat(TokenKind.As);
+            if (as_kw != null) {
+                return qualified_projection(p, l, first_ty, as_kw);
             }
-            had_named = had_named || name != null;
-            if (name != null) {
-                reject_function_type_default(p);
-            }
-            let end = p.cur.end();
-            let sep = p.cur.eat(TokenKind.Comma);
-            let more = sep != null && !p.cur.at(TokenKind.RParen) && !p.cur.at_end();
-            elements.push(
-                GroupElement { mark: element_mark, end: end, name: name, ty: ty, sep: sep },
-            );
-            if (!more) {
-                break;
-            }
+        }
+        elements.push(first);
+        let last = first;
+        while (last.sep != null && !p.cur.at(TokenKind.RParen) && !p.cur.at_end()) {
+            last = group_element(p);
+            elements.push(last);
         }
     }
     recover_to_paren_close(p);
@@ -352,37 +345,76 @@ function paren_group_contents(p: Parser, l: int) -> AnyType | ParseError throws 
 
     let arrow = p.cur.eat(TokenKind.Arrow);
     if (arrow != null) {
-        let params = elements.map((element) -> {
-            SepItem {
-                item: FunctionTypeParam {
-                    span: element.mark.to(element.end),
-                    name: element.name,
-                    ty: element.ty,
-                },
-                sep: element.sep,
-            }
-        });
-        // Bare return and `throws` unions are owned by the function. A pipe
-        // followed by another function head is reported as ambiguous once the
-        // whole type is built, instead of silently choosing this grouping.
-        let ret = type_expr(p);
-        let kw = p.cur.eat(TokenKind.Throws);
-        let clause = if (kw != null) {
-            throws_(p, kw)
-        } else {
-            null
-        };
-        return FunctionType {
-            span: p.span_from(mark),
-            l: l,
-            params: params,
-            r: r,
-            arrow: arrow,
-            ret: ret,
-            throws_: clause,
-        };
+        return function_type_from_group(p, l, elements, r, arrow);
     }
+    group_without_arrow(p, l, elements, r)
+}
 
+// port: baml_parser/src/types.rs::paren_group_contents (one element) @ d9be6853b
+// `name: T` or `T`, with the comma after it.
+function group_element(p: Parser) -> GroupElement throws never {
+    let mark = p.cur.mark();
+    let name = function_type_param_name(p);
+    let ty = type_expr(p);
+    if (name != null) {
+        reject_function_type_default(p);
+    }
+    let end = p.cur.end();
+    let sep = p.cur.eat(TokenKind.Comma);
+    GroupElement { mark: mark, end: end, name: name, ty: ty, sep: sep }
+}
+
+// port: baml_parser/src/types.rs::paren_group_contents (function type) @ d9be6853b
+// After the `->` that makes the group a function's parameters: the return
+// type and an optional `throws` clause.
+function function_type_from_group(
+    p: Parser,
+    l: int,
+    elements: GroupElement[],
+    r: int | Missing,
+    arrow: int,
+) -> FunctionType throws never {
+    let params = elements.map((element) -> {
+        SepItem {
+            item: FunctionTypeParam {
+                span: element.mark.to(element.end),
+                name: element.name,
+                ty: element.ty,
+            },
+            sep: element.sep,
+        }
+    });
+    // Bare return and `throws` unions are owned by the function. A pipe
+    // followed by another function head is reported as ambiguous once the
+    // whole type is built, instead of silently choosing this grouping.
+    let ret = type_expr(p);
+    let kw = p.cur.eat(TokenKind.Throws);
+    let clause = if (kw != null) {
+        throws_(p, kw)
+    } else {
+        null
+    };
+    FunctionType {
+        span: p.span_from(Mark { idx: l }),
+        l: l,
+        params: params,
+        r: r,
+        arrow: arrow,
+        ret: ret,
+        throws_: clause,
+    }
+}
+
+// port: baml_parser/src/types.rs::paren_group_contents (no `->` after the group) @ d9be6853b
+// A parenthesized type when the group holds one unnamed type, a tuple when it
+// holds several, and an error otherwise.
+function group_without_arrow(
+    p: Parser,
+    l: int,
+    elements: GroupElement[],
+    r: int | Missing,
+) -> AnyType | ParseError throws never {
+    let mark = Mark { idx: l };
     let only = if (elements.length() == 1) {
         elements[0]
     } else {
@@ -392,6 +424,9 @@ function paren_group_contents(p: Parser, l: int) -> AnyType | ParseError throws 
         return ParenType { span: p.span_from(mark), l: l, inner: only.ty, r: r };
     }
 
+    let had_named = elements.some((element) -> {
+        element.name != null
+    });
     if (!had_named && elements) {
         let items = elements.filter_map((element) -> {
             let ty = element.ty;

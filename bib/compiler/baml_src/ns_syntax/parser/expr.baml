@@ -217,217 +217,272 @@ function expr_bp(p: Parser, min_bp: int, r: Restrictions) -> AnyExpr | Missing t
 // The postfix and infix forms after `lhs`, an operand the caller parsed, each
 // binding at least `min_bp` (full binding power by default).
 // deviation: Rust's `expr_from(p, lhs, r)` forwards to `infix(p, lhs, 0, r)`;
-// here the two are one function with a defaulted `min_bp`.
+// here the two are one function with a defaulted `min_bp`. Each form the
+// loop takes is its own function below, chosen by `postfix_or_infix`.
 function expr_from(
     p: Parser,
     lhs: AnyExpr,
     r: Restrictions,
     min_bp: int = 0,
 ) -> AnyExpr throws never {
-    while (true) {
-        // A `//#` line is a statement: it ends the expression before it.
-        if (p.cur.header_ahead() || p.cur.at_end() || line_break_ends_expr(p.cur, r)) {
+    // A `//#` line is a statement: it ends the expression before it.
+    while (!(p.cur.header_ahead() || p.cur.at_end() || line_break_ends_expr(p.cur, r))) {
+        let next = postfix_or_infix(p, lhs, r, min_bp);
+        if (next == null) {
             break;
         }
-        let mark = p.mark_of(node_span(lhs));
-        let catch_kw = if (r.no_catch) {
-            null
-        } else {
-            p.cur.eat_in(CATCH_KW)
-        };
-        if (catch_kw != null) {
-            lhs = catch_expr(p, lhs, catch_kw);
-            continue;
-        }
-        let lt = if (p.cur.at(TokenKind.Less) && looks_like_generic_args(p.cur)) {
-            p.cur.eat(TokenKind.Less)
-        } else {
-            null
-        };
-        if (lt != null) {
-            let args = parse_generic_args(p, lt);
-            lhs = GenericApplyExpr { span: p.span_from(mark), base: lhs, args: args };
-            continue;
-        }
-        if let l: int = p.cur.eat(TokenKind.LParen) {
-            let args = parse_arg_list(p, l);
-            lhs = CallExpr { span: p.span_from(mark), callee: lhs, args: args };
-            continue;
-        }
+        lhs = next;
+    }
+    lhs
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the loop body) @ d9be6853b
+// The form the current token continues `lhs` with, or null when it ends the
+// expression. A token whose postfix form does not apply here is tried as a
+// binary operator.
+function postfix_or_infix(
+    p: Parser,
+    lhs: AnyExpr,
+    r: Restrictions,
+    min_bp: int,
+) -> AnyExpr? throws never {
+    let mark = p.mark_of(node_span(lhs));
+    match (p.cur.kind(0)) {
+        TokenKind.Catch | TokenKind.CatchAll | TokenKind.CatchAllPanics if !r.no_catch => {
+            catch_expr(p, lhs, eat_checked(p))
+        },
+        TokenKind.Less if looks_like_generic_args(p.cur) => {
+            generic_apply_expr(p, lhs, mark, eat_checked(p))
+        },
+        TokenKind.LParen => call_expr(p, lhs, mark, eat_checked(p)),
         // A template on the next line is a statement of its own.
-        let open = if (p.cur.at(TokenKind.BacktickStart) && !p.cur.has_newline_ahead()) {
-            p.cur.eat(TokenKind.BacktickStart)
-        } else {
-            null
-        };
-        if (open != null) {
-            let template = parse_backtick_string(p, open);
-            lhs = TaggedTemplateExpr { span: p.span_from(mark), tag: lhs, template: template };
-            continue;
-        }
-        if let l: int = p.cur.eat(TokenKind.LBracket) {
-            let index = operand(p, Restrictions.empty());
-            let close = p.expect(TokenKind.RBracket);
-            lhs = IndexExpr { span: p.span_from(mark), base: lhs, l: l, index: index, r: close };
-            continue;
-        }
-        if (p.cur.at_in(TUPLE_DOT) && p.cur.nth_in(1, NUMBER)) {
-            let dot = p.cur.eat_in(TUPLE_DOT) ?? baml.sys.panic("tuple dot");
-            let slot = p.cur.eat_in(LITERAL_EXPR_TOKEN) ?? baml.sys.panic("numeric slot");
-            // deviation: Rust's `part.parse::<u32>().is_ok()` on a canonical decimal
-            // is a bound on its digits: at most ten, and at most "4294967295".
-            let slot_number = (part: string) -> bool {
-                part
-                    && part.is_ascii_numeric()
-                    && (part == "0" || !part.starts_with("0"))
-                    && (part.length() < 10 || (part.length() == 10 && part <= "4294967295"))
-            };
-            if (!p.cur.text_of(slot).split(".").every(slot_number)) {
-                p.error("tuple slots must be decimal slot numbers", p.cur.token_range(slot));
-            }
-            lhs = TupleFieldExpr { span: p.span_from(mark), base: lhs, dot: dot, slot: slot };
-            continue;
-        }
-        if let qdot: int = p.cur.eat(TokenKind.QuestionDot) {
-            lhs
-                = if let l: int = p.cur.eat(TokenKind.LParen) {
-                    let args = parse_arg_list(p, l);
-                    OptionalCallExpr {
-                        span: p.span_from(mark),
-                        callee: lhs,
-                        qdot: qdot,
-                        args: args,
-                    }
-                } else if let l: int = p.cur.eat(TokenKind.LBracket) {
-                    let index = operand(p, Restrictions.empty());
-                    let close = p.expect(TokenKind.RBracket);
-                    OptionalIndexExpr {
-                        span: p.span_from(mark),
-                        base: lhs,
-                        qdot: qdot,
-                        l: l,
-                        index: index,
-                        r: close,
-                    }
-                } else {
-                    let name = p.expect_name(MEMBER_NAME, "field name, `[`, or `(` after `?.`");
-                    OptionalFieldAccessExpr {
-                        span: p.span_from(mark),
-                        base: lhs,
-                        qdot: qdot,
-                        name: name,
-                    }
-                };
-            continue;
-        }
+        TokenKind.BacktickStart if !p.cur.has_newline_ahead() => {
+            tagged_template_expr(p, lhs, mark, eat_checked(p))
+        },
+        TokenKind.LBracket => index_expr(p, lhs, mark, eat_checked(p)),
+        TokenKind.Dot | TokenKind.QuestionDot if p.cur.nth_in(1, NUMBER) => {
+            tuple_field_expr(p, lhs, mark, eat_checked(p))
+        },
+        TokenKind.QuestionDot => optional_chain_expr(p, lhs, mark, eat_checked(p)),
         // `F@spec`: an attribute on the next line is never absorbed.
-        let at = if (p.cur.at(TokenKind.At) && !p.cur.has_newline_ahead() && p.cur.nth_in(1, SPEC_SELECTOR)) {
-            p.cur.eat(TokenKind.At)
-        } else {
-            null
-        };
-        if (at != null) {
-            let selector = p.expect_in(SPEC_SELECTOR, "companion selector");
-            lhs = SpecExpr { span: p.span_from(mark), base: lhs, at: at, selector: selector };
-            continue;
-        }
-        if (looks_like_as_projection(p.cur)) {
-            if let dot: int = p.cur.eat(TokenKind.Dot) {
-                if let as_kw: int = p.cur.eat(TokenKind.As) {
-                    let lt = p.cur.eat(TokenKind.Less);
-                    let args = if (lt != null) {
-                        parse_generic_args(p, lt)
-                    } else {
-                        p.missing("'<'")
-                    };
-                    lhs
-                        = UpcastExpr {
-                            span: p.span_from(mark),
-                            base: lhs,
-                            dot: dot,
-                            as_kw: as_kw,
-                            args: args,
-                        };
-                    continue;
-                }
-            }
-        }
-        if let dot: int = p.cur.eat_in(MEMBER_DOT) {
-            let expected = if (p.cur.tokens().kinds[dot] == TokenKind.Dollar) {
-                "field name after `'$'`"
-            } else {
-                "field name after `'.'`"
-            };
-            let name = p.expect_name(MEMBER_NAME, expected);
-            lhs = FieldAccessExpr { span: p.span_from(mark), base: lhs, dot: dot, name: name };
-            continue;
-        }
-        if (p.cur.at(TokenKind.LBrace)) {
-            let ctor: AnyObjectCtor? = match (lhs) {
-                let path: PathExpr => path,
-                let apply: GenericApplyExpr => apply,
-                _ => null,
-            };
-            if (ctor == null) {
-                break;
-            }
-            let brace = p.cur.pos;
-            if (!(brace_looks_like_fields(p.cur, brace) && r.brace_literal_allowed(p.cur, brace))) {
-                break;
-            }
-            let l = p.cur.eat(TokenKind.LBrace);
-            if (l == null) {
-                break;
-            }
-            lhs = object_literal(p, mark, ctor, l);
-            continue;
-        }
-        if (p.cur.at(TokenKind.Is)) {
-            if (IS_BINDING_POWER.left < min_bp) {
-                break;
-            }
-            let is_kw = p.cur.eat(TokenKind.Is);
-            if (is_kw == null) {
-                break;
-            }
-            let pat = pattern(p, r);
-            lhs = IsExpr { span: p.span_from(mark), expr: lhs, is_kw: is_kw, pattern: pat };
-            continue;
-        }
-        if (p.cur.at(TokenKind.Not) && !p.cur.has_newline_ahead()) {
-            // A `!` after a complete expression is a non-null assertion from
-            // another language; on the next line it is a prefix operator.
+        TokenKind.At if !p.cur.has_newline_ahead() && p.cur.nth_in(1, SPEC_SELECTOR) => {
+            spec_expr(p, lhs, mark, eat_checked(p))
+        },
+        TokenKind.Dot if looks_like_as_projection(p.cur) => {
+            upcast_expr(p, lhs, mark, eat_checked(p))
+        },
+        TokenKind.Dot | TokenKind.Dollar => field_access_expr(p, lhs, mark, eat_checked(p)),
+        TokenKind.LBrace => object_literal_after(p, lhs, mark, r),
+        TokenKind.Is if IS_BINDING_POWER.left >= min_bp => is_expr(p, lhs, mark, eat_checked(p), r),
+        // A `!` after a complete expression is a non-null assertion from
+        // another language; on the next line it is a prefix operator.
+        TokenKind.Not if !p.cur.has_newline_ahead() => {
             p.error_here(
                 "unexpected '!'; BAML has no non-null assertion operator — unwrap optionals with '?? <default>' or 'if let x: T = opt { ... }'",
             );
             p.cur.skip();
-            continue;
-        }
-        // An assignment operator ends the expression (`>>=` before `>>`).
-        if (p.cur.at_assign_op()) {
-            break;
-        }
-        let idx = p.cur.nth(0);
-        let peeked = if (idx != null) {
-            binary_op_at(p.cur.tokens(), idx)
-        } else {
-            null
-        };
-        if (peeked == null) {
-            break;
-        }
-        let binding_power = binary_binding_power(peeked);
-        if (binding_power.left < min_bp) {
-            break;
-        }
-        let op = p.cur.eat_binary_op();
-        if (op == null) {
-            break;
-        }
-        let rhs = expr_bp(p, binding_power.right, r);
-        lhs = BinaryExpr { span: p.span_from(mark), lhs: lhs, op: op, rhs: rhs };
+            lhs
+        },
+        _ => binary_expr(p, lhs, mark, r, min_bp),
     }
-    lhs
+}
+
+// The current token, consumed: its kind was checked before.
+function eat_checked(p: Parser) -> int throws never {
+    let idx = p.cur.nth(0) ?? baml.sys.panic("take at end of input");
+    p.cur.skip();
+    idx
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the generic arguments arm) @ d9be6853b
+// `f<T>` after its `<`.
+function generic_apply_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    lt: int,
+) -> GenericApplyExpr throws never {
+    let args = parse_generic_args(p, lt);
+    GenericApplyExpr { span: p.span_from(mark), base: lhs, args: args }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the call arm) @ d9be6853b
+// `f(args)` after its `(`.
+function call_expr(p: Parser, lhs: AnyExpr, mark: Mark, l: int) -> CallExpr throws never {
+    let args = parse_arg_list(p, l);
+    CallExpr { span: p.span_from(mark), callee: lhs, args: args }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the tagged template arm) @ d9be6853b
+// `tag`...`` after its opening backtick.
+function tagged_template_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    open: int,
+) -> TaggedTemplateExpr throws never {
+    let template = parse_backtick_string(p, open);
+    TaggedTemplateExpr { span: p.span_from(mark), tag: lhs, template: template }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the index arm) @ d9be6853b
+// `xs[i]` after its `[`.
+function index_expr(p: Parser, lhs: AnyExpr, mark: Mark, l: int) -> IndexExpr throws never {
+    let index = operand(p, Restrictions.empty());
+    let close = p.expect(TokenKind.RBracket);
+    IndexExpr { span: p.span_from(mark), base: lhs, l: l, index: index, r: close }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the tuple slot arm) @ d9be6853b
+// `t.0` (or `t?.0`) after its dot.
+function tuple_field_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    dot: int,
+) -> TupleFieldExpr throws never {
+    let slot = p.cur.eat_in(LITERAL_EXPR_TOKEN) ?? baml.sys.panic("numeric slot");
+    // deviation: Rust's `part.parse::<u32>().is_ok()` on a canonical decimal
+    // is a bound on its digits: at most ten, and at most "4294967295".
+    let slot_number = (part: string) -> bool {
+        part
+            && part.is_ascii_numeric()
+            && (part == "0" || !part.starts_with("0"))
+            && (part.length() < 10 || (part.length() == 10 && part <= "4294967295"))
+    };
+    if (!p.cur.text_of(slot).split(".").every(slot_number)) {
+        p.error("tuple slots must be decimal slot numbers", p.cur.token_range(slot));
+    }
+    TupleFieldExpr { span: p.span_from(mark), base: lhs, dot: dot, slot: slot }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the optional chaining arm) @ d9be6853b
+// `x?.(args)`, `x?.[i]` or `x?.name` after its `?.`.
+function optional_chain_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    qdot: int,
+) -> AnyExpr throws never {
+    if let l: int = p.cur.eat(TokenKind.LParen) {
+        let args = parse_arg_list(p, l);
+        return OptionalCallExpr { span: p.span_from(mark), callee: lhs, qdot: qdot, args: args };
+    }
+    if let l: int = p.cur.eat(TokenKind.LBracket) {
+        let index = operand(p, Restrictions.empty());
+        let close = p.expect(TokenKind.RBracket);
+        return OptionalIndexExpr {
+            span: p.span_from(mark),
+            base: lhs,
+            qdot: qdot,
+            l: l,
+            index: index,
+            r: close,
+        };
+    }
+    let name = p.expect_name(MEMBER_NAME, "field name, `[`, or `(` after `?.`");
+    OptionalFieldAccessExpr { span: p.span_from(mark), base: lhs, qdot: qdot, name: name }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the companion selector arm) @ d9be6853b
+// `F@spec` after its `@`.
+function spec_expr(p: Parser, lhs: AnyExpr, mark: Mark, at: int) -> SpecExpr throws never {
+    let selector = p.expect_in(SPEC_SELECTOR, "companion selector");
+    SpecExpr { span: p.span_from(mark), base: lhs, at: at, selector: selector }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the `.as<I>` arm) @ d9be6853b
+// `x.as<I>` after its `.`.
+function upcast_expr(p: Parser, lhs: AnyExpr, mark: Mark, dot: int) -> UpcastExpr throws never {
+    let as_kw = p.cur.eat(TokenKind.As) ?? baml.sys.panic("as projection");
+    let lt = p.cur.eat(TokenKind.Less);
+    let args = if (lt != null) {
+        parse_generic_args(p, lt)
+    } else {
+        p.missing("'<'")
+    };
+    UpcastExpr { span: p.span_from(mark), base: lhs, dot: dot, as_kw: as_kw, args: args }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the field access arm) @ d9be6853b
+// `x.name` or `x$name` after its dot.
+function field_access_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    dot: int,
+) -> FieldAccessExpr throws never {
+    let expected = match (p.cur.tokens().kinds[dot]) {
+        TokenKind.Dollar => "field name after `'$'`",
+        _ => "field name after `'.'`",
+    };
+    let name = p.expect_name(MEMBER_NAME, expected);
+    FieldAccessExpr { span: p.span_from(mark), base: lhs, dot: dot, name: name }
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the object literal arm) @ d9be6853b
+// `Ctor { ... }` when `lhs` can construct and the `{` here opens its fields;
+// null when the brace belongs to something else.
+function object_literal_after(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    r: Restrictions,
+) -> ObjectLiteral? throws never {
+    let ctor: AnyObjectCtor = match (lhs) {
+        let path: PathExpr => path,
+        let apply: GenericApplyExpr => apply,
+        _ => {
+            return null;
+        },
+    };
+    let brace = p.cur.pos;
+    if (!(brace_looks_like_fields(p.cur, brace) && r.brace_literal_allowed(p.cur, brace))) {
+        return null;
+    }
+    let l = p.cur.eat(TokenKind.LBrace)
+        ?? return null;
+    object_literal(p, mark, ctor, l)
+}
+
+// port: baml_parser/src/expr.rs::expr_from (the `is` arm) @ d9be6853b
+// `x is Pattern` after its `is`.
+function is_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    is_kw: int,
+    r: Restrictions,
+) -> IsExpr throws never {
+    let pat = pattern(p, r);
+    IsExpr { span: p.span_from(mark), expr: lhs, is_kw: is_kw, pattern: pat }
+}
+
+// port: baml_parser/src/expr.rs::infix @ d9be6853b
+// `lhs op rhs` when a binary operator binding at least `min_bp` is here; null
+// otherwise. An assignment operator ends the expression (`>>=` before `>>`).
+function binary_expr(
+    p: Parser,
+    lhs: AnyExpr,
+    mark: Mark,
+    r: Restrictions,
+    min_bp: int,
+) -> BinaryExpr? throws never {
+    if (p.cur.at_assign_op()) {
+        return null;
+    }
+    let idx = p.cur.nth(0)
+        ?? return null;
+    let peeked = binary_op_at(p.cur.tokens(), idx)
+        ?? return null;
+    let binding_power = binary_binding_power(peeked);
+    if (binding_power.left < min_bp) {
+        return null;
+    }
+    let op = p.cur.eat_binary_op()
+        ?? return null;
+    let rhs = expr_bp(p, binding_power.right, r);
+    BinaryExpr { span: p.span_from(mark), lhs: lhs, op: op, rhs: rhs }
 }
 
 // port: baml_parser/src/expr.rs::line_break_ends_expr @ d9be6853b
@@ -487,6 +542,8 @@ function at_statement_end(cur: Cursor) -> bool throws never {
 }
 
 // port: baml_parser/src/expr.rs::primary @ d9be6853b
+// A literal, then by its first token: a keyword form, a bracketed form, or a
+// path. A token whose form does not apply here begins a path or nothing.
 function primary(p: Parser, r: Restrictions) -> AnyExpr | Missing throws never {
     if let token: int = p.cur.eat_in(LITERAL_EXPR_TOKEN) {
         return LiteralExpr { span: p.span_from(Mark { idx: token }), token: token };
@@ -494,121 +551,121 @@ function primary(p: Parser, r: Restrictions) -> AnyExpr | Missing throws never {
     if let lit: StringLit = string_lit(p, StringSite.Expr) {
         return lit;
     }
-    if let open: int = p.cur.eat(TokenKind.BacktickStart) {
-        return parse_backtick_string(p, open);
-    }
-    if let kw: int = p.cur.eat(TokenKind.Throw) {
-        let payload = if (at_statement_end(p.cur)) {
-            p.missing("expression after 'throw'")
-        } else {
-            expr(p, Restrictions { ...r, no_catch: true })
-        };
-        return ThrowExpr { span: p.span_from(Mark { idx: kw }), kw: kw, payload: payload };
-    }
-    if let kw: int = p.cur.eat(TokenKind.Return) {
-        // `return x catch ...` returns the caught value: a `return` cannot throw,
-        // so the clause can only be the value's.
-        let value = if (at_statement_end(p.cur)) {
-            null
-        } else {
-            ok(expr(p, r))
-        };
-        return ReturnExpr { span: p.span_from(Mark { idx: kw }), kw: kw, value: value };
-    }
-    if let kw: int = p.cur.eat(TokenKind.Break) {
-        return BreakExpr { span: p.span_from(Mark { idx: kw }), kw: kw };
-    }
-    if let kw: int = p.cur.eat(TokenKind.Continue) {
-        return ContinueExpr { span: p.span_from(Mark { idx: kw }), kw: kw };
-    }
-    if (p.cur.at(TokenKind.Map) && p.cur.nth_is(1, TokenKind.LBrace)) {
-        if let map_kw: int = p.cur.eat(TokenKind.Map) {
-            if let l: int = p.cur.eat(TokenKind.LBrace) {
-                return parse_map_literal(p, map_kw, l);
-            }
-        }
-    }
-    // `env.NAME` sugar; `env.get(...)` is an ordinary path.
-    if (
-        p.cur.at(TokenKind.Env)
-            && p.cur.nth_is(1, TokenKind.Dot)
+    match (p.cur.kind(0)) {
+        TokenKind.BacktickStart => parse_backtick_string(p, eat_checked(p)),
+        TokenKind.Throw => throw_expr(p, eat_checked(p), r),
+        TokenKind.Return => return_expr(p, eat_checked(p), r),
+        TokenKind.Break => {
+            let kw = eat_checked(p);
+            BreakExpr { span: p.span_from(Mark { idx: kw }), kw: kw }
+        },
+        TokenKind.Continue => {
+            let kw = eat_checked(p);
+            ContinueExpr { span: p.span_from(Mark { idx: kw }), kw: kw }
+        },
+        TokenKind.Map if p.cur.nth_is(1, TokenKind.LBrace) => {
+            let map_kw = eat_checked(p);
+            parse_map_literal(p, map_kw, eat_checked(p))
+        },
+        // `env.NAME` sugar; `env.get(...)` is an ordinary path.
+        TokenKind.Env
+            if p.cur.nth_is(1, TokenKind.Dot)
             && p.cur.nth_is(2, TokenKind.Word)
-            && !p.cur.nth_is(3, TokenKind.LParen)
-    ) {
-        if let env: int = p.cur.eat(TokenKind.Env) {
-            if let dot: int = p.cur.eat(TokenKind.Dot) {
-                let name = p.expect_name(KindSet.of([TokenKind.Word]), "identifier after 'env.'");
-                return EnvAccessExpr {
-                    span: p.span_from(Mark { idx: env }),
-                    env: env,
-                    dot: dot,
-                    name: name,
-                };
+            && !p.cur.nth_is(3, TokenKind.LParen) => env_access_expr(p, eat_checked(p)),
+        TokenKind.If => if_expr(p, eat_checked(p), r),
+        TokenKind.Match => match_expr(p, eat_checked(p), r),
+        TokenKind.LParen => paren_expr(p, r),
+        TokenKind.LBracket => parse_array_literal(p, eat_checked(p)),
+        TokenKind.LBrace => {
+            let map = looks_like_map(p.cur);
+            let l = eat_checked(p);
+            if (map) {
+                parse_map_literal(p, null, l)
+            } else {
+                block(p, l)
             }
-        }
+        },
+        TokenKind.Less if looks_like_generic_lambda(p.cur) => generic_lambda(p, eat_checked(p)),
+        _ => {
+            let head = p.cur.eat_in(EXPR_NAME)
+                ?? return p.missing("expression");
+            parse_path_expr(p, head)
+        },
     }
-    if let kw: int = p.cur.eat(TokenKind.If) {
-        return if_expr(p, kw, r);
-    }
-    if let kw: int = p.cur.eat(TokenKind.Match) {
-        return match_expr(p, kw, r);
-    }
-    // In a match guard, `(x) => ...` is the guard's last operand and the arm's
-    // arrow, not a lambda.
-    let guard_close = if (r.match_guard && p.cur.at(TokenKind.LParen)) {
+}
+
+// port: baml_parser/src/expr.rs::primary (the `throw` arm) @ d9be6853b
+// `throw payload` after its keyword.
+function throw_expr(p: Parser, kw: int, r: Restrictions) -> ThrowExpr throws never {
+    let payload = if (at_statement_end(p.cur)) {
+        p.missing("expression after 'throw'")
+    } else {
+        expr(p, Restrictions { ...r, no_catch: true })
+    };
+    ThrowExpr { span: p.span_from(Mark { idx: kw }), kw: kw, payload: payload }
+}
+
+// port: baml_parser/src/expr.rs::primary (the `return` arm) @ d9be6853b
+// `return` or `return value` after its keyword. `return x catch ...` returns
+// the caught value: a `return` cannot throw, so the clause can only be the
+// value's.
+function return_expr(p: Parser, kw: int, r: Restrictions) -> ReturnExpr throws never {
+    let value = if (at_statement_end(p.cur)) {
+        null
+    } else {
+        ok(expr(p, r))
+    };
+    ReturnExpr { span: p.span_from(Mark { idx: kw }), kw: kw, value: value }
+}
+
+// port: baml_parser/src/expr.rs::primary (the `env.NAME` arm) @ d9be6853b
+// `env.NAME` after `env`; the caller saw the `.` and the name.
+function env_access_expr(p: Parser, env: int) -> EnvAccessExpr throws never {
+    let dot = eat_checked(p);
+    let name = p.expect_name(KindSet.of([TokenKind.Word]), "identifier after 'env.'");
+    EnvAccessExpr { span: p.span_from(Mark { idx: env }), env: env, dot: dot, name: name }
+}
+
+// port: baml_parser/src/expr.rs::primary (the `(` arm) @ d9be6853b
+// A lambda, a qualified projection, or a parenthesized expression or tuple.
+// In a match guard, `(x) => ...` is the guard's last operand and the arm's
+// arrow, not a lambda.
+function paren_expr(p: Parser, r: Restrictions) -> AnyExpr throws never {
+    let guard_close = if (r.match_guard) {
         matching_close(p.cur, p.cur.pos)
     } else {
         null
     };
-    let lambda = p.cur.at(TokenKind.LParen)
-        && looks_like_lambda(p.cur)
+    let lambda = looks_like_lambda(p.cur)
         && !(guard_close != null && p.cur.kind_at_sig(guard_close + 1) == TokenKind.FatArrow);
-    let projection = p.cur.at(TokenKind.LParen) && !lambda && looks_like_qualified_projection(p.cur);
-    if let l: int = p.cur.eat(TokenKind.LParen) {
-        if (lambda) {
-            return parse_lambda_expr(p, null, l);
-        }
-        if (projection) {
-            return qualified_path_expr(p, l);
-        }
-        return paren_or_tuple(p, l);
+    let projection = !lambda && looks_like_qualified_projection(p.cur);
+    let l = eat_checked(p);
+    if (lambda) {
+        return parse_lambda_expr(p, null, l);
     }
-    if let l: int = p.cur.eat(TokenKind.LBracket) {
-        return parse_array_literal(p, l);
+    if (projection) {
+        return qualified_path_expr(p, l);
     }
-    let map = p.cur.at(TokenKind.LBrace) && looks_like_map(p.cur);
-    if let l: int = p.cur.eat(TokenKind.LBrace) {
-        return if (map) {
-            parse_map_literal(p, null, l)
-        } else {
-            block(p, l)
-        };
-    }
-    let generic_lt = if (p.cur.at(TokenKind.Less) && looks_like_generic_lambda(p.cur)) {
-        p.cur.eat(TokenKind.Less)
-    } else {
-        null
+    paren_or_tuple(p, l)
+}
+
+// port: baml_parser/src/expr.rs::primary (the generic lambda arm) @ d9be6853b
+// `<T>(x) -> ...` after its `<`. Lambdas are function values and cannot
+// declare generic parameters: the list is parsed for its diagnostics and kept
+// as a `Bogus`.
+function generic_lambda(p: Parser, lt: int) -> AnyExpr throws never {
+    let error = InvalidSyntax {
+        message: "a lambda cannot declare generic parameters",
+        range: p.cur.token_range(lt),
     };
-    if let lt: int = generic_lt {
-        // Lambdas are function values and cannot declare generic parameters: the
-        // list is parsed for its diagnostics and kept as a `Bogus`.
-        let error = InvalidSyntax {
-            message: "a lambda cannot declare generic parameters",
-            range: p.cur.token_range(lt),
-        };
-        p.discard((p) -> {
-            parse_generic_param_list(p, lt);
-        });
-        let rejected = p.bogus_since(Mark { idx: lt }, error);
-        if let l: int = p.cur.eat(TokenKind.LParen) {
-            return parse_lambda_expr(p, rejected, l);
-        }
-        return rejected;
+    p.discard((p) -> {
+        parse_generic_param_list(p, lt);
+    });
+    let rejected = p.bogus_since(Mark { idx: lt }, error);
+    if let l: int = p.cur.eat(TokenKind.LParen) {
+        return parse_lambda_expr(p, rejected, l);
     }
-    if let head: int = p.cur.eat_in(EXPR_NAME) {
-        return parse_path_expr(p, head);
-    }
-    p.missing("expression")
+    rejected
 }
 
 // port: baml_parser/src/expr.rs::impl Parse for PathExpr @ d9be6853b
@@ -760,66 +817,81 @@ function object_literal(
     l: int,
 ) -> ObjectLiteral throws never {
     let members = p.members(TokenKind.RBrace, STATEMENT_KEYWORD, OBJECT_MEMBER_START, (p) -> Member<AnyObjectMember>? {
-        let member_mark = p.cur.mark();
         if let dots: int = p.cur.eat(TokenKind.DotDotDot) {
-            let value = operand(p, Restrictions.empty());
-            let comma = p.cur.eat(TokenKind.Comma);
-            return Member {
-                item: SpreadElement {
-                    span: p.span_from(member_mark),
-                    dots: dots,
-                    value: value,
-                    comma: comma,
-                },
-                missing_sep: if (comma == null) {
-                    "',' or '}' after spread element"
-                } else {
-                    null
-                },
-            };
+            return spread_member(p, dots);
         }
-        let key: AnyObjectKey = if let head: int = p.cur.eat_in(EXPR_NAME) {
-            dotted_name(p, head, IDENT, "identifier")
-        } else if let lit: StringLit = string_lit(p, StringSite.Expr) {
-            lit
-        } else if let open: int = p.cur.eat(TokenKind.BacktickStart) {
-            parse_backtick_string(p, open)
-        } else {
-            p.unexpected("field name, spread element, or '}'");
-            return null;
-        };
-        let shorthand = key is DottedName
-            && !key.segments
-            && (p.cur.at(TokenKind.Comma) || p.cur.at(TokenKind.RBrace));
-        let colon = if (shorthand) {
-            null
-        } else {
-            p.cur.eat(TokenKind.Colon)
-        };
-        let value: FieldValue? = null;
-        if (colon != null) {
-            let field_value = if (p.cur.at_in(STATEMENT_KEYWORD) || !at_expression_start(p.cur)) {
-                p.missing("field value")
-            } else {
-                expr(p, Restrictions.empty())
-            };
-            value = FieldValue { colon: colon, value: field_value };
-        }
-        if (!shorthand && value == null) {
-            p.unexpected("':'");
-        }
-        let comma = p.cur.eat(TokenKind.Comma);
-        Member {
-            item: ObjectField { span: p.span_from(member_mark), key: key, value: value, comma: comma },
-            missing_sep: if (comma == null) {
-                "',' or '}' after object field"
-            } else {
-                null
-            },
-        }
+        object_field_member(p)
     });
     let close = p.expect(TokenKind.RBrace);
     ObjectLiteral { span: p.span_from(mark), ctor: ctor, l: l, members: members, r: close }
+}
+
+// port: baml_parser/src/expr.rs::object_literal (the spread member) @ d9be6853b
+// `...value` after its `...`.
+function spread_member(p: Parser, dots: int) -> Member<AnyObjectMember> throws never {
+    let value = operand(p, Restrictions.empty());
+    let comma = p.cur.eat(TokenKind.Comma);
+    Member {
+        item: SpreadElement {
+            span: p.span_from(Mark { idx: dots }),
+            dots: dots,
+            value: value,
+            comma: comma,
+        },
+        missing_sep: if (comma == null) {
+            "',' or '}' after spread element"
+        } else {
+            null
+        },
+    }
+}
+
+// port: baml_parser/src/expr.rs::object_literal (the field member) @ d9be6853b
+// `key: value`, or a lone `key` before `,` or `}` (shorthand); null (reported)
+// when no key begins here.
+function object_field_member(p: Parser) -> Member<AnyObjectMember>? throws never {
+    let member_mark = p.cur.mark();
+    let key: AnyObjectKey = if let head: int = p.cur.eat_in(EXPR_NAME) {
+        dotted_name(p, head, IDENT, "identifier")
+    } else if let lit: StringLit = string_lit(p, StringSite.Expr) {
+        lit
+    } else if let open: int = p.cur.eat(TokenKind.BacktickStart) {
+        parse_backtick_string(p, open)
+    } else {
+        p.unexpected("field name, spread element, or '}'");
+        return null;
+    };
+    let shorthand = key is DottedName && !key.segments && (p.cur.at(TokenKind.Comma) || p.cur.at(TokenKind.RBrace));
+    let value = if (shorthand) {
+        null
+    } else {
+        field_value(p)
+    };
+    let comma = p.cur.eat(TokenKind.Comma);
+    Member {
+        item: ObjectField { span: p.span_from(member_mark), key: key, value: value, comma: comma },
+        missing_sep: if (comma == null) {
+            "',' or '}' after object field"
+        } else {
+            null
+        },
+    }
+}
+
+// port: baml_parser/src/expr.rs::object_literal (the field value) @ d9be6853b
+// `: value` after a non-shorthand key; null (reported) without the `:`.
+function field_value(p: Parser) -> FieldValue? throws never {
+    let colon = p.cur.eat(TokenKind.Colon);
+    if (colon == null) {
+        p.unexpected("':'");
+        return null;
+    }
+    let value = if (p.cur.at_in(STATEMENT_KEYWORD) || !at_expression_start(p.cur)) {
+        p.missing("field value")
+    } else {
+        expr(p, Restrictions.empty())
+    };
+    FieldValue { colon: colon, value: value }
 }
 
 // ----- lambdas ------------------------------------------------------------------------

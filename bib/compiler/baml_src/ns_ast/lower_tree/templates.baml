@@ -494,60 +494,90 @@ function strip_edge(flat: Flat[], strip: Strip, at_end: bool) -> void throws nev
 
 // port: baml_compiler2_ast/src/lower_tree/templates.rs::alone_on_line @ d9be6853b
 // The strips for the tag at `tag`, or null when something other than blanks
-// shares its line. Backwards to the previous line break or the start of the
-// literal; forwards to the next line break (stripped too) or the end.
+// shares its line.
 function alone_on_line(flat: Flat[], tag: int) -> (Strip, Strip)? throws never {
-    let blank = (text: string) -> bool {
-        text.chars().every((c) -> {
-            c == " " || c == "\t"
-        })
-    };
-    let before: Strip = null;
-    for (let j = tag - 1; j >= 0; j -= 1) {
-        let part = flat[j];
-        if (!(part is FlatText)) {
-            return null;
-        }
-        let text = part.value;
-        let newline = text.last_index_of("\n");
-        if (newline != null) {
-            let tail = text.slice(newline + 1, text.length());
-            if (!blank(tail)) {
-                return null;
-            }
-            if (tail) {
-                before = (j, tail.length());
-            }
-            break;
-        }
-        if (!blank(text)) {
-            return null;
-        }
-        if (text) {
-            before = (j, text.length());
-        }
+    let before = blanks_before(flat, tag);
+    if (before is SharedLine) {
+        return null;
     }
-    let after: Strip = null;
-    for (let j = tag + 1; j < flat.length(); j += 1) {
-        let part = flat[j];
-        if (!(part is FlatText)) {
-            return null;
-        }
-        let text = part.value;
-        let newline = text.index_of("\n");
-        if (newline != null) {
-            if (!blank(text.slice(0, newline))) {
-                return null;
-            }
-            after = (j, newline + 1);
-            break;
-        }
-        if (!blank(text)) {
-            return null;
-        }
-        if (text) {
-            after = (j, text.length());
-        }
+    let after = blanks_after(flat, tag);
+    if (after is SharedLine) {
+        return null;
     }
     (before, after)
+}
+
+// port: baml_compiler2_ast/src/lower_tree/templates.rs::alone_on_line (the result of one side) @ d9be6853b
+// deviation: Rust returns `None` from `alone_on_line` where a side meets
+// something other than blanks; here that side says so with this value.
+class SharedLine {
+}
+
+// port: baml_compiler2_ast/src/lower_tree/templates.rs::alone_on_line (backwards) @ d9be6853b
+// The strip before the tag at `tag`: its blanks back to the previous line
+// break or the start of the literal.
+function blanks_before(flat: Flat[], tag: int) -> Strip | SharedLine throws never {
+    let strip: Strip = null;
+    for (let j = tag - 1; j >= 0; j -= 1) {
+        let text = match (flat[j]) {
+            let part: FlatText => part.value,
+            _ => {
+                return SharedLine {};
+            },
+        };
+        let newline = text.last_index_of("\n");
+        let tail = if (newline != null) {
+            text.slice(newline + 1, text.length())
+        } else {
+            text
+        };
+        if (!only_spaces_and_tabs(tail)) {
+            return SharedLine {};
+        }
+        if (tail) {
+            strip = (j, tail.length());
+        }
+        if (newline != null) {
+            return strip;
+        }
+    }
+    strip
+}
+
+// port: baml_compiler2_ast/src/lower_tree/templates.rs::alone_on_line (forwards) @ d9be6853b
+// The strip after the tag at `tag`: its blanks up to and including the next
+// line break, or to the end of the literal.
+function blanks_after(flat: Flat[], tag: int) -> Strip | SharedLine throws never {
+    let strip: Strip = null;
+    for (let j = tag + 1; j < flat.length(); j += 1) {
+        let text = match (flat[j]) {
+            let part: FlatText => part.value,
+            _ => {
+                return SharedLine {};
+            },
+        };
+        let newline = text.index_of("\n");
+        let head = if (newline != null) {
+            text.slice(0, newline)
+        } else {
+            text
+        };
+        if (!only_spaces_and_tabs(head)) {
+            return SharedLine {};
+        }
+        if (newline != null) {
+            return (j, newline + 1);
+        }
+        if (text) {
+            strip = (j, text.length());
+        }
+    }
+    strip
+}
+
+// port: baml_compiler2_ast/src/lower_tree/templates.rs::alone_on_line (blank) @ d9be6853b
+function only_spaces_and_tabs(text: string) -> bool throws never {
+    text.chars().every((c) -> {
+        c == " " || c == "\t"
+    })
 }

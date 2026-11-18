@@ -37,66 +37,7 @@ function lower_file(
     let out: Item[] = [];
     let registrations: TestRegistration[] = [];
     for (let item in tree.file.items) {
-        match (item) {
-            let id: root.syntax.FunctionDef => {
-                let func = items.function_(id, null);
-                if (func) {
-                    let no_owner_generics: string[] = [];
-                    let companions = expand_companions(func, null, no_owner_generics);
-                    out.push(ItemFunction { value: func });
-                    for (let companion in companions) {
-                        out.push(ItemFunction { value: companion });
-                    }
-                }
-            },
-            let id: root.syntax.ClassDef => {
-                let lowered = items.class_(id);
-                if (lowered) {
-                    out.push(ItemClass { value: lowered.0 });
-                    for (let imp in lowered.1) {
-                        out.push(ItemImplementsFor { value: imp });
-                    }
-                }
-            },
-            let id: root.syntax.EnumDef => {
-                if let def: EnumDef = items.enum_def(id) {
-                    out.push(ItemEnum { value: def });
-                }
-            },
-            let id: root.syntax.InterfaceDef => {
-                if let def: InterfaceDef = items.interface_(id) {
-                    out.push(ItemInterface { value: def });
-                }
-            },
-            let id: root.syntax.ImplementsFor => {
-                if let def: ImplementsForDef = items.implements_for(id) {
-                    out.push(ItemImplementsFor { value: def });
-                }
-            },
-            let id: root.syntax.TypeAliasDef => {
-                if let def: TypeAliasDef = items.type_alias(id) {
-                    out.push(ItemTypeAlias { value: def });
-                }
-            },
-            let id: root.syntax.LetItem => {
-                if let def: LetDef = items.top_level_let(id) {
-                    out.push(ItemLet { value: def });
-                }
-            },
-            // `let type` binds a runtime type for the rest of a block, and a file
-            // has no block for it to bind in.
-            let id: root.syntax.TypeBindingStmt => {
-                items.diags.push(LoweringDiagnosticTopLevelLetType { span: v.range(id.span) });
-            },
-            let id: root.syntax.ClientValueDef => {
-                out.push(ItemLet { value: items.client_(id) });
-            },
-            let id: root.syntax.TestDef => {
-                root.base.push_some(registrations, items.test_registration(id));
-            },
-            let id: root.syntax.RemovedItem => items.removed_item(id),
-            root.syntax.Bogus => {},
-        }
+        items.lower_item(item, out, registrations);
     }
     if (registrations) {
         let init_fn = synthesize_init_test_function(registrations, file_path, test_owner, items.diags, items.env_var_refs);
@@ -121,6 +62,77 @@ class Items {
     surface: TopLevelLetSurface,
     diags: LoweringDiagnostic[],
     env_var_refs: EnvVarRef[],
+
+    // port: baml_compiler2_ast/src/lower_tree/items.rs::lower_file_on (one item) @ d9be6853b
+    // Lower one file-scope item onto `out`; a test's registration goes to
+    // `registrations` for the file's `$init_test` registrar instead.
+    function lower_item(
+        self,
+        item: root.syntax.AnyItem,
+        out: Item[],
+        registrations: TestRegistration[],
+    ) -> void throws never {
+        match (item) {
+            let id: root.syntax.FunctionDef => {
+                let func = self.function_(id, null);
+                if (func) {
+                    let no_owner_generics: string[] = [];
+                    let companions = expand_companions(func, null, no_owner_generics);
+                    out.push(ItemFunction { value: func });
+                    for (let companion in companions) {
+                        out.push(ItemFunction { value: companion });
+                    }
+                }
+            },
+            let id: root.syntax.ClassDef => {
+                let lowered = self.class_(id);
+                if (lowered) {
+                    out.push(ItemClass { value: lowered.0 });
+                    for (let imp in lowered.1) {
+                        out.push(ItemImplementsFor { value: imp });
+                    }
+                }
+            },
+            let id: root.syntax.EnumDef => {
+                if let def: EnumDef = self.enum_def(id) {
+                    out.push(ItemEnum { value: def });
+                }
+            },
+            let id: root.syntax.InterfaceDef => {
+                if let def: InterfaceDef = self.interface_(id) {
+                    out.push(ItemInterface { value: def });
+                }
+            },
+            let id: root.syntax.ImplementsFor => {
+                if let def: ImplementsForDef = self.implements_for(id) {
+                    out.push(ItemImplementsFor { value: def });
+                }
+            },
+            let id: root.syntax.TypeAliasDef => {
+                if let def: TypeAliasDef = self.type_alias(id) {
+                    out.push(ItemTypeAlias { value: def });
+                }
+            },
+            let id: root.syntax.LetItem => {
+                if let def: LetDef = self.top_level_let(id) {
+                    out.push(ItemLet { value: def });
+                }
+            },
+            // `let type` binds a runtime type for the rest of a block, and a file
+            // has no block for it to bind in.
+            let id: root.syntax.TypeBindingStmt => {
+                self.diags.push(LoweringDiagnosticTopLevelLetType { span: self.v.range(id.span) });
+            },
+            let id: root.syntax.ClientValueDef => {
+                out.push(ItemLet { value: self.client_(id) });
+            },
+            let id: root.syntax.TestDef => {
+                root.base.push_some(registrations, self.test_registration(id));
+            },
+            let id: root.syntax.RemovedItem => self.removed_item(id),
+            root.syntax.Bogus => {},
+        }
+    }
 
     // port: baml_compiler2_ast/src/lower_tree/items.rs::Items::member_span @ d9be6853b
     // The span the rowan lowering gave a member: from its first own token

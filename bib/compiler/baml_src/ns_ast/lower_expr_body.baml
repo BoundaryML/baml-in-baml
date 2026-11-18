@@ -1026,10 +1026,61 @@ function synthesize_llm_spec_body(
     span: root.syntax.TextRange,
 ) -> (ExprBody, AstSourceMap, TemplateSegment[], LoweringDiagnostic[], EnvVarRef[]) throws never {
     let ctx = LoweringContext.new();
-
     // spec_name: "Fn"
     let name_lit = ctx.alloc_expr(ExprLiteral { value: root.base.LiteralString { value: function_name } }, span);
+    let target = spec_target_function(
+        ctx,
+        function_name,
+        param_names,
+        generic_param_names,
+        owner_class_name,
+        owner_generic_param_names,
+        span,
+    );
+    let args_map = spec_args_map(ctx, param_names, span);
+    let (let prompt_lambda, let segments) = spec_prompt_template(ctx, source, span);
+    let toolbox = spec_toolbox(ctx, source, span);
+    let default_client = spec_default_client(ctx, client, source, span);
 
+    let type_args: TypeExpr[] = if (out_type != null) {
+        [out_type]
+    } else {
+        []
+    };
+    let spec_obj = ctx.alloc_expr(
+        ExprObject {
+            type_name: root.base.Path.compiler(["ai", "FunctionSpec"]),
+            type_args: type_args,
+            fields: [
+                ObjectExprField.explicit("spec_name", name_lit),
+                ObjectExprField.explicit("target_function", target),
+                ObjectExprField.explicit("args", args_map),
+                ObjectExprField.explicit("prompt_template", prompt_lambda),
+                ObjectExprField.explicit("toolbox", toolbox),
+                ObjectExprField.explicit("default_client", default_client),
+            ],
+            spreads: [],
+        },
+        span,
+    );
+
+    let (let body, let source_map, let diagnostics, let env_var_refs) = ctx.finish(spec_obj);
+    (body, source_map, segments, diagnostics, env_var_refs)
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (target_function) @ d9be6853b
+// The function the spec stands for: `self.f` when a method's first
+// parameter is `self`, `Owner.f` for another method, else `f`; with the
+// function's generics applied.
+function spec_target_function(
+    ctx: LoweringContext,
+    function_name: string,
+    param_names: string[],
+    generic_param_names: string[],
+    owner_class_name: string?,
+    owner_generic_param_names: string[],
+    span: root.syntax.TextRange,
+) -> int throws never {
     let binds_receiver = owner_class_name != null && param_names.at(0) == "self";
     let target = if (binds_receiver) {
         let receiver = ctx.alloc_expr(ExprPath { value: root.base.Path.new(["self"]) }, span);
@@ -1049,172 +1100,54 @@ function synthesize_llm_spec_body(
         owner_class_name != null && !binds_receiver,
         span,
     );
-    if (target_args.length() > 0) {
-        target = ctx.alloc_expr(ExprGenericApply { base: target, type_args: target_args }, span);
+    if (target_args.length() == 0) {
+        return target;
     }
+    ctx.alloc_expr(ExprGenericApply { base: target, type_args: target_args }, span)
+}
 
-    // args: { "p": p, ... }
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (args) @ d9be6853b
+// args: { "p": p, ... }
+function spec_args_map(
+    ctx: LoweringContext,
+    param_names: string[],
+    span: root.syntax.TextRange,
+) -> int throws never {
     let entries = param_names.map((name) -> {
         let key = ctx.alloc_expr(ExprLiteral { value: root.base.LiteralString { value: name } }, span);
         let value = ctx.alloc_expr(ExprPath { value: root.base.Path.new([name]) }, span);
         MapExprEntry.explicit(key, value)
     });
-    let args_map = ctx.alloc_expr(ExprMap { entries: entries }, span);
+    ctx.alloc_expr(ExprMap { entries: entries }, span)
+}
 
-    // prompt_template: ( __spec_output_format: ai.OutputFormat) -> ai.Prompt { ... }
-    //
-    // The parameter's leading-space name keeps a function parameter named
-    // `output_format` visible to `${output_format}`. The synthesized `let ctx`
-    // sits at an empty range at the literal's start, before every reference,
-    // since binding references are checked against their `let`'s window.
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (prompt_template) @ d9be6853b
+// prompt_template: ( __spec_output_format: ai.OutputFormat) -> ai.Prompt { ... }
+//
+// The parameter's leading-space name keeps a function parameter named
+// `output_format` visible to `${output_format}`. Returns the lambda and the
+// flattened template's segments.
+function spec_prompt_template(
+    ctx: LoweringContext,
+    source: LlmSpecSource,
+    span: root.syntax.TextRange,
+) -> (int, TemplateSegment[]) throws never {
     let of_param_name = " __spec_output_format";
     let prompt_lambda_span = source.prompt_span();
     let prompt_start = root.syntax.TextRange.empty(prompt_lambda_span.start);
-    let of_ref = ctx.alloc_expr(ExprPath { value: root.base.Path.new([of_param_name]) }, prompt_start);
-    let spec_ctx_obj = ctx.alloc_expr(
-        ExprObject {
-            type_name: root.base.Path.compiler(["ai", "internal", "SpecCtx"]),
-            type_args: [],
-            fields: [ObjectExprField.explicit("_output_format", of_ref)],
-            spreads: [],
-        },
-        prompt_start,
-    );
-    let ctx_pat = ctx.alloc_pattern(PatternBind { name: "ctx", subpat: null }, prompt_start);
-    let let_ctx = ctx.alloc_stmt(
-        StmtLet {
-            pattern: ctx_pat,
-            initializer: spec_ctx_obj,
-            origin: LetOrigin.Source,
-            else_branch: null,
-        },
-        prompt_start,
-    );
+    let let_ctx = spec_ctx_let(ctx, of_param_name, prompt_start);
     // Flatten the template exactly like the public `prompt` tag; rewrite the
     // prompt-local constructors before name resolution.
     let segments = source.prompt_segments(ctx);
-    // `role(...)` and `cache(...)` are prompt-local: a bare call lowers to
-    // `ai.internal.make_role` / `ai.internal.make_cache`. `cache`'s one
-    // parameter is defaulted, so the positional `cache(x)` is labelled
-    // `args = x`.
-    // BUG (upstream): both are recognized by spelling before resolution, so a
-    // writer's own `role` or `cache` is never called from a prompt.
-    let prompt_local_callees: (int, int, root.base.Path)[] = [];
-    for (let call = 0; call < ctx.exprs.length(); call += 1) {
-        let found = match (ctx.exprs[call]) {
-            let c: ExprCall => match (ctx.exprs[c.callee]) {
-                let path: ExprPath if path.value.segments.length() == 1 => {
-                    match (path.value.segments[0]) {
-                        "role" => {
-                            (
-                                call,
-                                c.callee,
-                                root.base.Path.compiler(["ai", "internal", "make_role"]),
-                            )
-                        },
-                        "cache" => {
-                            (
-                                call,
-                                c.callee,
-                                root.base.Path.compiler(["ai", "internal", "make_cache"]),
-                            )
-                        },
-                        _ => null,
-                    }
-                },
-                _ => null,
-            },
-            _ => null,
-        };
-        if (found != null) {
-            prompt_local_callees.push(found);
-        }
-    }
-    for (let entry in prompt_local_callees) {
-        let (let call, let callee, let callee_target) = entry;
-        let is_cache = callee_target.leaf() == "make_cache";
-        ctx.exprs[callee] = ExprPath { value: callee_target };
-        if (is_cache) {
-            if let c: ExprCall = ctx.exprs[call] {
-                if (c.args.length() == 1 && c.args[0].label == null) {
-                    c.args[0].label = "args";
-                }
-            }
-        }
-    }
+    rewrite_prompt_local_calls(ctx);
 
     let prev_synth = ctx.synthesizing;
     ctx.synthesizing = true;
     let tagged_expr = ctx.elaborate_tagged_body(segments, prompt_lambda_span);
     ctx.synthesizing = prev_synth;
 
-    // Evaluate the flattened template once before reading its two arrays.
-    let tagged_name = " __spec_tagged_prompt";
-    let tagged_pat = ctx.alloc_pattern(PatternBind { name: tagged_name, subpat: null }, prompt_start);
-    let let_tagged = ctx.alloc_stmt(
-        StmtLet {
-            pattern: tagged_pat,
-            initializer: tagged_expr,
-            origin: LetOrigin.Source,
-            else_branch: null,
-        },
-        prompt_start,
-    );
-    let parts_base = ctx.alloc_expr(ExprPath { value: root.base.Path.new([tagged_name]) }, prompt_start);
-    let parts = ctx.alloc_expr(ExprMemberAccess { base: parts_base, member: "parts" }, prompt_start);
-    let values_base = ctx.alloc_expr(ExprPath { value: root.base.Path.new([tagged_name]) }, prompt_start);
-    let values = ctx.alloc_expr(ExprMemberAccess { base: values_base, member: "values" }, prompt_start);
-    let assemble_callee = ctx.alloc_expr(
-        ExprPath { value: root.base.Path.compiler(["ai", "internal", "assemble_llm_prompt"]) },
-        prompt_start,
-    );
-    let prompt_ast = ctx.alloc_expr(
-        ExprCall {
-            callee: assemble_callee,
-            type_args: [],
-            args: [CallArg.positional(parts), CallArg.positional(values)],
-        },
-        prompt_start,
-    );
-    let block_body = ctx.alloc_expr(
-        ExprBlock { stmts: [let_ctx, let_tagged], tail_expr: prompt_ast },
-        prompt_lambda_span,
-    );
-    // Wrap the whole template body: a user expression in the prompt may throw,
-    // and the stored `prompt_template` boundary is typed
-    // `throws ai.errors.PromptRenderError`, so anything raised while rendering
-    // is wrapped into that one typed failure.
-    let err_name = " __prompt_render_err";
-    let err_binding = ctx.alloc_pattern(PatternBind { name: err_name, subpat: null }, prompt_start);
-    let wildcard = ctx.alloc_pattern(PatternWildcard {}, prompt_start);
-    let message = ctx.alloc_expr(
-        ExprLiteral { value: root.base.LiteralString { value: "prompt template rendering threw" } },
-        prompt_start,
-    );
-    let cause = ctx.alloc_expr(ExprPath { value: root.base.Path.new([err_name]) }, prompt_start);
-    let render_error = ctx.alloc_expr(
-        ExprObject {
-            type_name: root.base.Path.compiler(["ai", "errors", "PromptRenderError"]),
-            type_args: [],
-            fields: [ObjectExprField.explicit("message", message), ObjectExprField.explicit("cause", cause)],
-            spreads: [],
-        },
-        prompt_start,
-    );
-    let throw_wrapped = ctx.alloc_expr(ExprThrow { value: render_error }, prompt_start);
-    let wrap_arm = ctx.alloc_catch_arm(CatchArm { pattern: wildcard, body: throw_wrapped }, prompt_start);
-    let lambda_body = ctx.alloc_expr(
-        ExprCatch {
-            base: block_body,
-            clause: CatchClause {
-                kind: CatchClauseKind.CatchAll,
-                binding: err_binding,
-                stack_trace_binding: null,
-                arms: [wrap_arm],
-            },
-        },
-        prompt_lambda_span,
-    );
+    let block_body = assemble_tagged_prompt(ctx, let_ctx, tagged_expr, prompt_start, prompt_lambda_span);
+    let lambda_body = wrap_prompt_render_error(ctx, block_body, prompt_start, prompt_lambda_span);
     let of_param = Param {
         name: of_param_name,
         type_expr: TypeExpr {
@@ -1246,9 +1179,193 @@ function synthesize_llm_spec_body(
         },
         prompt_lambda_span,
     );
-    // toolbox: ai.Toolbox.new([...])
+    (prompt_lambda, segments)
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (the `let ctx`) @ d9be6853b
+// `let ctx = ai.internal.SpecCtx { _output_format: <of_param_name> };`
+//
+// It sits at an empty range at the literal's start (`prompt_start`), before
+// every reference, since binding references are checked against their
+// `let`'s window.
+function spec_ctx_let(
+    ctx: LoweringContext,
+    of_param_name: string,
+    prompt_start: root.syntax.TextRange,
+) -> int throws never {
+    let of_ref = ctx.alloc_expr(ExprPath { value: root.base.Path.new([of_param_name]) }, prompt_start);
+    let spec_ctx_obj = ctx.alloc_expr(
+        ExprObject {
+            type_name: root.base.Path.compiler(["ai", "internal", "SpecCtx"]),
+            type_args: [],
+            fields: [ObjectExprField.explicit("_output_format", of_ref)],
+            spreads: [],
+        },
+        prompt_start,
+    );
+    let ctx_pat = ctx.alloc_pattern(PatternBind { name: "ctx", subpat: null }, prompt_start);
+    ctx.alloc_stmt(
+        StmtLet {
+            pattern: ctx_pat,
+            initializer: spec_ctx_obj,
+            origin: LetOrigin.Source,
+            else_branch: null,
+        },
+        prompt_start,
+    )
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (prompt-local callees) @ d9be6853b
+// `role(...)` and `cache(...)` are prompt-local: a bare call lowers to
+// `ai.internal.make_role` / `ai.internal.make_cache`. `cache`'s one
+// parameter is defaulted, so the positional `cache(x)` is labelled
+// `args = x`.
+// BUG (upstream): both are recognized by spelling before resolution, so a
+// writer's own `role` or `cache` is never called from a prompt.
+function rewrite_prompt_local_calls(ctx: LoweringContext) -> void throws never {
+    let rewrites: (int, int, root.base.Path)[] = [];
+    for (let call = 0; call < ctx.exprs.length(); call += 1) {
+        root.base.push_some(rewrites, prompt_local_call(ctx, call));
+    }
+    for (let entry in rewrites) {
+        let (let call, let callee, let callee_target) = entry;
+        ctx.exprs[callee] = ExprPath { value: callee_target };
+        if (callee_target.leaf() != "make_cache") {
+            continue;
+        }
+        if let c: ExprCall = ctx.exprs[call] {
+            if (c.args.length() == 1 && c.args[0].label == null) {
+                c.args[0].label = "args";
+            }
+        }
+    }
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (one prompt-local callee) @ d9be6853b
+// `(call, callee, target)` when expression `call` calls bare `role` or
+// `cache`, else null.
+function prompt_local_call(
+    ctx: LoweringContext,
+    call: int,
+) -> (int, int, root.base.Path)? throws never {
+    let c = match (ctx.exprs[call]) {
+        let c: ExprCall => c,
+        _ => {
+            return null;
+        },
+    };
+    let path = match (ctx.exprs[c.callee]) {
+        let path: ExprPath if path.value.segments.length() == 1 => path,
+        _ => {
+            return null;
+        },
+    };
+    let target = match (path.value.segments[0]) {
+        "role" => root.base.Path.compiler(["ai", "internal", "make_role"]),
+        "cache" => root.base.Path.compiler(["ai", "internal", "make_cache"]),
+        _ => {
+            return null;
+        },
+    };
+    (call, c.callee, target)
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (the prompt block) @ d9be6853b
+// `{ let ctx = ..; let tagged = <template>; ai.internal.assemble_llm_prompt(tagged.parts, tagged.values) }`:
+// the flattened template is evaluated once before its two arrays are read.
+function assemble_tagged_prompt(
+    ctx: LoweringContext,
+    let_ctx: int,
+    tagged_expr: int,
+    prompt_start: root.syntax.TextRange,
+    prompt_lambda_span: root.syntax.TextRange,
+) -> int throws never {
+    let tagged_name = " __spec_tagged_prompt";
+    let tagged_pat = ctx.alloc_pattern(PatternBind { name: tagged_name, subpat: null }, prompt_start);
+    let let_tagged = ctx.alloc_stmt(
+        StmtLet {
+            pattern: tagged_pat,
+            initializer: tagged_expr,
+            origin: LetOrigin.Source,
+            else_branch: null,
+        },
+        prompt_start,
+    );
+    let parts_base = ctx.alloc_expr(ExprPath { value: root.base.Path.new([tagged_name]) }, prompt_start);
+    let parts = ctx.alloc_expr(ExprMemberAccess { base: parts_base, member: "parts" }, prompt_start);
+    let values_base = ctx.alloc_expr(ExprPath { value: root.base.Path.new([tagged_name]) }, prompt_start);
+    let values = ctx.alloc_expr(ExprMemberAccess { base: values_base, member: "values" }, prompt_start);
+    let assemble_callee = ctx.alloc_expr(
+        ExprPath { value: root.base.Path.compiler(["ai", "internal", "assemble_llm_prompt"]) },
+        prompt_start,
+    );
+    let prompt_ast = ctx.alloc_expr(
+        ExprCall {
+            callee: assemble_callee,
+            type_args: [],
+            args: [CallArg.positional(parts), CallArg.positional(values)],
+        },
+        prompt_start,
+    );
+    ctx.alloc_expr(
+        ExprBlock { stmts: [let_ctx, let_tagged], tail_expr: prompt_ast },
+        prompt_lambda_span,
+    )
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (the render-error catch) @ d9be6853b
+// Wrap the whole template body: a user expression in the prompt may throw,
+// and the stored `prompt_template` boundary is typed
+// `throws ai.errors.PromptRenderError`, so anything raised while rendering
+// is wrapped into that one typed failure.
+function wrap_prompt_render_error(
+    ctx: LoweringContext,
+    block_body: int,
+    prompt_start: root.syntax.TextRange,
+    prompt_lambda_span: root.syntax.TextRange,
+) -> int throws never {
+    let err_name = " __prompt_render_err";
+    let err_binding = ctx.alloc_pattern(PatternBind { name: err_name, subpat: null }, prompt_start);
+    let wildcard = ctx.alloc_pattern(PatternWildcard {}, prompt_start);
+    let message = ctx.alloc_expr(
+        ExprLiteral { value: root.base.LiteralString { value: "prompt template rendering threw" } },
+        prompt_start,
+    );
+    let cause = ctx.alloc_expr(ExprPath { value: root.base.Path.new([err_name]) }, prompt_start);
+    let render_error = ctx.alloc_expr(
+        ExprObject {
+            type_name: root.base.Path.compiler(["ai", "errors", "PromptRenderError"]),
+            type_args: [],
+            fields: [ObjectExprField.explicit("message", message), ObjectExprField.explicit("cause", cause)],
+            spreads: [],
+        },
+        prompt_start,
+    );
+    let throw_wrapped = ctx.alloc_expr(ExprThrow { value: render_error }, prompt_start);
+    let wrap_arm = ctx.alloc_catch_arm(CatchArm { pattern: wildcard, body: throw_wrapped }, prompt_start);
+    ctx.alloc_expr(
+        ExprCatch {
+            base: block_body,
+            clause: CatchClause {
+                kind: CatchClauseKind.CatchAll,
+                binding: err_binding,
+                stack_trace_binding: null,
+                arms: [wrap_arm],
+            },
+        },
+        prompt_lambda_span,
+    )
+}
+
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (toolbox) @ d9be6853b
+// toolbox: ai.Toolbox.new([...]), a bare function reference in the list
+// wrapped in `ai.tool(...)`.
+function spec_toolbox(
+    ctx: LoweringContext,
+    source: LlmSpecSource,
+    span: root.syntax.TextRange,
+) -> int throws never {
     let wrap_bare_ref = (c: LoweringContext, id: int) -> int {
-        // A bare function reference: normalize through ai.tool().
         let tool_callee = c.alloc_expr(ExprPath { value: root.base.Path.compiler(["ai", "tools", "tool"]) }, span);
         c.alloc_expr(
             ExprCall { callee: tool_callee, type_args: [], args: [CallArg.positional(id)] },
@@ -1260,16 +1377,24 @@ function synthesize_llm_spec_body(
         ExprPath { value: root.base.Path.compiler(["ai", "tools", "Toolbox", "new"]) },
         span,
     );
-    let toolbox = ctx.alloc_expr(
+    ctx.alloc_expr(
         ExprCall { callee: toolbox_callee, type_args: [], args: [CallArg.positional(tool_list)] },
         span,
-    );
+    )
+}
 
-    // default_client: evaluated when the `@spec` function runs (each call of
-    // the LLM function), never during `$init`. A `"provider/model"` literal maps
-    // at compile time to a builtin constructor; anything else is wrapped in
-    // `ai.clients.resolve(selector, providers, prefixes)`.
-    let default_client = match (client) {
+// port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_llm_spec_body (default_client) @ d9be6853b
+// default_client: evaluated when the `@spec` function runs (each call of
+// the LLM function), never during `$init`. A `"provider/model"` literal maps
+// at compile time to a builtin constructor; anything else is wrapped in
+// `ai.clients.resolve(selector, providers, prefixes)`.
+function spec_default_client(
+    ctx: LoweringContext,
+    client: LlmClient,
+    source: LlmSpecSource,
+    span: root.syntax.TextRange,
+) -> int throws never {
+    match (client) {
         let provider: LlmClientProvider => {
             let model_lit = ctx.alloc_expr(
                 ExprLiteral { value: root.base.LiteralString { value: provider.model } },
@@ -1294,32 +1419,7 @@ function synthesize_llm_spec_body(
             let args = ctx.complete_client_resolve_call(resolve_callee, [CallArg.positional(inner)], span);
             ctx.alloc_expr(ExprCall { callee: resolve_callee, type_args: [], args: args }, span)
         },
-    };
-
-    let type_args: TypeExpr[] = if (out_type != null) {
-        [out_type]
-    } else {
-        []
-    };
-    let spec_obj = ctx.alloc_expr(
-        ExprObject {
-            type_name: root.base.Path.compiler(["ai", "FunctionSpec"]),
-            type_args: type_args,
-            fields: [
-                ObjectExprField.explicit("spec_name", name_lit),
-                ObjectExprField.explicit("target_function", target),
-                ObjectExprField.explicit("args", args_map),
-                ObjectExprField.explicit("prompt_template", prompt_lambda),
-                ObjectExprField.explicit("toolbox", toolbox),
-                ObjectExprField.explicit("default_client", default_client),
-            ],
-            spreads: [],
-        },
-        span,
-    );
-
-    let (let body, let source_map, let diagnostics, let env_var_refs) = ctx.finish(spec_obj);
-    (body, source_map, segments, diagnostics, env_var_refs)
+    }
 }
 
 // port: baml_compiler2_ast/src/lower_expr_body.rs::synthesize_shorthand_prefixes @ d9be6853b

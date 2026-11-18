@@ -1004,70 +1004,96 @@ function function_body(p: Parser, l: int, allow_llm_body: bool) -> AnyFunctionBo
 function parse_llm_body(p: Parser, l: int) -> LlmBody throws never {
     let mark = Mark { idx: l };
     let fields: AnyLlmField[] = [];
-    let has_client = false;
-    let has_prompt = false;
-    let has_tools = false;
     while (!p.cur.at(TokenKind.RBrace) && !p.cur.at_end()) {
         // A top-level keyword other than `client` means a `}` is missing.
         if (p.cur.at_in(TOP_LEVEL_KEYWORD) && !p.cur.at(TokenKind.Client)) {
             break;
         }
-        if (p.cur.at(TokenKind.Client) && has_client) {
-            p.unexpected("Duplicate 'client' field");
-        } else if (p.cur.at(TokenKind.Prompt) && has_prompt) {
-            p.unexpected("Duplicate 'prompt' field");
-        } else if (p.cur.at(TokenKind.Tools) && has_tools) {
-            p.unexpected("Duplicate 'tools' field");
-        }
-        let kind = p.cur.kind(0);
-        if (kind == TokenKind.Client) {
-            has_client = true;
-            fields.push(parse_client_field(p, p.cur.eat(TokenKind.Client) ?? 0));
-        } else if (kind == TokenKind.Prompt) {
-            has_prompt = true;
-            fields.push(parse_prompt_field(p, p.cur.eat(TokenKind.Prompt) ?? 0));
-        } else if (kind == TokenKind.Tools) {
-            has_tools = true;
-            fields.push(parse_tools_field(p, p.cur.eat(TokenKind.Tools) ?? 0));
-        } else if (at_removed_type_builder(p.cur)) {
-            fields.push(skip_removed_type_builder(p, p.cur.eat(TokenKind.TypeBuilder) ?? 0));
-        } else if (p.cur.at(TokenKind.Comma) || p.cur.at(TokenKind.Semicolon)) {
-            // Fields are separated by a newline; name the real requirement instead
-            // of letting the value scanner swallow the separator and misreport
-            // `prompt` as missing.
-            let sep = p.cur.text_at(0) ?? "";
-            let error = InvalidSyntax {
-                message: `unexpected \`${sep}\` between LLM function fields; separate \`client\` and \`prompt\` with a newline`,
-                range: p.cur.error_range(),
-            };
-            let sep_mark = p.cur.mark();
-            p.cur.skip();
-            fields.push(p.bogus_since(sep_mark, error));
-        } else {
-            // A name is quoted as written; anything else by its kind, so the
-            // message never embeds a whole string literal.
-            let found = if (kind == null) {
-                "EOF"
-            } else if (IDENT.contains(kind)) {
-                p.cur.text_at(0) ?? ""
-            } else {
-                found_name(kind)
-            };
-            fields.push(
-                p.bogus_one(
-                    `Only 'client', 'tools' and 'prompt' allowed in LLM function, found '${found}'`,
-                ),
-            );
-        }
+        fields.push(llm_field(p, fields));
     }
+    let has_client = fields.some((field) -> {
+        field is ClientField
+    });
     if (!has_client) {
         p.unexpected("LLM function missing 'client' field");
     }
+    let has_prompt = fields.some((field) -> {
+        field is PromptField
+    });
     if (!has_prompt) {
         p.unexpected("LLM function missing 'prompt' field");
     }
     let r = p.expect(TokenKind.RBrace);
     LlmBody { span: p.span_from(mark), l: l, fields: fields, r: r }
+}
+
+// port: baml_parser/src/items.rs::LlmBody::parse (one field) @ d9be6853b
+// The field at the cursor. `earlier` holds the body's fields so far: a second
+// `client`, `prompt` or `tools` is reported, then parsed like the first.
+function llm_field(p: Parser, earlier: AnyLlmField[]) -> AnyLlmField throws never {
+    let kind = p.cur.kind(0);
+    match (kind) {
+        TokenKind.Client => {
+            let duplicate = earlier.some((field) -> {
+                field is ClientField
+            });
+            if (duplicate) {
+                p.unexpected("Duplicate 'client' field");
+            }
+            parse_client_field(p, p.cur.eat(TokenKind.Client) ?? 0)
+        },
+        TokenKind.Prompt => {
+            let duplicate = earlier.some((field) -> {
+                field is PromptField
+            });
+            if (duplicate) {
+                p.unexpected("Duplicate 'prompt' field");
+            }
+            parse_prompt_field(p, p.cur.eat(TokenKind.Prompt) ?? 0)
+        },
+        TokenKind.Tools => {
+            let duplicate = earlier.some((field) -> {
+                field is ToolsField
+            });
+            if (duplicate) {
+                p.unexpected("Duplicate 'tools' field");
+            }
+            parse_tools_field(p, p.cur.eat(TokenKind.Tools) ?? 0)
+        },
+        _ => llm_non_field(p, kind),
+    }
+}
+
+// port: baml_parser/src/items.rs::LlmBody::parse (a token that starts no field) @ d9be6853b
+// A removed `type_builder` block, a stray separator, or anything else, each
+// recovered as one `Bogus`.
+function llm_non_field(p: Parser, kind: TokenKind?) -> Bogus throws never {
+    if (at_removed_type_builder(p.cur)) {
+        return skip_removed_type_builder(p, p.cur.eat(TokenKind.TypeBuilder) ?? 0);
+    }
+    if (p.cur.at(TokenKind.Comma) || p.cur.at(TokenKind.Semicolon)) {
+        // Fields are separated by a newline; name the real requirement instead
+        // of letting the value scanner swallow the separator and misreport
+        // `prompt` as missing.
+        let sep = p.cur.text_at(0) ?? "";
+        let error = InvalidSyntax {
+            message: `unexpected \`${sep}\` between LLM function fields; separate \`client\` and \`prompt\` with a newline`,
+            range: p.cur.error_range(),
+        };
+        let sep_mark = p.cur.mark();
+        p.cur.skip();
+        return p.bogus_since(sep_mark, error);
+    }
+    // A name is quoted as written; anything else by its kind, so the message
+    // never embeds a whole string literal.
+    let found = if (kind == null) {
+        "EOF"
+    } else if (IDENT.contains(kind)) {
+        p.cur.text_at(0) ?? ""
+    } else {
+        found_name(kind)
+    };
+    p.bogus_one(`Only 'client', 'tools' and 'prompt' allowed in LLM function, found '${found}'`)
 }
 
 // port: baml_parser/src/items.rs::ClientField::parse @ d9be6853b
@@ -1110,6 +1136,50 @@ function parse_prompt_field(p: Parser, kw: int) -> PromptField throws never {
     PromptField { span: p.span_from(mark), kw: kw, colon: colon, value: value }
 }
 
+// ----- item bodies ---------------------------------------------------------------------------
+
+// port: baml_parser/src/items.rs::class_def (member loop, shared with enum_def and interface_def) @ d9be6853b
+// The members of an enum, class or interface body after its `{`, up to its
+// `}` or to where `ends` says the closing brace is missing. A `@@` attribute
+// belongs to the item wherever it stands; `member` parses one member after
+// its docs, or returns null to leave the docs rejected and the token reported
+// as `unexpected`.
+function body_members<M>(
+    p: Parser,
+    ends: (Cursor) -> bool throws never,
+    member: (Parser, Mark, DocPart[]) -> M? throws never,
+    unexpected: string,
+) -> (M | BlockAttr | Bogus)[] throws never {
+    let members: (M | BlockAttr | Bogus)[] = [];
+    while (!p.cur.at(TokenKind.RBrace) && !p.cur.at_end() && !ends(p.cur)) {
+        let at = p.cur.eat(TokenKind.AtAt);
+        if (at != null) {
+            members.push(parse_block_attr(p, at));
+            continue;
+        }
+        let member_mark = p.cur.mark();
+        let docs = leading_docs(p);
+        if (p.cur.at(TokenKind.AtAt)) {
+            // The docs documented nothing; the attribute is the next member.
+            root.base.push_some(members, reject_docs(p, docs));
+            continue;
+        }
+        let parsed = member(p, member_mark, docs);
+        if (parsed != null) {
+            members.push(parsed);
+            continue;
+        }
+        // The docs preceded the next item or nothing, not a member.
+        root.base.push_some(members, reject_docs(p, docs));
+        // After trailing docs the body may be over: nothing to skip.
+        if (ends(p.cur) || p.cur.at(TokenKind.RBrace) || p.cur.at_end()) {
+            break;
+        }
+        members.push(p.bogus_one(unexpected));
+    }
+    members
+}
+
 // ----- enums ------------------------------------------------------------------------------
 
 // port: baml_parser/src/items.rs::enum_def @ d9be6853b
@@ -1120,45 +1190,17 @@ function enum_def(p: Parser, mark: Mark, docs: AnyDoc[], kw: int) -> EnumDef thr
     if (l is Missing) {
         return EnumDef { span: p.span_from(mark), docs: docs, kw: kw, name: name, l: l, members: [], r: l };
     }
-    let members: AnyEnumMember[] = [];
-    while (!p.cur.at(TokenKind.RBrace) && !p.cur.at_end()) {
-        // A top-level keyword means the closing brace is missing.
-        if (p.cur.at_in(TOP_LEVEL_KEYWORD)) {
-            break;
-        }
-        let at = p.cur.eat(TokenKind.AtAt);
-        if (at != null) {
-            members.push(parse_block_attr(p, at));
-            continue;
-        }
-        let member_docs = leading_docs(p);
-        if (p.cur.at(TokenKind.AtAt)) {
-            // The docs documented nothing; the attribute is the next member.
-            let rejected = reject_docs(p, member_docs);
-            if (rejected != null) {
-                members.push(rejected);
-            }
-            continue;
-        }
-        let name = if (p.cur.at_in(TOP_LEVEL_KEYWORD)) {
-            null
-        } else {
-            p.cur.eat_in(IDENT)
-        };
-        if (name != null) {
-            members.push(parse_enum_variant(p, member_docs, name));
-            continue;
-        }
-        let rejected = reject_docs(p, member_docs);
-        if (rejected != null) {
-            members.push(rejected);
-        }
-        // After trailing docs the body may be over: nothing to skip.
-        if (p.cur.at_in(TOP_LEVEL_KEYWORD) || p.cur.at(TokenKind.RBrace) || p.cur.at_end()) {
-            break;
-        }
-        members.push(p.bogus_one("Unexpected token in enum body"));
-    }
+    let members: AnyEnumMember[] = body_members(
+        p,
+        (cur) -> {
+            // A top-level keyword means the closing brace is missing.
+            cur.at_in(TOP_LEVEL_KEYWORD)
+        },
+        (p, _, member_docs) -> {
+            enum_member(p, member_docs)
+        },
+        "Unexpected token in enum body",
+    );
     let r = p.expect(TokenKind.RBrace);
     EnumDef {
         span: p.span_from(mark),
@@ -1169,6 +1211,17 @@ function enum_def(p: Parser, mark: Mark, docs: AnyDoc[], kw: int) -> EnumDef thr
         members: members,
         r: r,
     }
+}
+
+// port: baml_parser/src/items.rs::enum_def (one member after its docs) @ d9be6853b
+// A variant, or null when the token after the docs is not a variant name.
+function enum_member(p: Parser, docs: DocPart[]) -> EnumVariant? throws never {
+    if (p.cur.at_in(TOP_LEVEL_KEYWORD)) {
+        return null;
+    }
+    let name = p.cur.eat_in(IDENT)
+        ?? return null;
+    parse_enum_variant(p, docs, name)
 }
 
 // port: baml_parser/src/items.rs::EnumVariant::parse @ d9be6853b
@@ -1238,58 +1291,16 @@ function class_def(p: Parser, mark: Mark, docs: AnyDoc[], kw: int) -> ClassDef t
             r: l,
         };
     }
-    let members: AnyClassMember[] = [];
-    while (!p.cur.at(TokenKind.RBrace) && !p.cur.at_end()) {
-        if (class_body_ends(p.cur)) {
-            break;
-        }
-        // A `@@` attribute is the class's, wherever in the body it stands.
-        let at = p.cur.eat(TokenKind.AtAt);
-        if (at != null) {
-            members.push(parse_block_attr(p, at));
-            continue;
-        }
-        let member_mark = p.cur.mark();
-        let member_docs = leading_docs(p);
-        if (p.cur.at(TokenKind.AtAt)) {
-            // The docs documented nothing; the attribute is the next member.
-            let rejected = reject_docs(p, member_docs);
-            if (rejected != null) {
-                members.push(rejected);
-            }
-            continue;
-        }
-        let fn_kw = p.cur.eat(TokenKind.Function);
-        if (fn_kw != null) {
-            members.push(function_def(p, member_mark, member_docs, fn_kw));
-            continue;
-        }
-        let impl_kw = p.cur.eat_in(IMPLEMENTS_KW);
-        if (impl_kw != null) {
-            members.push(parse_implements_block(p, member_docs, impl_kw));
-            continue;
-        }
-        let ends = class_body_ends(p.cur);
-        let name = if (ends) {
-            null
-        } else {
-            p.cur.eat_in(MEMBER_NAME)
-        };
-        if (name != null) {
-            members.push(parse_field(p, member_docs, name));
-            continue;
-        }
-        // The docs preceded the next item or nothing, not a member.
-        let rejected = reject_docs(p, member_docs);
-        if (rejected != null) {
-            members.push(rejected);
-        }
-        // After trailing docs the body may be over: nothing to skip.
-        if (ends || p.cur.at(TokenKind.RBrace) || p.cur.at_end()) {
-            break;
-        }
-        members.push(p.bogus_one("Unexpected token in class body"));
-    }
+    let members: AnyClassMember[] = body_members(
+        p,
+        (cur) -> {
+            class_body_ends(cur)
+        },
+        (p, member_mark, member_docs) -> {
+            class_member(p, member_mark, member_docs)
+        },
+        "Unexpected token in class body",
+    );
     let r = p.expect(TokenKind.RBrace);
     ClassDef {
         span: p.span_from(mark),
@@ -1301,6 +1312,26 @@ function class_def(p: Parser, mark: Mark, docs: AnyDoc[], kw: int) -> ClassDef t
         members: members,
         r: r,
     }
+}
+
+// port: baml_parser/src/items.rs::class_def (one member after its docs) @ d9be6853b
+// A method, an `implements` block or a field, or null when the token after
+// the docs starts none of them.
+function class_member(p: Parser, mark: Mark, docs: DocPart[]) -> AnyClassMember? throws never {
+    let fn_kw = p.cur.eat(TokenKind.Function);
+    if (fn_kw != null) {
+        return function_def(p, mark, docs, fn_kw);
+    }
+    let impl_kw = p.cur.eat_in(IMPLEMENTS_KW);
+    if (impl_kw != null) {
+        return parse_implements_block(p, docs, impl_kw);
+    }
+    if (class_body_ends(p.cur)) {
+        return null;
+    }
+    let name = p.cur.eat_in(MEMBER_NAME)
+        ?? return null;
+    parse_field(p, docs, name)
 }
 
 // port: baml_parser/src/items.rs::Field::parse @ d9be6853b
@@ -1372,51 +1403,16 @@ function interface_def(
             r: l,
         };
     }
-    let members: AnyInterfaceMember[] = [];
-    while (!p.cur.at(TokenKind.RBrace) && !p.cur.at_end()) {
-        if (p.cur.at_in(TOP_LEVEL_KEYWORD) && !p.cur.at(TokenKind.Function)) {
-            break;
-        }
-        let at = p.cur.eat(TokenKind.AtAt);
-        if (at != null) {
-            members.push(parse_block_attr(p, at));
-            continue;
-        }
-        let member_mark = p.cur.mark();
-        let member_docs = leading_docs(p);
-        if (p.cur.at(TokenKind.AtAt)) {
-            // The docs documented nothing; the attribute is the next member.
-            let rejected = reject_docs(p, member_docs);
-            if (rejected != null) {
-                members.push(rejected);
-            }
-            continue;
-        }
-        let fn_kw = p.cur.eat(TokenKind.Function);
-        if (fn_kw != null) {
-            members.push(interface_method(p, member_mark, member_docs, fn_kw));
-            continue;
-        }
-        let type_kw = p.cur.eat(TokenKind.Type);
-        if (type_kw != null) {
-            members.push(parse_assoc_type_decl(p, member_docs, type_kw));
-            continue;
-        }
-        let field_name = p.cur.eat_in(IDENT);
-        if (field_name != null) {
-            members.push(parse_field(p, member_docs, field_name));
-            continue;
-        }
-        let rejected = reject_docs(p, member_docs);
-        if (rejected != null) {
-            members.push(rejected);
-        }
-        // After trailing docs the body may be over: nothing to skip.
-        if (p.cur.at_in(TOP_LEVEL_KEYWORD) || p.cur.at(TokenKind.RBrace) || p.cur.at_end()) {
-            break;
-        }
-        members.push(p.bogus_one("Unexpected token in interface body"));
-    }
+    let members: AnyInterfaceMember[] = body_members(
+        p,
+        (cur) -> {
+            cur.at_in(TOP_LEVEL_KEYWORD) && !cur.at(TokenKind.Function)
+        },
+        (p, member_mark, member_docs) -> {
+            interface_member(p, member_mark, member_docs)
+        },
+        "Unexpected token in interface body",
+    );
     let r = p.expect(TokenKind.RBrace);
     InterfaceDef {
         span: p.span_from(mark),
@@ -1429,6 +1425,27 @@ function interface_def(
         members: members,
         r: r,
     }
+}
+
+// port: baml_parser/src/items.rs::interface_def (one member after its docs) @ d9be6853b
+// A method, an associated type or a field, or null when the token after the
+// docs starts none of them.
+function interface_member(
+    p: Parser,
+    mark: Mark,
+    docs: DocPart[],
+) -> AnyInterfaceMember? throws never {
+    let fn_kw = p.cur.eat(TokenKind.Function);
+    if (fn_kw != null) {
+        return interface_method(p, mark, docs, fn_kw);
+    }
+    let type_kw = p.cur.eat(TokenKind.Type);
+    if (type_kw != null) {
+        return parse_assoc_type_decl(p, docs, type_kw);
+    }
+    let name = p.cur.eat_in(IDENT)
+        ?? return null;
+    parse_field(p, docs, name)
 }
 
 // port: baml_parser/src/items.rs::RequiresClause::parse @ d9be6853b
@@ -1566,10 +1583,16 @@ function impl_members(p: Parser) -> AnyImplMember[] throws never {
         }
         let member_mark = p.cur.mark();
         let before = p.cur.pos;
-        members.push(match (p.attempt((p) -> { impl_member(p, member_mark) })) {
-            let error: ParseError => p.bogus_since(member_mark, error),
-            let member: AnyImplMember => member,
-        });
+        members.push(
+            match (
+                p.attempt((p) -> {
+                    impl_member(p, member_mark)
+                })
+            ) {
+                let error: ParseError => p.bogus_since(member_mark, error),
+                let member: AnyImplMember => member,
+            },
+        );
         // A member that consumed nothing must not be read again here.
         if (p.cur.pos == before && !p.cur.at(TokenKind.RBrace) && !p.cur.at_end()) {
             p.cur.skip();
