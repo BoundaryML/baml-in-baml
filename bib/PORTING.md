@@ -394,6 +394,13 @@ Open items:
   normalize in.
 - normalize's test helpers (`Ctx`, `param`, `enum_ty`, `class1`, ...) are in
   `types` under their Rust names; pattern_overlap's tests reuse them.
+- The Rust oracle serves the stdlib as a precompiled package interface; we
+  compile it from source (decision 1, option A). Through HIR that made no
+  difference; in TIR it can: `diagnostic_errors/anyfunction` gets E0153 from
+  us for `implements reflect.AnyFunction for MyTool` (the source path checks
+  the interface target; the interface path has no source location and skips
+  it). Confirm against Rust, then either list such units in
+  KNOWN_DIFFERENCES or serve the stdlib as an interface (decision 1, B).
 
 ## Declaration gate (2026-11-18, after K1)
 
