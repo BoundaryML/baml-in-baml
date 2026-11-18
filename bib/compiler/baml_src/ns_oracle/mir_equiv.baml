@@ -44,12 +44,28 @@ function mir_dump(
             root.hir.function_source_map(db_, f).span.start
         });
         for (let f in functions) {
-            let mir = root.mir.lower_function(db_, f, opt) catch (e) {
-                let err: root.mir.MirInternalError => err,
+            // A panic in our lowering (a stub, a bug) is that function's
+            // output; the rest still print.
+            let task: baml.future.Future<string, never> = spawn {
+                let mir = root.mir.lower_function(db_, f, opt) catch (e) {
+                    let err: root.mir.MirInternalError => err,
+                };
+                match (mir) {
+                    let err: root.mir.MirInternalError => `!! MIR lowering failed: ${err.message}`,
+                    let m: root.mir.MirFunction => root.mir.display_function(db_, m),
+                }
             };
-            let text = match (mir) {
-                let err: root.mir.MirInternalError => `!! MIR lowering failed: ${err.message}`,
-                let m: root.mir.MirFunction => root.mir.display_function(db_, m),
+            let settled = await baml.future.all_settled([task]);
+            let text = match (settled[0]) {
+                let ok: baml.future.Success<string> => ok.value,
+                let panicked: baml.future.Panicked => {
+                    db_.cycles.reset();
+                    `!! panic: ${`${panicked.panic}`.split("\n")[0]}`
+                },
+                _ => {
+                    db_.cycles.reset();
+                    "!! failed"
+                },
             };
             out.push(`${text}\n`);
         }
@@ -65,33 +81,34 @@ function mir_rust(
     if (!baml.fs.exists(MIR_ORACLE_BIN)) {
         baml.sys.panic("bib/tools/mir_oracle is not built: run `cargo build --release` there");
     }
-    if (baml.fs.exists(MIR_ORACLE_DIR)) {
-        baml.fs.remove_dir_all(MIR_ORACLE_DIR);
-    }
+    // A directory per call, so concurrent runs do not share their input.
+    let scratch = `${MIR_ORACLE_DIR}/${baml.random.SystemRandom.get().random_int()}`;
     for (let path in files.keys()) {
-        let full = `${MIR_ORACLE_DIR}/${path}`;
+        let full = `${scratch}/${path}`;
         let parts = full.split("/");
         baml.fs.mkdir(parts.slice(0, parts.length() - 1).join("/"), baml.fs.MkdirOptions { recursive: true });
         baml.fs.write(full, files[path]);
     }
     let run = baml.sys.run(
         MIR_ORACLE_BIN,
-        args = [MIR_ORACLE_DIR, "--opt", opt_level_arg(opt)],
+        args = [scratch, "--opt", opt_level_arg(opt)],
         capture_output = true,
     ) catch_all (e) {
         _ => baml.sys.panic("cannot run mir_oracle"),
     };
+    baml.fs.remove_dir_all(scratch);
     string.from_utf8(run.stdout) catch_all (e) {
         _ => baml.sys.panic("mir_oracle printed invalid UTF-8"),
     }
 }
 
-// A dump split into its functions, keyed `<file>::<fn header line>`, in
-// order. A repeated key gets a `#n` suffix.
+// A dump split into its functions, keyed `<file>#<n>` (the n-th function of
+// the file in declaration order), so a function one side failed to lower
+// still lines up with the other side's.
 function split_dump(text: string) -> (string, string)[] throws never {
     let out: (string, string)[] = [];
-    let seen: map<string, int> = {};
     let file = "";
+    let n = 0;
     let key = "";
     let body: string[] = [];
     let flush = () -> void {
@@ -105,12 +122,11 @@ function split_dump(text: string) -> (string, string)[] throws never {
         if (line.starts_with("// file: ")) {
             flush();
             file = line.slice(9, line.length());
+            n = 0;
         } else if (line.starts_with("fn ") || line.starts_with("!! ")) {
             flush();
-            let base = `${file}::${line}`;
-            let n = seen.get(base) ?? 0;
-            seen[base] = n + 1;
-            key = if (n == 0) { base } else { `${base}#${n}` };
+            key = `${file}#${n}`;
+            n += 1;
             body.push(line);
         } else if (key != "") {
             body.push(line);
@@ -167,7 +183,7 @@ function mir_equiv_files(
             }
             report.mismatches.push(
                 MirMismatch {
-                    function_: entry.0,
+                    function_: `${entry.0} ${a[0]}`,
                     line: i + 1,
                     rust: if (i < a.length()) { a[i] } else { "<end>" },
                     ours: if (i < b.length()) { b[i] } else { "<end>" },

@@ -46,6 +46,14 @@ class Cycles {
         Cycles { stack: [], heads: {} }
     }
 
+    // Forget every running query after a panic unwound through them: a
+    // caller that catches the panic (an oracle running one unit per task)
+    // keeps using the Db. Not a salsa item: salsa unwinds its own stack.
+    function reset(self) -> void throws never {
+        self.stack = [];
+        self.heads = {};
+    }
+
     // The running execution read the provisional value of the head at
     // stack index `head`.
     function read_provisional(self, head: int) -> void throws never {
@@ -123,9 +131,11 @@ class TrackedMemo<V> {
             return self.values[key];
         }
         let id = `${self.name}:${key}`;
-        // Re-entered while running: this query is a cycle head.
+        // Re-entered while running: this query is a cycle head. A key whose
+        // frame is gone was left by a panic that unwound past it
+        // (`Cycles.reset`), and is not running.
         let running = self.active.get(key);
-        if (running != null) {
+        if (running != null && running < cycles.stack.length() && cycles.stack[running].id == id) {
             if (recovery == "panic") {
                 baml.sys.panic(`cycle through ${id}`);
             }
