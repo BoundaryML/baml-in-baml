@@ -389,3 +389,9 @@ Open items:
 - exhaustiveness's test helpers (`viewpoint`, `qtn`, `class_ty`,
   `USER_ROOT`, ...) are free functions in `hir_ty`; a later port of
   `test_heads.rs` must reuse them, not redefine them.
+- normalize's mu-automaton is superlinear on the VM: a 500-level nesting
+  under a recursive alias took 278 s (plain nesting: 0.1 s). Profile before
+  the full gate. `baml check` on the compiler went from ~1 s to ~6 s with
+  normalize in.
+- normalize's test helpers (`Ctx`, `param`, `enum_ty`, `class1`, ...) are in
+  `types` under their Rust names; pattern_overlap's tests reuse them.
