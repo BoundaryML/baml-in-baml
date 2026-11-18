@@ -513,38 +513,3 @@ function prefix_operands(block: BasicBlock, index: int) -> Operand[] throws neve
 function constant_type(constant: Constant) -> root.types.RuntimeTy? throws never {
     baml.sys.panic("constant_type: not ported (U5)")
 }
-
-// port: baml_compiler2_mir/src/reducible.rs::check @ d9be6853b
-// Check that `body`'s CFG is reducible. On failure, returns the blocks left
-// once every acyclic part is peeled away: a cycle with more than one entry,
-// and what only it reaches.
-function check(body: MirFunctionBody) -> int[]? throws never {
-    baml.sys.panic("check: not ported (U5)")
-}
-
-// port: baml_compiler2_mir/src/reducible.rs::check_graph @ d9be6853b
-// The reducibility test over plain successor lists.
-function check_graph(entry: int, succs: int[][]) -> int[]? throws never {
-    baml.sys.panic("check_graph: not ported (U5)")
-}
-
-// port: baml_compiler2_mir/src/reducible.rs::cycle_residue @ d9be6853b
-// Peel the acyclic part off `forward` (Kahn's algorithm over the blocks in
-// `rpo`); what is left lies on or behind a cycle.
-function cycle_residue(rpo: int[], forward: int[][]) -> int[] throws never {
-    baml.sys.panic("cycle_residue: not ported (U5)")
-}
-
-// port: baml_compiler2_mir/src/reducible.rs::reverse_postorder @ d9be6853b
-// The blocks reachable from `entry`, in reverse postorder.
-function reverse_postorder(entry: int, succs: int[][]) -> int[] throws never {
-    baml.sys.panic("reverse_postorder: not ported (U5)")
-}
-
-// port: baml_compiler2_mir/src/reducible.rs::immediate_dominators @ d9be6853b
-// Immediate dominators indexed by block (Cooper, Harvey & Kennedy, "A
-// Simple, Fast Dominance Algorithm"). The entry is its own dominator;
-// unreachable blocks keep `usize::MAX`.
-function immediate_dominators(entry: int, succs: int[][], rpo: int[]) -> int[] throws never {
-    baml.sys.panic("immediate_dominators: not ported (U5)")
-}
