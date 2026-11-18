@@ -2194,7 +2194,7 @@ function owner_self_ty(db: root.hir.Db, function_: int) -> root.types.Ty? throws
 // Restructured: Rust first reads `impls::impl_facts` for a target served from
 // an interface (`mounted_type_row`). While no root is served from an
 // interface every `mounted_type_row` answers null, so that branch is taken
-// only when some root is; `impl_facts` is not ported.
+// only when some root is.
 function owner_impl_target(
     db: root.hir.Db,
     function_: int,

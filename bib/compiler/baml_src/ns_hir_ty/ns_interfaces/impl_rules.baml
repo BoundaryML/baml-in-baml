@@ -1168,7 +1168,7 @@ function validate_impl_signatures(
                         if (required_iface == null) {
                             continue;
                         }
-                        let concrete = root.hir_ty.interned_ty(pool, for_ty);
+                        let concrete = pool.from_plain(for_ty);
                         let required_interned = root.types.infer_interface_from_constraint(pool, required_iface);
                         if (!root.hir_ty.implements_interface(db, concrete, required_interned)) {
                             diags.push(
@@ -1642,7 +1642,7 @@ class ResolvedImpl {
 // port: baml_compiler2_hir_ty/src/interfaces/impl_rules.rs::package_impl_locs @ d9be6853b
 // Every `implements` block declared in a package, in file then source order.
 function package_impl_locs(db: root.hir.Db, pkg_id: int) -> int[] throws never {
-    db.ty_memo.package_impl_locs.get(db.cycles, pkg_id, () -> {
+    db.ty_memo.impl_rules_package_impl_locs.get(db.cycles, pkg_id, () -> {
         let out: int[] = [];
         // Only the package's own files.
         for (let file in db.source_root(pkg_id).files) {

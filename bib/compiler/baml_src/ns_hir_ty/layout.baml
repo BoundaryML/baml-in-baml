@@ -3,8 +3,9 @@
 // Layout facts of a declaration, whichever lane declares it: the `Source`
 // arm reads the item's lowered data, the `External` arm its exported row.
 // Ported: the subset the type checker reaches (head to ref for classes,
-// enums and aliases, `package_aliases`, `class_fields`, `alias_value`). The
-// rest of layout.rs serves MIR and codegen.
+// enums and aliases, `package_aliases`, `class_fields`,
+// `class_generic_params`, `alias_value`). The rest of layout.rs serves MIR
+// and codegen.
 //
 // Restructured: a `ClassRef` (`DeclRef<ClassLoc, ExternClassLoc>`) is
 // `root.hir.DeclRefSource<int> | root.hir.DeclRefExternal<int>`, and so for
@@ -103,6 +104,20 @@ function class_fields(
             extern_class_row(db, external.value).fields.map((field) -> {
                 (field.0, field.1)
             })
+        },
+    }
+}
+
+// port: baml_compiler2_hir_ty/src/layout.rs::class_generic_params @ d9be6853b
+// The class's generic parameters, in declaration order.
+function class_generic_params(
+    db: root.hir.Db,
+    class_: root.hir.DeclRefSource<int> | root.hir.DeclRefExternal<int>,
+) -> root.types.ParamTy[] throws never {
+    match (class_) {
+        let source: root.hir.DeclRefSource<int> => class_generic_frame(db, source.value),
+        let external: root.hir.DeclRefExternal<int> => {
+            extern_class_row(db, external.value).generic_params
         },
     }
 }

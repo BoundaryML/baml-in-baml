@@ -3,7 +3,7 @@
 // One `TrackedMemo` per hir_ty query (ns_hir/tracked.baml), named after the
 // query, keyed like HIR's memos: an interned loc id (`db.function_locs`, ...)
 // or a root id. A query keyed by something else interns its key here first
-// (`assoc_members`). Reached as `db.ty_memo.<query>`.
+// (`assoc_members`, `impl_type_keys`). Reached as `db.ty_memo.<query>`.
 //
 // Restructured: Rust's interned types live in one global pool
 // (`baml_type::interned::pool()`); here the compile's pool is `pool`, so a
@@ -64,11 +64,23 @@ class TyMemos {
     impl_data_source_map: root.hir.TrackedMemo<root.hir_ty.interfaces.ImplDataSourceMap>,
     // impl_rules.rs::validate_impl_signatures (key: impl loc)
     validate_impl_signatures: root.hir.TrackedMemo<(TirTypeError, root.hir_ty.interfaces.ImplDiagnosticLocation)[]>,
-    // impl_rules.rs::package_impl_locs (key: root id)
-    package_impl_locs: root.hir.TrackedMemo<int[]>,
+    // impl_rules.rs::package_impl_locs (key: root id). Renamed: impls.rs
+    // has a query of the same name (`package_impl_locs` below).
+    impl_rules_package_impl_locs: root.hir.TrackedMemo<int[]>,
     // coherence.rs::package_coherence_diagnostics (key: root id)
     package_coherence_diagnostics: root.hir.TrackedMemo<root.hir_ty.interfaces.CoherenceViolation[]>,
     assoc_members: AssocMemberKeys,
+    // impls.rs::impl_facts (key: impl loc)
+    impl_facts: root.hir.TrackedMemo<ImplHeaderResolution>,
+    // impls.rs::package_impl_locs (key: root id)
+    package_impl_locs: root.hir.TrackedMemo<int[]>,
+    // impls.rs::impls_for_type_cached (key: `impl_type_keys`)
+    impls_for_type_cached: root.hir.TrackedMemo<CachedResolvedImpl[]>,
+    impl_type_keys: ImplTypeKeys,
+    // callable.rs::callable_throws (key: function loc)
+    callable_throws: root.hir.TrackedMemo<CallableThrows>,
+    // callable.rs::function_signature_ty (key: function loc)
+    function_signature_ty: root.hir.TrackedMemo<FunctionSignatureTy>,
     // The compile's interned-type pool (Rust's global `pool()`).
     pool: root.types.InferPool,
 
@@ -89,9 +101,15 @@ class TyMemos {
             impl_data: root.hir.TrackedMemo.new("impl_data"),
             impl_data_source_map: root.hir.TrackedMemo.new("impl_data_source_map"),
             validate_impl_signatures: root.hir.TrackedMemo.new("validate_impl_signatures"),
-            package_impl_locs: root.hir.TrackedMemo.new("package_impl_locs"),
+            impl_rules_package_impl_locs: root.hir.TrackedMemo.new("impl_rules::package_impl_locs"),
             package_coherence_diagnostics: root.hir.TrackedMemo.new("package_coherence_diagnostics"),
             assoc_members: AssocMemberKeys.new(),
+            impl_facts: root.hir.TrackedMemo.new("impl_facts"),
+            package_impl_locs: root.hir.TrackedMemo.new("package_impl_locs"),
+            impls_for_type_cached: root.hir.TrackedMemo.new("impls_for_type_cached"),
+            impl_type_keys: ImplTypeKeys.new(),
+            callable_throws: root.hir.TrackedMemo.new("callable_throws"),
+            function_signature_ty: root.hir.TrackedMemo.new("function_signature_ty"),
             pool: root.types.InferPool.new(),
         }
     }
