@@ -180,6 +180,20 @@ function canonicalize_unions(
     ctx: InferenceContext,
     ty: root.types.ClosedTy,
 ) -> root.types.ClosedTy throws never {
+    let cached = ctx.canonical_unions.get(ty.ty);
+    if (cached != null) {
+        return root.types.ClosedTy { ty: cached };
+    }
+    let result = canonicalize_unions_uncached(ctx, ty);
+    ctx.canonical_unions[ty.ty] = result.ty;
+    result
+}
+
+// The body of `canonicalize_unions`, before its per-context cache.
+function canonicalize_unions_uncached(
+    ctx: InferenceContext,
+    ty: root.types.ClosedTy,
+) -> root.types.ClosedTy throws never {
     let pool = ctx.table.pool;
     match (pool.kinds[ty.ty]) {
         root.types.InferTyUnion => {

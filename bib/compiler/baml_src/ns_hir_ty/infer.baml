@@ -2342,6 +2342,9 @@ function expectation_adjust_for_branches(
 // functions taking `ctx: InferenceContext` first (infer.baml, the
 // `infer_stubs_u<N>.baml` files, and `ns_infer/`).
 class InferenceContext {
+    // Speed, not a Rust field: `canonicalize_unions` results by handle. The
+    // function reads only the pool and `facts`, both fixed for a context.
+    canonical_unions: map<int, int>,
     db: root.hir.Db,
     facts: Facts,
     index: root.hir.FileSemanticIndex,
@@ -2476,6 +2479,7 @@ class InferenceContext {
         };
         let pool = db.ty_memo.pool;
         InferenceContext {
+            canonical_unions: {},
             db: db,
             facts: Facts.with_bounds(db, owner_declared_bounds(db, owner)),
             index: root.hir.file_semantic_index(db, owner_file),

@@ -101,15 +101,17 @@ function report_constant_regex_pattern(
         return;
     }
     let bindings = plan.bindings;
+    // `find_map`: the first binding providing parameter `index`.
     let provided = (index: int) -> int? {
-        bindings
-            .filter_map((binding) -> {
-                match (binding) {
-                    let p: ParamBindingProvided if p.param_index == index => p.arg,
-                    _ => null,
-                }
-            })
-            .at(0)
+        for (let binding in bindings) {
+            match (binding) {
+                let p: ParamBindingProvided if p.param_index == index => {
+                    return p.arg;
+                },
+                _ => {},
+            }
+        }
+        null
     };
     let expr = provided(0);
     let backtracking_arg = provided(1);
