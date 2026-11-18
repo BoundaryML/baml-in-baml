@@ -11,8 +11,9 @@
 // - A set of `CellId`s is `map<int, CellId>`, keyed by `cell_key` (a
 //   local's cell `2 * local`, a capture's `2 * index + 1`: injective, so
 //   two cells share a key exactly when they are the same cell) with the
-//   cell itself as the value, so the set can be iterated. Used by
-//   `Resources.cells` and `spawn_shared_cells`.
+//   cell itself (a `cell_copy`, never the MIR's own place) as the value, so
+//   the set can be iterated. Used by `Resources.cells` and
+//   `spawn_shared_cells`.
 // - The `&mut impl FnMut` visitors are closures `(..) -> void`.
 // - `spawn_shared_cells`'s local `Defs` and `Walk` structs are the
 //   namespace classes `Defs` and `Walk`, `Walk`'s methods free of borrows.
@@ -24,6 +25,17 @@ function cell_key(cell: CellId) -> int throws never {
     match (cell) {
         let l: PlaceLocal => 2 * l.value,
         let c: PlaceCapture => 2 * c.value + 1,
+    }
+}
+
+// Not in Rust: a copy of a cell id taken from MIR, for a set that outlives
+// the instruction it came from. The optimizer rewrites places in place, and
+// a set holding the MIR's own `PlaceLocal` would then disagree with its
+// `cell_key`. Rust's `CellId` is `Copy`.
+function cell_copy(cell: CellId) -> CellId throws never {
+    match (cell) {
+        let l: PlaceLocal => PlaceLocal { value: l.value },
+        let c: PlaceCapture => PlaceCapture { value: c.value },
     }
 }
 
@@ -509,7 +521,7 @@ function spawn_shared_cells(body: MirFunctionBody) -> map<int, CellId> throws ne
                         let c: PlaceCapture => c,
                         _ => baml.sys.panic("a capture operand is a cell pointer"),
                     };
-                    shared[cell_key(cell)] = cell;
+                    shared[cell_key(cell)] = cell_copy(cell);
                     // The closure a shared cell holds is reachable from the
                     // task.
                     walk.follow_cell(defs, cell);
@@ -536,7 +548,7 @@ function place_reads(place: Place, out: Resources) -> void throws never {
         },
         PlaceCapture => {},
         let d: PlaceDeref => {
-            out.cells[cell_key(d.value)] = d.value;
+            out.cells[cell_key(d.value)] = cell_copy(d.value);
             let local = cell_id_local(d.value);
             if (local != null) {
                 out.locals[local] = true;
@@ -631,7 +643,7 @@ function place_writes(place: Place, out: Resources) -> void throws never {
         },
         PlaceCapture => baml.sys.panic("a bare capture is a pointer nothing stores to"),
         let d: PlaceDeref => {
-            out.cells[cell_key(d.value)] = d.value;
+            out.cells[cell_key(d.value)] = cell_copy(d.value);
         },
         let p: PlaceField => {
             out.fields[p.field] = true;

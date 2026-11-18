@@ -48,8 +48,9 @@
 // - `EFFECTS` holds `(native key, Effect)` pairs; `Effect.keeps` and
 //   `ReturnsFresh.value` are `int[]`.
 //
-// Not ported: the hot-swap early return in `can_summarize` (added upstream
-// after `BASE`).
+// Ported from the fork's tree, which mirrors upstream past `BASE`: the
+// `@ d9be6853b` headers are nominal (PORTING.md), and `can_summarize` has
+// upstream's hot-swap early return.
 
 // port: baml_compiler2_mir/src/escape.rs::NEVER @ d9be6853b
 // Locality mask of a node that is shared whatever the caller passes:
@@ -512,7 +513,22 @@ function static_callee(callee: Operand) -> int? throws never {
 // it opaque.
 function can_summarize(db: root.hir.Db, caller: int, callee: int) -> bool throws never {
     let root_id = db.file(db.function_locs.get(callee).file).root;
+    // A hot swap can replace any user function with a body that leaks its
+    // arguments, so with swapping on only the stdlib, which cannot be
+    // swapped, is safe to look through.
+    if (hotswap_enabled()) {
+        return db.source_root(root_id).kind == root.base.SourceRootKind.Stdlib;
+    }
     root_id == caller || db.source_root(root_id).kind == root.base.SourceRootKind.Stdlib
+}
+
+// port: baml_env/src/lib.rs::hotswap_enabled @ d9be6853b
+// Home: `baml_env`, which has no namespace here. Whether function hot
+// swapping is on for this process (`baml run --hot` sets it before anything
+// compiles). Restructured: Rust's process-wide `AtomicBool` has no setter
+// here, since this compiler never runs with `--hot`, so it is always off.
+function hotswap_enabled() -> bool throws never {
+    false
 }
 
 // port: baml_compiler2_mir/src/escape.rs::may_finalize @ d9be6853b
