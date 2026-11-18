@@ -1,3 +1,4 @@
 .agents/
 .cli_oracle/
 .baml/
+.mir_oracle/

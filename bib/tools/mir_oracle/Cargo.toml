@@ -1,0 +1,20 @@
+# Prints the Rust compiler's MIR for every function of a directory: the
+# oracle for MIR equivalence (`oracle.mir_equiv`). Standalone (not a member of
+# the baml_language workspace, so no upstream file is edited); Cargo.lock is
+# a copy of baml_language's so the dependency versions match.
+[package]
+name = "mir_oracle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+baml_db = { path = "../../../baml_language/crates/baml_db" }
+baml_compiler2_hir = { path = "../../../baml_language/crates/baml_compiler2_hir" }
+baml_compiler2_mir = { path = "../../../baml_language/crates/baml_compiler2_mir" }
+
+[profile.release]
+lto = false
+codegen-units = 16

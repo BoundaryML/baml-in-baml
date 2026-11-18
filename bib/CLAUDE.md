@@ -8,7 +8,8 @@ This repo is upstream BAML plus its compiler rewritten in BAML. See `bib/README.
 - **Runtime is frozen.** Do not change the linker, the VM (`bex_*`), sys_*,
   bridges or SDK runtimes. The contracts are upstream's `EmittedPackage` and
   `PackageInterface`. The compiler is 100% BAML: no Rust or Python of ours
-  in the compile or test path.
+  in the compile or test path. One exception, an oracle only: `bib/tools/mir_oracle`
+  prints the Rust compiler's MIR for any directory, for `oracle.mir_equiv`.
 - **LSP is out of scope** for now and keeps using the Rust frontend.
 - **Never edit mirrored upstream files for convenience.** Every edit to an
   upstream path is a future merge conflict. New work goes in new paths.

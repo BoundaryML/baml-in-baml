@@ -29,7 +29,10 @@ About 170k lines, a third of it the type checker.
 
 The compiler, its tests, `bless`, and every helper they use are BAML. No
 Rust or Python of ours sits in the compile or test path. The only non-BAML
-code in `bib/` is repo plumbing (`bib/scripts/sync.py`). Borsh reading and
+code in `bib/` is repo plumbing (`bib/scripts/sync.py`) and one oracle,
+`bib/tools/mir_oracle`: the Rust compiler's MIR for any directory (no
+upstream API prints it), compared with ours by `oracle.mir_equiv` /
+`oracle.mir_equiv_gate`. Build it once with `cargo build --release` there. Borsh reading and
 writing, used for the precompiled stdlib interface and `EmittedPackage`, are
 written in BAML on `uint8array`.
 
