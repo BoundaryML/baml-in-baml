@@ -236,8 +236,26 @@ depend on it: compile the BAML compiler to native code early through
 |---|---|
 | oracle in BAML | Pass. A BAML test gets the Rust compiler's diagnostics through `reflect.Package._compile` (`ns_oracle/oracle.baml`). |
 | lexer | Ported (`ns_syntax/lexer.baml`, `token.baml`); 88 table asserts from `lexer/tests.rs` pass. Whole stdlib (128 files, 1.47 MB, 257,053 tokens) lexes in 256 ms on the VM: ~5.7 MB/s, ~1M tokens/s. Rust baseline: pending. |
-| big unions | not run |
+| big unions | `baml check` on the compiler project takes ~75s at 34 files / ~10k lines. Adding `types.baml` or `patterns.baml` alone to the foundation costs ~30s each; files without heavy `match` over node unions cost ~1s. Being bisected. |
 | salsa idiom | not run |
+
+## Parser gate (2026-11-17)
+
+Parse diagnostics compared file by file with the Rust compiler (`root.oracle.corpus_summary`):
+
+| Corpus | Match |
+|---|---|
+| `baml_tests/projects/broken_syntax` | 41/43 |
+| `baml_tests/projects/diagnostic_errors` | 167/174 |
+| `baml_tests/projects/parser_stress` | 5/5 |
+| `baml_tests/baml_src` | 604/617 |
+| stdlib (`baml_builtins2/baml_std`) | 128/128 |
+
+All 22 mismatches are files whose expected output changed in upstream #5030
+(tuples, merged 2026-11-16). The oracle was nightly 20261115, which predates
+it; the port follows `BASE`, which includes it. **The oracle must be the Rust
+compiler at `BASE`**, not the installed nightly: build `baml-cli` from the fork
+at `BASE` and select it with `baml toolchain use <path>` for oracle runs.
 
 ## Agents
 

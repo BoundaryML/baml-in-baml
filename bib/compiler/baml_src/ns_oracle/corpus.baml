@@ -24,3 +24,15 @@ function parse_corpus(dir: string) -> CorpusReport throws baml.errors.Io | baml.
   }
   CorpusReport { files: paths.length(), matched: paths.length() - mismatches.length(), mismatches: mismatches }
 }
+
+// One line per directory, then the first `limit` mismatches of each.
+function corpus_summary(dirs: string[], limit: int = 5) -> string throws baml.errors.Io | baml.errors.ParseError {
+  dirs.map((dir) -> {
+    let report = parse_corpus(dir);
+    let head = `${dir}: ${report.matched}/${report.files} files match`;
+    let shown = report.mismatches.slice(0, limit).map((m) -> {
+      `  ${m.path}\n    rust: ${m.rust.join("\n          ")}\n    ours: ${m.ours.join("\n          ")}`
+    });
+    [head].concat(shown).join("\n")
+  }).join("\n")
+}
