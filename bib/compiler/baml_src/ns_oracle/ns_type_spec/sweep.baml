@@ -2,8 +2,8 @@
 //
 // The whole-corpus sweep: run hir_ty over every `baml_src` file and census
 // the typed surface (error-channel entries, with any panic surfaced
-// verbatim). Compared byte for byte with upstream's insta snapshot (header
-// stripped, `snapshot_body`):
+// verbatim). Compared with upstream's insta snapshot
+// (`snapshot_body`, `snapshot_matches`: insta 1.47's reader and comparison):
 //
 //   baml run oracle.type_spec.sweep_summary
 //
@@ -19,8 +19,9 @@
 // - `read_corpus_files`'s `&mut Vec` out-param is the returned array;
 //   `(rel, content)` pairs are `CorpusFile`s.
 // - The `#[test]` is a test block over `sweep_snapshot`, which also feeds
-//   `sweep_summary`; `insta::assert_snapshot!` is the equality assertion,
-//   and the summary prints a line diff on a mismatch.
+//   `sweep_summary`. `insta::assert_snapshot!` is `snapshot_matches`
+//   (insta 1.47's comparison, as the fixtures harness uses); the summary
+//   prints a line diff on a mismatch.
 // - `snippet` slices UTF-8 bytes, as Rust's `&str` ranges do (the corpus is
 //   not all ASCII, and our string slicing is by character).
 
@@ -182,15 +183,15 @@ function sweep_snapshot() -> SnapshotResult throws baml.errors.Io | baml.errors.
 // `match`, or a line diff against upstream.
 function sweep_summary() -> string throws baml.errors.Io | baml.errors.ParseError {
     let result = sweep_snapshot();
-    if (result.expected == result.ours) {
+    if (snapshot_matches(result.expected, result.ours)) {
         `${result.name}: match`
     } else {
-        `${result.name}: differs\n${unified_diff(result.expected, result.ours)}`
+        `${result.name}: differs\n${unified_diff(snapshot_normalize(result.expected), snapshot_normalize(result.ours))}`
     }
 }
 
 // port: baml_tests/src/type_spec/sweep.rs::s15_sweep_baml_src @ d9be6853b
 test "s15 sweep baml src" {
     let result = sweep_snapshot();
-    assert.equal(result.ours, result.expected)
+    assert.is_true(snapshot_matches(result.expected, result.ours))
 }

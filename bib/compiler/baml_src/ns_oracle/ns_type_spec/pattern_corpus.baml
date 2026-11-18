@@ -2,8 +2,8 @@
 //
 // The legacy pattern/exhaustiveness corpora through hir_ty: per function,
 // how many of its `match` expressions hir_ty records as non-exhaustive.
-// One snapshot per corpus, compared byte for byte with upstream's insta
-// snapshot (header stripped, `snapshot_body`):
+// One snapshot per corpus, compared with upstream's insta snapshot
+// (`snapshot_body`, `snapshot_matches`: insta 1.47's reader and comparison):
 //
 //   baml run oracle.type_spec.pattern_corpus_summary
 //
@@ -19,8 +19,9 @@
 //   corpora, each read into its own workspace root (as `corpus.baml`),
 //   instead of a fresh database per corpus.
 // - Each `#[test]` is a test block over `corpus_snapshot`, which also feeds
-//   `pattern_corpus_summary`; `insta::assert_snapshot!` is the equality
-//   assertion, and the summary prints a line diff on a mismatch.
+//   `pattern_corpus_summary`. `insta::assert_snapshot!` is
+//   `snapshot_matches` (insta 1.47's comparison, as the fixtures harness
+//   uses); the summary prints a line diff on a mismatch.
 // - Upstream paths are relative to `baml_tests` (`BAML_TESTS_DIR`, Rust's
 //   `CARGO_MANIFEST_DIR`); the corpora are read in place.
 
@@ -99,16 +100,16 @@ function pattern_corpus_summary() -> string throws baml.errors.Io | baml.errors.
     });
     let matched = results
         .filter((r) -> {
-            r.expected == r.ours
+            snapshot_matches(r.expected, r.ours)
         })
         .length();
     [`pattern corpus snapshots: ${matched}/${results.length()} match`]
         .concat(
             results.map((r) -> {
-                if (r.expected == r.ours) {
+                if (snapshot_matches(r.expected, r.ours)) {
                     `${r.name}: match`
                 } else {
-                    `${r.name}: differs\n${unified_diff(r.expected, r.ours)}`
+                    `${r.name}: differs\n${unified_diff(snapshot_normalize(r.expected), snapshot_normalize(r.ours))}`
                 }
             }),
         )
@@ -118,23 +119,23 @@ function pattern_corpus_summary() -> string throws baml.errors.Io | baml.errors.
 // port: baml_tests/src/type_spec/pattern_corpus.rs::match_exhaustiveness_corpus @ d9be6853b
 test "match exhaustiveness corpus" {
     let result = corpus_snapshot(root.stdlib_db(), "corpus__match_exhaustiveness");
-    assert.equal(result.ours, result.expected)
+    assert.is_true(snapshot_matches(result.expected, result.ours))
 }
 
 // port: baml_tests/src/type_spec/pattern_corpus.rs::generic_rigid_coverage_corpus @ d9be6853b
 test "generic rigid coverage corpus" {
     let result = corpus_snapshot(root.stdlib_db(), "corpus__generic_rigid_coverage");
-    assert.equal(result.ours, result.expected)
+    assert.is_true(snapshot_matches(result.expected, result.ours))
 }
 
 // port: baml_tests/src/type_spec/pattern_corpus.rs::patterns_new_corpus @ d9be6853b
 test "patterns new corpus" {
     let result = corpus_snapshot(root.stdlib_db(), "corpus__patterns_new");
-    assert.equal(result.ours, result.expected)
+    assert.is_true(snapshot_matches(result.expected, result.ours))
 }
 
 // port: baml_tests/src/type_spec/pattern_corpus.rs::generic_match_typevar_arm_corpus @ d9be6853b
 test "generic match typevar arm corpus" {
     let result = corpus_snapshot(root.stdlib_db(), "corpus__generic_match_typevar_arm");
-    assert.equal(result.ours, result.expected)
+    assert.is_true(snapshot_matches(result.expected, result.ours))
 }
