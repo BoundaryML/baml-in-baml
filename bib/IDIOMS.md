@@ -26,7 +26,7 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `const FOO: KindSet = KindSet::new(&[..])` | `const FOO: KindSet = KindSet.of([..]);` |
 | field, method or parameter named after a BAML keyword (`throws`, `requires`, `client`, `class`, `function`, `interface`) | the Rust name plus `_`: `throws_`, `client_`, `self.class_(..)`. Function names built from a keyword (`parse_throws_clause`, `class_def`) keep their Rust spelling |
 | a field that would clash with a method of the same class | the field gets a suffix (`tools_value`, `is_testset`); say so in a comment |
-| a binding, field or parameter named `root` | not allowed (`root` is the package path): `file`, `root_node`, ... |
+| a binding, field or parameter named `root` | not allowed (`root` is the package path): a `SourceRoot` becomes `root_id` (it is an id); a tree root becomes `file`/`root_node` |
 
 ## Types
 
