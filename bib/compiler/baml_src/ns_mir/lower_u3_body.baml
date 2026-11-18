@@ -273,7 +273,7 @@ function builtin_trace_hook(
     let name = root.hir.function_data(db, function_).name;
     // Declaration identity protects user hooks with the same spelling.
     if (
-        !lang(ctx).is_(root.base.LangPackage.Trace, package.root_id)
+        !root.hir.lang_roots(ctx.db).is_(root.base.LangPackage.Trace, package.root_id)
             || package.namespace_path.length() != 0
     ) {
         return null;

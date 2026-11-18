@@ -102,3 +102,57 @@ class LangRoots {
     self.inverted().get(root_id)
   }
 }
+
+// port: baml_base/src/lang.rs::native_key_spelling @ d9be6853b
+// A written type spelled for a native key: a written `root.` at the start of
+// a path becomes `package.`. The rest, a string literal in a type argument
+// included, is the written text verbatim. Walks characters (`chars()`) where
+// Rust walks a `&str`.
+function native_key_spelling(package: string, written: string) -> string throws never {
+    let chars = written.chars();
+    let out: string[] = [];
+    let i = 0;
+    let path_start = true;
+    while (i < chars.length()) {
+        if (path_start && chars.slice(i, i + 5).join("") == "root.") {
+            out.push(package);
+            out.push(".");
+            i += 5;
+            path_start = false;
+            continue;
+        }
+        let literal = string_literal_prefix(chars, i);
+        if (literal > 0) {
+            out.push(chars.slice(i, i + literal).join(""));
+            i += literal;
+            path_start = false;
+            continue;
+        }
+        let c = chars[i];
+        path_start = !(c.is_alphanumeric() || c == "_" || c == ".");
+        out.push(c);
+        i += 1;
+    }
+    out.join("")
+}
+
+// port: baml_base/src/lang.rs::string_literal_prefix @ d9be6853b
+// The length in characters of the string literal starting at `chars[at]`,
+// closing quote included, or 0 if none starts there: `"..."` with backslash
+// escapes. An unterminated literal runs to the end.
+function string_literal_prefix(chars: string[], at: int) -> int throws never {
+    if (at >= chars.length() || chars[at] != "\"") {
+        return 0;
+    }
+    let escaped = false;
+    for (let i = at + 1; i < chars.length(); i += 1) {
+        if (escaped) {
+            escaped = false;
+        } else if (chars[i] == "\\") {
+            escaped = true;
+        } else if (chars[i] == "\"") {
+            return i + 1 - at;
+        }
+    }
+    chars.length() - at
+}

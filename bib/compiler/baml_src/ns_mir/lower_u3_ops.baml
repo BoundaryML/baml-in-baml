@@ -436,7 +436,7 @@ function is_string_add(
             _ => {},
         }
     }
-    is_string_ty(lang(ctx), expr_ty(ctx, lhs)) && is_string_ty(lang(ctx), expr_ty(ctx, rhs))
+    is_string_ty(root.hir.lang_roots(ctx.db), expr_ty(ctx, lhs)) && is_string_ty(root.hir.lang_roots(ctx.db), expr_ty(ctx, rhs))
 }
 
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::is_string_ty @ d9be6853b
@@ -472,8 +472,8 @@ function arithmetic_uses_primitive_opcode(
     lhs: int,
     rhs: int,
 ) -> bool throws MirInternalError {
-    arith_primitive(lang(ctx), expr_ty(ctx, lhs), true)
-        && arith_primitive(lang(ctx), expr_ty(ctx, rhs), true)
+    arith_primitive(root.hir.lang_roots(ctx.db), expr_ty(ctx, lhs), true)
+        && arith_primitive(root.hir.lang_roots(ctx.db), expr_ty(ctx, rhs), true)
 }
 
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_arithmetic_via_driver @ d9be6853b
@@ -522,7 +522,7 @@ function ordering_uses_primitive_opcode(
     lhs: int,
     rhs: int,
 ) -> bool throws MirInternalError {
-    let lang_roots = lang(ctx);
+    let lang_roots = root.hir.lang_roots(ctx.db);
     orderable(lang_roots, expr_ty(ctx, lhs)) && orderable(lang_roots, expr_ty(ctx, rhs))
 }
 
@@ -593,7 +593,7 @@ function negate_uses_primitive_opcode(
     ctx: LoweringContext,
     operand: int,
 ) -> bool throws MirInternalError {
-    arith_primitive(lang(ctx), expr_ty(ctx, operand), false)
+    arith_primitive(root.hir.lang_roots(ctx.db), expr_ty(ctx, operand), false)
 }
 
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_negate_via_driver @ d9be6853b

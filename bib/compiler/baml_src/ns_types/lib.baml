@@ -96,6 +96,62 @@ function contains_ty_where(ty: Ty, pred: (Ty) -> bool) -> bool {
         })
 }
 
+// port: baml_type_runtime/src/lib.rs::erase_typevars_matching @ d9be6853b
+// Replace the type variables `should_erase` selects with `unknown`, for
+// runtime-facing metadata: a bounded generic parameter is compile-time
+// evidence, not a runtime type tag. Shared by MIR and bytecode metadata.
+// baml_type_runtime has no namespace of its own; it lives beside
+// `contains_ty_where`.
+function erase_typevars_matching(
+    ty: Ty,
+    should_erase: (ParamTy) -> bool throws never,
+) -> Ty throws never {
+    let has_typevar = contains_ty_where(ty, (t) -> {
+        t is TyTypeVar
+    });
+    if (!has_typevar) {
+        return ty;
+    }
+    let erase = (t: Ty) -> Ty {
+        erase_typevars_matching(t, should_erase)
+    };
+    match (ty) {
+        let x: TyTypeVar => if (should_erase(x.param)) { TyUnknown {} } else { x },
+        let x: TyClass => TyClass { name: x.name, args: x.args.map(erase) },
+        let x: TyInterface => {
+            TyInterface {
+                name: x.name,
+                args: x.args.map(erase),
+                associated_types: x.associated_types.map((b) -> {
+                    AssociatedType { name: b.name, ty: erase(b.ty) }
+                }),
+            }
+        },
+        let x: TyList => TyList { elem: erase(x.elem) },
+        let x: TyMap => TyMap { key: erase(x.key), value: erase(x.value) },
+        let x: TyUnion => TyUnion { members: x.members.map(erase) },
+        let x: TyTuple => TyTuple { items: x.items.map(erase) },
+        let x: TyFuture => TyFuture { value: erase(x.value), error: erase(x.error) },
+        let x: TyAssociatedTypeProjection => {
+            TyAssociatedTypeProjection {
+                base: erase(x.base),
+                interface_: map_tys(x.interface_, erase),
+                member: x.member,
+            }
+        },
+        let x: TyFunction => {
+            TyFunction {
+                params: x.params.map((p) -> {
+                    FunctionParamTy { name: p.name, ty: erase(p.ty), mode: p.mode }
+                }),
+                ret: erase(x.ret),
+                throws_: erase(x.throws_),
+            }
+        },
+        _ => ty,
+    }
+}
+
 // port: baml_type/src/lib.rs::Ty::is_valid_impl_subject @ d9be6853b
 // Whether this type may be the implementor (`for`-target) of an interface
 // implementation. Valid: concrete user-facing types with one runtime

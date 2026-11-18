@@ -256,7 +256,7 @@ function lower_object(
         _ => {
             throw internal_error_here(
                 ctx,
-                `object literal typed \`${root.types.runtime_ty_to_string(spelled(ctx, ty))}\`, which is not a class`,
+                `object literal typed \`${spelled(ctx, ty)}\`, which is not a class`,
             );
         },
     };

@@ -22,14 +22,6 @@
 //   named default (Rust's `lower_ref_in_scope` only forwards to it at
 //   `Existential`). `qualify_def` (a forward to `hir_ty`'s) is not ported:
 //   call `root.hir_ty.qualify_def`.
-// - Items of other crates MIR needs that are not ported yet are stubs:
-//   `root.types.resolved_aliases_convert` (`ResolvedAliases::convert`),
-//   `root.types.erase_typevars_matching`,
-//   `root.types.ty_template_substitute_symbolic`,
-//   `root.types.native_key_spelling` (baml_base's) in
-//   `ns_types/template_stubs_u1.baml`; layout's `class_field_index`,
-//   `class_field_ty`, `enum_variants`, `enum_variant_index`, `lang_class`
-//   in `ns_hir_ty/layout_stubs_u1.baml`.
 
 // port: baml_compiler2_mir/src/lower.rs::PackageAliases @ d9be6853b
 // A package's memoized alias environment (`resolved_aliases_for_package`).
@@ -539,9 +531,9 @@ class RuntimeLowering {
     // port: baml_compiler2_mir/src/lower.rs::RuntimeLowering::convert @ d9be6853b
     // A compile-time type as MIR carries it: aliases expanded, every head
     // still the declaration's identity. Kept as Rust's method (the crossing's
-    // one conversion) over `ResolvedAliases::convert`, which is a stub here.
+    // one conversion) over `ResolvedAliases::convert`.
     function convert(self, ty: root.types.Ty) -> root.types.RuntimeTy throws never {
-        root.types.resolved_aliases_convert(self.aliases, ty)
+        self.aliases.convert(ty)
     }
 
     // port: baml_compiler2_mir/src/lower.rs::RuntimeLowering::wire @ d9be6853b
@@ -1247,12 +1239,12 @@ function native_key_for(db: root.hir.Db, func_loc: int) -> string throws never {
             let for_display = if (class_ != null && block.origin == root.ast.ImplOrigin.InBody) {
                 root.hir.class_data(db, class_).name
             } else {
-                root.types.native_key_spelling(
+                root.base.native_key_spelling(
                     package,
                     block.type_refs.display(block.for_target).to_string(),
                 )
             };
-            let iface_display = root.types.native_key_spelling(
+            let iface_display = root.base.native_key_spelling(
                 package,
                 block.type_refs.display(block.interface_target).to_string(),
             );

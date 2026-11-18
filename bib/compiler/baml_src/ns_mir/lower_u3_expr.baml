@@ -518,7 +518,7 @@ function default_delegation(
     }
     // The target lowered whole (as the constraint head it is: written pins
     // only): its generic args.
-    let lowered = lower_ref_in_scope_at(
+    let lowered = lower_ref_in_scope(
         db,
         target.type_refs,
         target.target,
@@ -527,7 +527,7 @@ function default_delegation(
         generic_params,
         generic_param_bounds,
         null,
-        root.hir_ty.TypePosition.ConstraintHead,
+        position = root.hir_ty.TypePosition.ConstraintHead,
     );
     let iface_args: root.types.Ty[] = match (lowered) {
         let iface: root.types.TyInterface => iface.args,

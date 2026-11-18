@@ -18,10 +18,7 @@
 //   render through `render_with(widen_runtime_ty_to_lowering_ty(t), s)`.
 // - `optional`, `is_unit`, `is_uninhabited`, `is_nullable_union`,
 //   `strip_null`: nothing on the type checker's path calls them.
-// - `ResolvedAliases::convert`, `lower_to_runtime`, `lower_vec`,
-//   `lower_interface_to_runtime`: MIR lowering's boundary; the type checker
-//   converts with `try_from` instead. `ResolvedAliases`, `from_aliases`,
-//   `has_cycle` and `ty_has_cycle` are ported (decl_cycles needs them).
+// - `lower_vec`: a `map` inside `lower_to_runtime`.
 // - `impl Default for ResolvedAliases`: write
 //   `ResolvedAliases { aliases: {}, recursive: {} }`.
 // - The tests: they cover the items above (`is_unit`, the constructors at
@@ -73,6 +70,120 @@ class ResolvedAliases {
             }
         }
         ResolvedAliases { aliases: aliases, recursive: recursive }
+    }
+
+    // port: baml_type/src/runtime_ty.rs::ResolvedAliases::convert @ d9be6853b
+    // A compile-time type as the runtime carries it (lower_to_runtime).
+    // Panics on an error-recovery type: a type-checked program has none.
+    function convert(self, ty: Ty) -> RuntimeTy throws never {
+        lower_to_runtime(ty, self) catch (e) {
+            let err: NotRuntimeTy => baml.sys.panic(
+                `ty is not a runtime type: ${err.variant}: an error-recovery type reached runtime lowering`,
+            ),
+        }
+    }
+}
+
+// port: baml_type/src/runtime_ty.rs::NotRuntimeTy @ d9be6853b
+// A type with no runtime form: the error-recovery sentinel, or an alias the
+// environment cannot see.
+class NotRuntimeTy {
+    variant: string,
+}
+
+// port: baml_type/src/runtime_ty.rs::lower_to_runtime @ d9be6853b
+// Lower `ty` to its runtime form: non-recursive aliases expanded inline,
+// recursive ones kept opaque, literal freshness reset to Regular (a
+// compiler-only flag), every other variant mapped to its runtime twin.
+function lower_to_runtime(ty: Ty, resolved: ResolvedAliases) -> RuntimeTy throws NotRuntimeTy {
+    let lower = (t: Ty) -> RuntimeTy throws NotRuntimeTy {
+        lower_to_runtime(t, resolved)
+    };
+    match (ty) {
+        let x: TyInt
+            | TyBigint
+            | TyFloat
+            | TyString
+            | TyBool
+            | TyNull
+            | TyUint8Array
+            | TyMedia
+            | TyEnum
+            | TyEnumVariant
+            | TyRustType
+            | TyType
+            | TyResource
+            | TyPromptAst
+            | TyTypeVar
+            | TyUnknown
+            | TyNever =>
+        {
+            x
+        },
+        let x: TyClass => RuntimeTyClass { name: x.name, args: x.args.map(lower) },
+        let x: TyInterface => {
+            RuntimeTyInterface {
+                name: x.name,
+                args: x.args.map(lower),
+                associated_types: x.associated_types.map((b) -> RuntimeAssociatedType throws NotRuntimeTy {
+                    RuntimeAssociatedType { name: b.name, ty: lower(b.ty) }
+                }),
+            }
+        },
+        let x: TyTypeAlias => {
+            if (resolved.recursive.has(x.name)) {
+                // Recursive aliases stay opaque: the runtime resolves them.
+                return x;
+            }
+            let target = resolved.aliases.get(x.name);
+            if (target == null) {
+                // A name nothing will declare: carrying it opaque would bake a
+                // dangling reference into the program image.
+                throw NotRuntimeTy { variant: "TypeAlias (not in the resolved-alias environment)" };
+            }
+            lower(target)
+        },
+        let x: TyList => RuntimeTyList { elem: lower(x.elem) },
+        let x: TyMap => RuntimeTyMap { key: lower(x.key), value: lower(x.value) },
+        let x: TyUnion => RuntimeTyUnion { members: x.members.map(lower) },
+        let x: TyTuple => RuntimeTyTuple { items: x.items.map(lower) },
+        let x: TyLiteral => TyLiteral { value: x.value, freshness: Freshness.Regular },
+        let x: TyFunction => {
+            RuntimeTyFunction {
+                params: x.params.map((p) -> RuntimeFunctionParamTy throws NotRuntimeTy {
+                    RuntimeFunctionParamTy { name: p.name, ty: lower(p.ty), mode: p.mode }
+                }),
+                ret: lower(x.ret),
+                throws_: lower(x.throws_),
+            }
+        },
+        let x: TyAssociatedTypeProjection => {
+            RuntimeTyAssociatedTypeProjection {
+                base: lower(x.base),
+                interface_: lower_interface_to_runtime(x.interface_, resolved),
+                member: x.member,
+            }
+        },
+        let x: TyFuture => RuntimeTyFuture { value: lower(x.value), error: lower(x.error) },
+        TyError => throw NotRuntimeTy { variant: "Error" },
+    }
+}
+
+// port: baml_type/src/runtime_ty.rs::lower_interface_to_runtime @ d9be6853b
+// An interface constraint (the `as I` of a projection) in runtime form,
+// every generic argument and binding lowered.
+function lower_interface_to_runtime(
+    interface_: InterfaceConstraint,
+    resolved: ResolvedAliases,
+) -> RuntimeInterfaceConstraint throws NotRuntimeTy {
+    RuntimeInterfaceConstraint {
+        name: interface_.name,
+        generics: interface_.generics.map((t) -> RuntimeTy throws NotRuntimeTy {
+            lower_to_runtime(t, resolved)
+        }),
+        associated_types: interface_.associated_types.map((b) -> RuntimeAssociatedType throws NotRuntimeTy {
+            RuntimeAssociatedType { name: b.name, ty: lower_to_runtime(b.ty, resolved) }
+        }),
     }
 }
 
