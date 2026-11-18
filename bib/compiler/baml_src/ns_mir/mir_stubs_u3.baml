@@ -18,69 +18,6 @@
 //   `int`s; `Name` is `string`; parameters named after a BAML keyword (or
 //   `root`) get `_` (`root_id`).
 
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::external_callee @ d9be6853b
-// The exported row a callee expression names, following the same
-// flat-vs-path-member precedence as the source-location helpers.
-function external_callee(ctx: LoweringContext, callee: int) -> int? throws never {
-    baml.sys.panic("external_callee: not ported (U3)")
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::trusted_external_callee @ d9be6853b
-// The exported row a callee names, ONLY when its package is
-// compiler-built (the precompiled stdlib): the one gate on trusting a
-// row's `builtin_kind` for compiler-owned lowering. Trust follows the
-// package the row's ADDRESS lives in: a blob cannot borrow another
-// package's trust by spelling its `target`.
-function trusted_external_callee(
-    ctx: LoweringContext,
-    callee: int,
-) -> (int, ExportedFunction)? throws never {
-    baml.sys.panic("trusted_external_callee: not ported (U3)")
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_tagged_template @ d9be6853b
-// Lower a tagged template (a `TAGGED_TEMPLATE_EXPR`) to a
-// `tag(body = <closure>)` call, where the closure builds a
-// `baml.TaggedString { parts, values }` from the template segments.
-function lower_tagged_template(
-    ctx: LoweringContext,
-    expr_id: int,
-    tag: int,
-    body: int,
-    segments: root.ast.TemplateSegment[],
-    dest: Place,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_tagged_template: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::collect_static_tagged_segments @ d9be6853b
-// Flatten text/interpolation segments into `(parts, value_exprs)` honoring
-// `parts.len() == value_exprs.len() + 1`. Returns `None` if any
-// `${for}`/`${if}` block or value-less `${…}` is present (the flatten
-// body runs those).
-function collect_static_tagged_segments(
-    segments: root.ast.TemplateSegment[],
-) -> (string[], int[])? throws never {
-    baml.sys.panic("collect_static_tagged_segments: not ported (U3)")
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::build_tagged_body_closure @ d9be6853b
-// Hand-roll the tagged-template body closure, returning the closure value.
-// Replicates `lower_lambda`'s state-save / param-decl / build / capture /
-// `MakeClosure` skeleton, replacing the AST-body lowering with the
-// array-builder (`static_layout`). `self.body`/`self.source_map` are NOT
-// swapped: the interpolation exprs live in the current `ExprBody`.
-function build_tagged_body_closure(
-    ctx: LoweringContext,
-    expr_id: int,
-    body: int,
-    body_params: (string, root.types.RuntimeTy)[],
-    closure_ty: root.types.RuntimeTy,
-    static_layout: (string[], int[])?,
-) -> Operand throws MirInternalError {
-    throw MirInternalError { message: "build_tagged_body_closure: not ported (U3)", span: null }
-}
-
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_scoped_block @ d9be6853b
 function lower_scoped_block(
     ctx: LoweringContext,
