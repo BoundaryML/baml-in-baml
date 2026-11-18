@@ -89,7 +89,7 @@ function external_callee(ctx: LoweringContext, callee: int) -> int? throws never
 function trusted_external_callee(
     ctx: LoweringContext,
     callee: int,
-) -> (int, ExportedFunction)? throws never {
+) -> (int, root.hir_ty.ExportedFunction)? throws never {
     baml.sys.panic("trusted_external_callee: not ported (U3)")
 }
 

@@ -400,7 +400,7 @@ function interface_declares(
     ctx: LoweringContext,
     iface_tn: root.types.DeclName,
     member: string,
-) -> DeclaredMember? throws never {
+) -> root.hir_ty.DeclaredMember? throws never {
     baml.sys.panic("interface_declares: not ported (U2)")
 }
 
@@ -411,7 +411,7 @@ function decl_interface_declares(
     ctx: LoweringContext,
     iface_decl: root.types.DeclName,
     member: string,
-) -> DeclaredMember? throws never {
+) -> root.hir_ty.DeclaredMember? throws never {
     baml.sys.panic("decl_interface_declares: not ported (U2)")
 }
 
