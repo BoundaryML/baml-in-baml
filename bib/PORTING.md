@@ -261,6 +261,29 @@ it; the port follows `BASE`, which includes it. **The oracle must be the Rust
 compiler at `BASE`**, not the installed nightly: build `baml-cli` from the fork
 at `BASE` and select it with `baml toolchain use <path>` for oracle runs.
 
+## AST lowering gate (2026-11-18)
+
+`check()` runs parse + CST to AST lowering; compared with the Rust compiler's
+parse diagnostics plus its lowering diagnostics (phase `hir`, lowering codes
+E0001 E0010 E0017 E0098 E0108 E0127 E0147 E0152 E0171), warnings included:
+
+| Corpus | Match |
+|---|---|
+| `projects/broken_syntax` | 43/43 |
+| `projects/diagnostic_errors` | 173/174 |
+| `projects/parser_stress` | 5/5 |
+| `baml_tests/baml_src` | 613/617 |
+| stdlib | 128/128 |
+
+The 5 differences are all the 63-bit `int` limit (accepted): our lowering
+rejects an i64-only literal that Rust rejects during type checking. They are
+listed in `ns_oracle/corpus.baml::KNOWN_DIFFERENCES`.
+
+Toolchain: upstream canary plus the lazy Hash-eligibility fix (separate PR);
+`baml check` on this project went from 11 minutes to under a second. No
+parser/AST/diagnostics changes between `BASE` and that canary, so it is a
+valid oracle for these two stages.
+
 ## Agents
 
 - A task is one Rust function (or a small cycle of them) whose callees are ported.

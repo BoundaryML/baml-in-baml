@@ -2,12 +2,20 @@
 // what our compiler should report.
 
 function rust_diagnostics(files: map<string, string>) -> reflect.Diagnostic[] throws never {
-  let package = reflect.Package._compile(files, {}) catch (error) {
+  let artifact = reflect.Package._compile(files, {}) catch (error) {
     reflect.errors.CompilationError => {
       return error.diagnostics;
     },
   };
-  []
+  // A successful compile still has its warnings; they live on the finished
+  // package. (If the package's top-level initialization throws, its warnings
+  // are lost; no corpus file does that.)
+  let package = reflect.Package._finish(artifact, {}) catch_all (e) {
+    _ => {
+      return [];
+    },
+  };
+  package.diagnostics()
 }
 
 // What two compilers must agree on for one diagnostic: code, place, headline
@@ -28,7 +36,23 @@ class ParseComparison {
 function compare_parse(files: map<string, string>) -> ParseComparison throws never {
   ParseComparison {
     rust: rust_diagnostics(files).filter((d) -> { d.phase == "parse" }).map(diagnostic_key),
-    ours: root.check(files).map(diagnostic_key),
+    ours: root.check(files).filter((d) -> { d.phase == "parse" }).map(diagnostic_key),
+  }
+}
+
+// The codes CST to AST lowering reports (`LoweringDiagnostic::to_diagnostic`).
+// HIR's own phase-"hir" diagnostics use other codes, so these pick out the
+// lowering's share of the Rust compiler's output.
+const LOWERING_CODES: string[] = ["E0001", "E0010", "E0017", "E0098", "E0108", "E0127", "E0147", "E0152", "E0171"];
+
+// Parse and lowering diagnostics, ours vs the Rust compiler's.
+function compare_lowering(files: map<string, string>) -> ParseComparison throws never {
+  let in_scope = (d: reflect.Diagnostic) -> bool {
+    d.phase == "parse" || (d.phase == "hir" && LOWERING_CODES.includes(d.code))
+  };
+  ParseComparison {
+    rust: rust_diagnostics(files).filter(in_scope).map(diagnostic_key),
+    ours: root.check(files).filter(in_scope).map(diagnostic_key),
   }
 }
 

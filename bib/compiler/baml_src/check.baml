@@ -6,11 +6,42 @@ function check(files: map<string, string>) -> reflect.Diagnostic[] throws never 
   files.keys().flat_map((file) -> { check_file(file, files[file]) })
 }
 
-// port: baml_db/src/check.rs::check_file @ d9be6853b (the parse step and the
-// final dedup). One file's diagnostics, in the order its checks produce them.
+// port: baml_db/src/check.rs::check_file @ d9be6853b. One file's
+// diagnostics in the order its steps produce them (parse, then CST to AST
+// lowering), deduplicated. `file` is the path relative to the package root.
 function check_file(file: string, text: string) -> reflect.Diagnostic[] throws never {
-  let diagnostics = root.syntax.parse(text).errors.map((error) -> { root.syntax.parse_error_diagnostic(error, file) });
+  let parsed = root.syntax.parse(text);
+  let (let _items, let lowering, let _env_refs) = root.ast.lower_file(parsed.tree, file, test_owner(file));
+  let diagnostics = parsed.errors.map((error) -> { root.syntax.parse_error_diagnostic(error, file) })
+    .concat(lowering.map((d) -> { root.ast.to_diagnostic(d, file) }));
   sort_diagnostics(dedup_adjacent(diagnostics))
+}
+
+// port: baml_compiler2_hir/src/lib.rs::file_ast's test owner: `root`, or
+// `root.<ns>...` from the file's namespace.
+function test_owner(file: string) -> string throws never {
+  ["root"].concat(namespace_path(file)).join(".")
+}
+
+// port: baml_compiler2_hir/src/file_package.rs::file_package's namespace path:
+// every `ns_<identifier>` directory on the way to the file, in order.
+function namespace_path(file: string) -> string[] throws never {
+  let dirs = file.split("/");
+  dirs.pop();
+  dirs.filter_map((dir) -> { ns_name(dir) })
+}
+
+// port: file_package.rs::extract_ns_name. The namespace an `ns_` directory
+// names, when the rest is an identifier.
+function ns_name(dir: string) -> string? throws never {
+  if (!dir.starts_with("ns_")) {
+    return null;
+  }
+  let name = dir.slice(3, dir.length());
+  let first = name.at(0) ?? return null;
+  let valid = (first.is_ascii_alphabetic() || first == "_")
+    && name.chars().every((c) -> { c.is_ascii_alphanumeric() || c == "_" });
+  if (valid) { name } else { null }
 }
 
 // port: baml_db/src/check.rs::sort_diagnostics. By primary span start, then
