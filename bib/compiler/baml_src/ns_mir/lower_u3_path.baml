@@ -501,7 +501,7 @@ function lower_multi_segment_path_as_field_chain(
             throw internal_error(ctx, "the checker recorded no type for a path segment", expr_id);
         }
         let target_place: Place = if (is_last) {
-            dest
+            place_clone(dest)
         } else {
             PlaceLocal { value: ctx.builder.declare_local(target_ty) }
         };
@@ -511,7 +511,7 @@ function lower_multi_segment_path_as_field_chain(
                 let local = ctx.builder.declare_local(current_ty);
                 ctx.builder.assign(
                     PlaceLocal { value: local },
-                    RvalueUse { value: OperandCopy { value: current_place } },
+                    RvalueUse { value: OperandCopy { value: place_clone(current_place) } },
                 );
                 local
             },
@@ -525,7 +525,7 @@ function lower_multi_segment_path_as_field_chain(
                     interface_prefix.1,
                     interface_prefix.2,
                     seg,
-                    target_place,
+                    place_clone(target_place),
                 )
         ) {
             if (is_last) {
@@ -559,7 +559,7 @@ function lower_multi_segment_path_as_field_chain(
             ctx,
             "index",
             [OperandCopy { value: current_place }, operand_copy_local(key_local)],
-            target_place,
+            place_clone(target_place),
         );
         if (is_last) {
             return;

@@ -281,12 +281,15 @@ function lower_expr_map(
 ) -> void throws MirInternalError {
     let (let key_ty, let value_ty) = map_kv_templates(ctx, expr_id);
     let map = PlaceLocal { value: ctx.builder.declare_local(expr_ty(ctx, expr_id)) };
-    ctx.builder.assign(map, RvalueMap { key_ty: key_ty, value_ty: value_ty, entries: [] });
+    ctx.builder.assign(
+        place_clone(map),
+        RvalueMap { key_ty: key_ty, value_ty: value_ty, entries: [] },
+    );
     for (let entry in entries) {
         let key = lower_to_operand(ctx, entry.key);
         let value = lower_to_operand(ctx, entry.value);
         let ignored = PlaceLocal { value: ctx.builder.declare_local(root.types.TyUnknown {}) };
-        emit_map_call(ctx, "set", [OperandCopy { value: map }, key, value], ignored);
+        emit_map_call(ctx, "set", [OperandCopy { value: place_clone(map) }, key, value], ignored);
     }
     ctx.builder.assign(dest, RvalueUse { value: OperandCopy { value: map } });
 }
@@ -349,7 +352,7 @@ function lower_expr_is(
 
     ctx.builder.set_current_block(bb_true);
     ctx.builder.assign(
-        dest,
+        place_clone(dest),
         RvalueUse { value: OperandConstant { value: ConstantBool { value: true } } },
     );
     ctx.builder.goto(bb_join);
@@ -445,7 +448,7 @@ function lower_await(
 ) -> void throws MirInternalError {
     let future_local = ctx.builder.declare_local(root.types.TyNull {});
     let future_place = PlaceLocal { value: future_local };
-    lower_expr(ctx, future, future_place);
+    lower_expr(ctx, future, place_clone(future_place));
 
     // `TerminatorAwait` requires its destination to be a `PlaceLocal`. If
     // the caller handed a projection (field/index), await into a temp local
@@ -463,7 +466,7 @@ function lower_await(
     }
 
     let resume = ctx.builder.create_block();
-    ctx.builder.await_(future_place, await_dest, resume);
+    ctx.builder.await_(future_place, place_clone(await_dest), resume);
     ctx.builder.set_current_block(resume);
 
     if (projection_dest != null) {

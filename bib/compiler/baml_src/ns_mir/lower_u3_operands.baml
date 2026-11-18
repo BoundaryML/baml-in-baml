@@ -152,7 +152,7 @@ function lower_if(
     lower_condition(ctx, condition, bb_then, bb_else);
 
     ctx.builder.set_current_block(bb_then);
-    lower_expr(ctx, then_branch, dest);
+    lower_expr(ctx, then_branch, place_clone(dest));
     if (!ctx.builder.is_current_terminated()) {
         ctx.builder.goto(bb_join);
     }
@@ -201,7 +201,7 @@ function lower_if_let(
     // Then-branch: bind the pattern's locals, lower the body.
     ctx.builder.set_current_block(bb_then);
     bind_pattern(ctx, scrutinee_local, pattern, root.hir.DefinitionSitePatternBinding { value: pattern });
-    lower_expr(ctx, then_branch, dest);
+    lower_expr(ctx, then_branch, place_clone(dest));
     if (!ctx.builder.is_current_terminated()) {
         ctx.builder.goto(bb_join);
     }
@@ -356,7 +356,7 @@ function lower_object(
             },
             let named: ObjectEntryNamed => {
                 let idx = object_field_slot(ctx, class_, named.name);
-                result[idx] = named.operand;
+                result[idx] = operand_clone(named.operand);
             },
         }
     }
@@ -402,7 +402,11 @@ function lower_member_access_with_base(
     let slot = tuple_slot(field);
     if (slot != null) {
         let base_ty = expr_ty(ctx, base);
-        let base_op = cached_base ?? lower_to_operand(ctx, base);
+        let base_op = if (cached_base != null) {
+            operand_clone(cached_base)
+        } else {
+            lower_to_operand(ctx, base)
+        };
         let base_local = ctx.builder.declare_local(base_ty);
         ctx.builder.assign(PlaceLocal { value: base_local }, RvalueUse { value: base_op });
         let index = ctx.builder.declare_local(root.types.TyInt {});
@@ -438,7 +442,11 @@ function lower_member_access_with_base(
     // without evaluating the receiver twice.
     let view = dispatch_target_for_member_access(ctx, expr_id, base, field);
     if (view != null && mir_interface_declares_method(ctx, view.0, field)) {
-        let recv_op = cached_base ?? lower_to_operand(ctx, base);
+        let recv_op = if (cached_base != null) {
+            operand_clone(cached_base)
+        } else {
+            lower_to_operand(ctx, base)
+        };
         let recv_local = ctx.builder.declare_local(expr_ty(ctx, base));
         ctx.builder.assign(PlaceLocal { value: recv_local }, RvalueUse { value: recv_op });
         emit_virtual_bound_method(ctx, expr_id, recv_local, view, field, dest);
@@ -505,7 +513,11 @@ function lower_member_access_resolution(
                         // emit MakeBoundMethod.
                         let item = root.hir_ty.member_resolution_callable(method, ctx.db);
                         if (item != null) {
-                            let receiver_op = cached_base ?? lower_to_operand(ctx, base);
+                            let receiver_op = if (cached_base != null) {
+                                operand_clone(cached_base)
+                            } else {
+                                lower_to_operand(ctx, base)
+                            };
                             assign_bound_method_value(ctx, expr_id, dest, item, receiver_op);
                             return true;
                         }
@@ -557,7 +569,11 @@ function lower_member_access_field(
     cached_base: Operand?,
 ) -> void throws MirInternalError {
     let base_ty = expr_ty(ctx, base);
-    let base_op = cached_base ?? lower_to_operand(ctx, base);
+    let base_op = if (cached_base != null) {
+        operand_clone(cached_base)
+    } else {
+        lower_to_operand(ctx, base)
+    };
 
     // Unwrap an optional: called from `lower_optional_member_access`, the
     // base type is `T?` but already null-checked, so use the inner type.
@@ -791,13 +807,13 @@ function emit_map_call(
         },
     };
     let call_dest: Place = match (dest) {
-        PlaceLocal => dest,
+        PlaceLocal => place_clone(dest),
         _ => PlaceLocal { value: ctx.builder.declare_local(root.types.TyUnknown {}) },
     };
     let resume = ctx.builder.create_block();
     // Native map operations read K/V from the typed receiver, not call type
     // arguments.
-    ctx.builder.call_with_type_args(callee, args, 0, call_dest, resume);
+    ctx.builder.call_with_type_args(callee, args, 0, place_clone(call_dest), resume);
     ctx.builder.set_current_block(resume);
     if (call_dest != dest) {
         ctx.builder.assign(dest, RvalueUse { value: OperandCopy { value: call_dest } });
@@ -847,4 +863,33 @@ function operand_to_local(
     let temp = ctx.builder.declare_local(ty);
     ctx.builder.assign(PlaceLocal { value: temp }, RvalueUse { value: op });
     temp
+}
+
+// port: baml_compiler2_mir/src/ir.rs::impl Clone for Place @ d9be6853b
+// Rust's derived `Clone`: a fresh, deep copy. A `Place` the lowering puts
+// in two MIR positions (where Rust clones it) must be two objects: the
+// optimizer rewrites places in place (`remap_place`, `apply_subst_*`), and a
+// shared object would be rewritten once per position.
+function place_clone(place: Place) -> Place throws never {
+    match (place) {
+        let p: PlaceLocal => PlaceLocal { value: p.value },
+        let p: PlaceField => PlaceField { base: place_clone(p.base), field: p.field },
+        let p: PlaceIndex => PlaceIndex { base: place_clone(p.base), index: p.index, kind: p.kind },
+        let p: PlaceCapture => PlaceCapture { value: p.value },
+        let p: PlaceDeref => match (p.value) {
+            let cell: PlaceLocal => PlaceDeref { value: PlaceLocal { value: cell.value } },
+            let cell: PlaceCapture => PlaceDeref { value: PlaceCapture { value: cell.value } },
+        },
+    }
+}
+
+// port: baml_compiler2_mir/src/ir.rs::impl Clone for Operand @ d9be6853b
+// Rust's derived `Clone`, as `place_clone`. A constant is never rewritten in
+// place, so the copy shares it.
+function operand_clone(operand: Operand) -> Operand throws never {
+    match (operand) {
+        let o: OperandCopy => OperandCopy { value: place_clone(o.value) },
+        let o: OperandMove => OperandMove { value: place_clone(o.value) },
+        let o: OperandConstant => OperandConstant { value: o.value },
+    }
 }

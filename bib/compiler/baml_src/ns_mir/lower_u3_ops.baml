@@ -237,7 +237,7 @@ function lower_equality_via_driver(
     let bool_ty = root.types.TyBool {};
     if (structural != null) {
         let result: Place = if (op == root.ast.BinaryOp.Eq) {
-            dest
+            place_clone(dest)
         } else {
             PlaceLocal { value: ctx.builder.declare_local(bool_ty) }
         };
@@ -247,7 +247,7 @@ function lower_equality_via_driver(
             [],
             root.types.structural_interface_native_function(structural),
         );
-        emit_direct_structural_call(ctx, func, [lhs_op, rhs_op], 0, null, bool_ty, result);
+        emit_direct_structural_call(ctx, func, [lhs_op, rhs_op], 0, null, bool_ty, place_clone(result));
         if (op == root.ast.BinaryOp.Ne) {
             ctx.builder.assign(
                 dest,
@@ -264,7 +264,7 @@ function lower_equality_via_driver(
     // projection destinations, so this covers both local and projection
     // cases).
     let eq_dest = PlaceLocal { value: ctx.builder.declare_local(bool_ty) };
-    lower_via_ops_driver(ctx, "equals_equals", [lhs_op, rhs_op], bool_ty, eq_dest);
+    lower_via_ops_driver(ctx, "equals_equals", [lhs_op, rhs_op], bool_ty, place_clone(eq_dest));
     ctx.builder.assign(
         dest,
         RvalueUnaryOp { op: UnaryOp.Not, operand: OperandCopy { value: eq_dest } },
@@ -296,10 +296,10 @@ function lower_via_ops_driver(
     let call_dest: Place = if (needs_temp) {
         PlaceLocal { value: ctx.builder.declare_local(result_ty) }
     } else {
-        dest
+        place_clone(dest)
     };
     let resume = ctx.builder.create_block();
-    ctx.builder.call_with_type_args(callee, args, 0, call_dest, resume);
+    ctx.builder.call_with_type_args(callee, args, 0, place_clone(call_dest), resume);
     ctx.builder.set_current_block(resume);
     if (needs_temp) {
         ctx.builder.assign(dest, RvalueUse { value: OperandCopy { value: call_dest } });
@@ -635,17 +635,20 @@ function lower_short_circuit(
     } else {
         ShortCircuitKind.Or
     };
-    ctx.builder.short_circuit(lhs_op, kind, sc_dest, bb_rhs, bb_join);
+    ctx.builder.short_circuit(lhs_op, kind, place_clone(sc_dest), bb_rhs, bb_join);
 
     ctx.builder.set_current_block(bb_rhs);
-    lower_expr(ctx, rhs, sc_dest);
+    lower_expr(ctx, rhs, place_clone(sc_dest));
     // The stored result must be the COERCED bool (`a && b` is bool-typed even
     // when its operands are not), so a truthy-marked rhs re-assigns through
     // the coercion in place.
     if (tir_truthy_condition(ctx, rhs)) {
         ctx.builder.assign(
-            sc_dest,
-            RvalueUnaryOp { op: UnaryOp.Truthy, operand: OperandCopy { value: sc_dest } },
+            place_clone(sc_dest),
+            RvalueUnaryOp {
+                op: UnaryOp.Truthy,
+                operand: OperandCopy { value: place_clone(sc_dest) },
+            },
         );
     }
     if (!ctx.builder.is_current_terminated()) {
@@ -671,10 +674,16 @@ function lower_null_coalesce(
     let lhs_op = lower_to_operand(ctx, lhs);
     let bb_rhs = ctx.builder.create_block();
     let bb_join = ctx.builder.create_block();
-    ctx.builder.short_circuit(lhs_op, ShortCircuitKind.Coalesce, result_place, bb_rhs, bb_join);
+    ctx.builder.short_circuit(
+        lhs_op,
+        ShortCircuitKind.Coalesce,
+        place_clone(result_place),
+        bb_rhs,
+        bb_join,
+    );
 
     ctx.builder.set_current_block(bb_rhs);
-    lower_expr(ctx, rhs, result_place);
+    lower_expr(ctx, rhs, place_clone(result_place));
     if (!ctx.builder.is_current_terminated()) {
         ctx.builder.goto(bb_join);
     }
@@ -699,7 +708,7 @@ function lower_optional_chain(
     ctx.chain_null_exits.push(bb_null);
 
     // Lower the inner expression: optional nodes jump to bb_null on null.
-    lower_expr(ctx, inner, dest);
+    lower_expr(ctx, inner, place_clone(dest));
 
     ctx.chain_null_exits.pop();
 
@@ -799,8 +808,8 @@ function emit_assign_op(
             let current = PlaceLocal { value: ctx.builder.declare_local(expr_ty(ctx, target)) };
             let receiver = OperandCopy { value: index_place.base };
             let key = operand_copy_local(index_place.index);
-            emit_map_call(ctx, "index", [receiver, key], current);
-            emit_assign_op(ctx, current, target, op, value);
+            emit_map_call(ctx, "index", [operand_clone(receiver), operand_clone(key)], place_clone(current));
+            emit_assign_op(ctx, place_clone(current), target, op, value);
             let ignored = PlaceLocal { value: ctx.builder.declare_local(root.types.TyUnknown {}) };
             emit_map_call(ctx, "set", [receiver, key, OperandCopy { value: current }], ignored);
             return;
@@ -817,13 +826,13 @@ function emit_assign_op(
         _ => null,
     };
     if (driver != null && !arithmetic_uses_primitive_opcode(ctx, target, value)) {
-        let current = OperandCopy { value: place };
+        let current = OperandCopy { value: place_clone(place) };
         let rhs = lower_to_operand(ctx, value);
         let result_ty = expr_ty(ctx, target);
         lower_via_ops_driver(ctx, driver, [current, rhs], result_ty, place);
         return;
     }
-    let current = OperandCopy { value: place };
+    let current = OperandCopy { value: place_clone(place) };
     let rhs = lower_to_operand(ctx, value);
     ctx.builder.assign(place, RvalueBinaryOp { op: mir_op, left: current, right: rhs });
 }
@@ -873,7 +882,7 @@ function lower_optional_member_access(
         ctx.builder.branch(operand_copy_local(test_local), bb_null, bb_access);
 
         ctx.builder.set_current_block(bb_access);
-        lower_member_access_with_base(ctx, expr_id, base, field, dest, cached_base = operand_copy_local(base_local));
+        lower_member_access_with_base(ctx, expr_id, base, field, place_clone(dest), cached_base = operand_copy_local(base_local));
         if (!ctx.builder.is_current_terminated()) {
             ctx.builder.goto(bb_join);
         }
@@ -925,7 +934,7 @@ function lower_optional_index(
         ctx.builder.branch(operand_copy_local(test_local), bb_null, bb_access);
 
         ctx.builder.set_current_block(bb_access);
-        lower_optional_index_access(ctx, base_local, base_ty, index, dest, bb_null);
+        lower_optional_index_access(ctx, base_local, base_ty, index, place_clone(dest), bb_null);
         if (!ctx.builder.is_current_terminated()) {
             ctx.builder.goto(bb_join);
         }
@@ -959,7 +968,7 @@ function lower_optional_index_access(
     if (index_ty != root.types.runtime_ty_strip_null(index_ty)) {
         let is_null = RvalueBinaryOp {
             op: BinOp.Eq,
-            left: index_op,
+            left: operand_clone(index_op),
             right: OperandConstant { value: ConstantNull {} },
         };
         let test_local = ctx.builder.declare_local(root.types.TyBool {});
@@ -1009,7 +1018,7 @@ function lower_optional_call(
         ctx.builder.branch(operand_copy_local(test_local), bb_null, bb_call);
 
         ctx.builder.set_current_block(bb_call);
-        lower_call(ctx, expr_id, callee, args, dest);
+        lower_call(ctx, expr_id, callee, args, place_clone(dest));
         if (!ctx.builder.is_current_terminated()) {
             ctx.builder.goto(bb_join);
         }
