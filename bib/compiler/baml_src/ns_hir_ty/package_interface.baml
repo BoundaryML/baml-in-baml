@@ -20,3 +20,21 @@ function reexport_paths(
 ) -> (root.types.DeclName, string[], string)[] throws never {
     []
 }
+
+// port: baml_compiler2_hir_ty/src/package_interface.rs::ExportedFunction @ d9be6853b
+// A served package's exported function row. No root is served from an
+// interface here, so MIR never holds one; the lookups that answer it
+// (`extern_function_row`) are not reached. Not ported: the fields `target`
+// (`ExternalCallTarget`) and `linkability` (`ExternalLinkability`), whose
+// types are not ported.
+class ExportedFunction {
+    name: string,
+    params: root.types.FunctionParamTy[],
+    return_type: root.types.Ty,
+    callable_throws: root.types.Ty,
+    // Function-level generic parameters, including any synthetic callback
+    // effect parameters introduced by bounded signature elaboration.
+    generic_params: root.types.ParamTy[],
+    generic_param_bounds: root.types.InterfaceConstraint[][],
+    builtin_kind: root.ast.BuiltinKind?,
+}

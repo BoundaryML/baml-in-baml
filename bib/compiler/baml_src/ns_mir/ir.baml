@@ -438,11 +438,11 @@ function type_test_for_each_type_arg_ref(
     match (test_) {
         let t: TypeTestClass => {
             for (let arg in t.args) {
-                ty_template_for_each_type_arg_ref(arg, f);
+                root.types.ty_template_for_each_type_arg_ref(arg, f);
             }
         },
         TypeTestEnum => {},
-        let t: TypeTestTemplate => ty_template_for_each_type_arg_ref(t.value, f),
+        let t: TypeTestTemplate => root.types.ty_template_for_each_type_arg_ref(t.value, f),
     }
 }
 
@@ -456,12 +456,14 @@ function type_test_template(
     match (test_) {
         let t: TypeTestClass => {
             root.types.TyTemplateClass {
-                name: class_head(db, root.hir.DeclRefSource { value: t.class_ }),
+                name: root.hir_ty.class_head(db, root.hir.DeclRefSource { value: t.class_ }),
                 args: t.args,
             }
         },
         let t: TypeTestEnum => {
-            root.types.TyEnum { name: enum_head(db, root.hir.DeclRefSource { value: t.value }) }
+            root.types.TyEnum {
+                name: root.hir_ty.enum_head(db, root.hir.DeclRefSource { value: t.value }),
+            }
         },
         let t: TypeTestTemplate => t.value,
     }
