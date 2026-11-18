@@ -9,7 +9,7 @@
 //
 // Restructured (BAML forces it):
 // - Rust's derived `Ord` on `QualifiedTypeName` sorts Tarjan's nodes; BAML
-//   has no derived `Compare` for classes, so `decl_name_cmp` spells it out.
+//   has no derived `Compare` for classes; `cmp_decl_name` (ord.baml) spells it out.
 // - Graph walks whose depth is the length of a declaration chain (Tarjan's
 //   `strong_connect`, the alias chain followed by
 //   `extract_required_class_deps`, and `has_cycle`) use an explicit work
@@ -19,32 +19,6 @@
 // Also here, from a file not yet ported: `ResolvedAliases::from_aliases`,
 // `has_cycle` and `ty_has_cycle` (runtime_ty.rs). This file's tests call
 // them.
-
-// port: baml_type/src/names.rs::QualifiedTypeName (derived Ord) @ d9be6853b
-// The derived order of a DeclName: package, then namespace path
-// (lexicographic, shorter prefix first), then short name.
-function decl_name_cmp(a: DeclName, b: DeclName) -> baml.ops.Ordering throws never {
-    let by_pkg = a.pkg.cmp(b.pkg);
-    if (by_pkg != baml.ops.Ordering.Equal) {
-        return by_pkg;
-    }
-    let shared = if (a.namespace.length() < b.namespace.length()) {
-        a.namespace.length()
-    } else {
-        b.namespace.length()
-    };
-    for (let i = 0; i < shared; i += 1) {
-        let by_segment = a.namespace[i].cmp(b.namespace[i]);
-        if (by_segment != baml.ops.Ordering.Equal) {
-            return by_segment;
-        }
-    }
-    let by_depth = a.namespace.length().cmp(b.namespace.length());
-    if (by_depth != baml.ops.Ordering.Equal) {
-        return by_depth;
-    }
-    a.name.cmp(b.name)
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INVALID CYCLE DETECTION (Tarjan's SCC + structural edges)
@@ -248,7 +222,7 @@ class Tarjan {
         let tarjan = Tarjan { graph: graph, index: 0, stack: [], state: state, components_value: [] };
 
         // Sort nodes for deterministic traversal order.
-        let nodes = graph.keys().sort_by(decl_name_cmp);
+        let nodes = graph.keys().sort_by(cmp_decl_name);
         for (let node in nodes) {
             if (tarjan.state[node].index == TARJAN_UNVISITED) {
                 tarjan.strong_connect(node);
@@ -257,7 +231,7 @@ class Tarjan {
 
         // Sort components by first element for deterministic output.
         tarjan.components_value.sort_by((a, b) -> {
-            decl_name_cmp(a[0], b[0])
+            cmp_decl_name(a[0], b[0])
         })
     }
 
@@ -309,7 +283,7 @@ class Tarjan {
         self.stack.push(node_id);
 
         // Sort successors for deterministic DFS order.
-        let successors = self.graph[node_id].keys().sort_by(decl_name_cmp);
+        let successors = self.graph[node_id].keys().sort_by(cmp_decl_name);
         TarjanFrame { node_id: node_id, node: node, successors: successors, next: 0 }
     }
 
@@ -342,7 +316,7 @@ class Tarjan {
         // deterministic cycle paths.
         let min_idx = 0;
         for (let i = 1; i < component.length(); i += 1) {
-            if (decl_name_cmp(component[i], component[min_idx]) == baml.ops.Ordering.Less) {
+            if (cmp_decl_name(component[i], component[min_idx]) == baml.ops.Ordering.Less) {
                 min_idx = i;
             }
         }
