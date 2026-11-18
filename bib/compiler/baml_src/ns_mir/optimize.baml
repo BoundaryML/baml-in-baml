@@ -18,13 +18,14 @@
 //   functions RETURN the rewritten value (an `int`, a new `Place`, ...),
 //   and the caller stores it into the containing field or array: an
 //   operand that changes variant cannot be replaced through a parameter,
-//   and IR nodes are shared references (lowering may share one `Place`,
-//   copy propagation shares a substituted operand across its uses), so a
-//   rewrite in place could be applied twice. No function here mutates an
-//   IR node; mutated in place are only `MirFunctionBody` fields,
+//   and IR nodes are shared references, so a rewrite in place of a shared
+//   node would be applied twice. No function here mutates an IR node;
+//   mutated in place are only `MirFunctionBody` fields,
 //   `BasicBlock` fields and the block-owned `statements` arrays (rebuilt
 //   wholesale where Rust rewrites every statement). A rewriter returns its
-//   argument itself where nothing in it can change.
+//   argument itself where nothing in it can change. Where Rust clones a
+//   substitution into each use (`apply_subst_to_operand`), each use gets
+//   its own operand; a `Constant` is shared, as it is never rewritten.
 // - `block.clone()` (dead blocks, RPO) is `BasicBlock { ...block, id }`: the
 //   old `blocks` array is dropped, so sharing its statement arrays is safe.
 //   `local_decl.clone()` shares the `LocalDecl`; the old `locals` array is
@@ -1059,7 +1060,24 @@ function apply_subst_to_operand(op: Operand, subst: map<int, Operand>) -> Operan
         OperandCopy { value: PlaceLocal { value: let l } }
             | OperandMove { value: PlaceLocal { value: let l } } =>
         {
-            subst.get(l) ?? op
+            let replacement = subst.get(l)
+                ?? return op;
+            // Rust's `.cloned()`: each use gets its own operand. A
+            // substitution is a plain-local read or a constant (which is
+            // never rewritten in place, so the copy shares it).
+            match (replacement) {
+                OperandCopy { value: PlaceLocal { value: let source } } => {
+                    operand_copy_local(source)
+                },
+                OperandMove { value: PlaceLocal { value: let source } } => {
+                    OperandMove { value: PlaceLocal { value: source } }
+                },
+                let c: OperandConstant => OperandConstant { value: c.value },
+                // Not built by any pass: a projection is substituted only
+                // through `apply_subst_to_place_locals`.
+                let o: OperandCopy => OperandCopy { value: o.value },
+                let o: OperandMove => OperandMove { value: o.value },
+            }
         },
         // Projection (Field/Index): substitute locals within the place, e.g.
         // `copy _5.0` where `_5 -> copy _1` becomes `copy _1.0`.
