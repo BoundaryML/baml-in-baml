@@ -528,3 +528,21 @@ sees the stdlib's source, as `baml check` does.
 
 `ported_layers` now includes `tir`: upstream changes to the type checker
 queue as port tasks.
+
+## type_spec (2026-11-18)
+
+Upstream's inferred-type fixtures, read in place from
+`baml_tests/src/type_spec/fixtures/` (`ns_oracle/ns_type_spec/`, a port of
+`harness.rs` and `fixtures.rs`):
+
+    baml run oracle.type_spec.type_spec_summary
+
+| Check | Result |
+|---|---|
+| fixtures | 173/173 |
+| caret annotations (inferred types, `throws`, error channel) | 355/355 |
+| `render_infer` snapshots, byte for byte | 5/5 |
+
+Runs in ~6 s. A changed expectation is reported as
+`line:col expected=<...> ours=<...>`; `baml test` includes the
+all-fixtures test.
