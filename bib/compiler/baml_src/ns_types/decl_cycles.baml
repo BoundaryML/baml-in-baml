@@ -16,9 +16,8 @@
 //   stack instead of recursion. Walks over one type's nesting stay recursive,
 //   as in lib.baml.
 //
-// Also here, from a file not yet ported: `ResolvedAliases::from_aliases`,
-// `has_cycle` and `ty_has_cycle` (runtime_ty.rs). This file's tests call
-// them.
+// The tests also call `ResolvedAliases::from_aliases`, `has_cycle` and
+// `ty_has_cycle` (runtime_ty.baml).
 
 // ═══════════════════════════════════════════════════════════════════════════
 // INVALID CYCLE DETECTION (Tarjan's SCC + structural edges)
@@ -529,102 +528,4 @@ function required_deps_result(frame: RequiredDepsFrame) -> map<DeclName, bool> t
         }
     }
     deps
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// RECURSIVE ALIAS DETECTION (runtime_ty.rs)
-// ═══════════════════════════════════════════════════════════════════════════
-
-// port: baml_type/src/runtime_ty.rs::ResolvedAliases @ d9be6853b
-// The resolved type-alias environment needed to erase a Ty into a RuntimeTy:
-// the alias targets to expand and the set of recursive aliases to keep
-// opaque. Only `from_aliases` is ported (`convert` belongs with
-// `lower_to_runtime`, not yet ported).
-class ResolvedAliases {
-    aliases: map<DeclName, Ty>,
-    recursive: map<DeclName, bool>,
-
-    // port: baml_type/src/runtime_ty.rs::ResolvedAliases::from_aliases @ d9be6853b
-    // Build the environment from the collected alias targets, computing the
-    // recursive set here, so a caller cannot pair aliases with a stale
-    // recursive set.
-    function from_aliases(aliases: map<DeclName, Ty>) -> ResolvedAliases throws never {
-        let recursive: map<DeclName, bool> = {};
-        for (let name in aliases.keys()) {
-            if (has_cycle(name, aliases)) {
-                recursive.set(name, true);
-            }
-        }
-        ResolvedAliases { aliases: aliases, recursive: recursive }
-    }
-}
-
-// One `has_cycle` call in progress: the alias and the aliases its target
-// names, in walk order, with how many it has followed.
-class AliasCycleFrame {
-    name: DeclName,
-    refs: DeclName[],
-    next: int,
-}
-
-// port: baml_type/src/runtime_ty.rs::has_cycle @ d9be6853b
-// Whether a depth-first walk from `name` through alias targets meets an
-// alias already on its path (a cycle reachable from `name`, not necessarily
-// through it).
-//
-// Rust recurses through `ty_has_cycle` with `visited` and `stack` threaded
-// in; here both are local and each pending call is an `AliasCycleFrame`. The
-// walk follows the same aliases in the same order and stops at the first
-// back edge, as Rust's short-circuiting `||` and `any` do.
-function has_cycle(name: DeclName, aliases: map<DeclName, Ty>) -> bool throws never {
-    let visited: map<DeclName, bool> = {};
-    let stack: map<DeclName, bool> = {};
-    visited.set(name, true);
-    stack.set(name, true);
-    let frames = [AliasCycleFrame { name: name, refs: ty_has_cycle(aliases[name], aliases), next: 0 }];
-    while (frames.length() > 0) {
-        let frame = frames[frames.length() - 1];
-        if (frame.next == frame.refs.length()) {
-            stack.delete(frame.name);
-            frames.pop();
-            continue;
-        }
-        let next = frame.refs[frame.next];
-        frame.next += 1;
-        if (stack.has(next)) {
-            return true;
-        }
-        if (visited.has(next)) {
-            continue;
-        }
-        visited.set(next, true);
-        stack.set(next, true);
-        frames.push(
-            AliasCycleFrame { name: next, refs: ty_has_cycle(aliases[next], aliases), next: 0 },
-        );
-    }
-    false
-}
-
-// port: baml_type/src/runtime_ty.rs::ty_has_cycle @ d9be6853b
-// The aliases (keys of `aliases`) that `ty` names, in the order Rust's
-// `ty_has_cycle` would follow them. Rust calls `has_cycle` on each as it
-// finds it; here `has_cycle` follows the returned list. Rust's arms descend
-// into exactly `children_ty`, in its order.
-function ty_has_cycle(ty: Ty, aliases: map<DeclName, Ty>) -> DeclName[] throws never {
-    let refs: DeclName[] = [];
-    let pending = [ty];
-    while let next: Ty = pending.pop() {
-        match (next) {
-            let alias: TyTypeAlias if aliases.has(alias.name) => {
-                refs.push(alias.name);
-            },
-            _ => {
-                for (let child in children_ty(next).reverse()) {
-                    pending.push(child);
-                }
-            },
-        }
-    }
-    refs
 }
