@@ -100,7 +100,11 @@ class LangFacts {
             []
         }
 
-        function interface_requires(self, sub: InterfaceConstraint, sup: InterfaceConstraint) -> bool {
+        function interface_requires(
+            self,
+            sub: InterfaceConstraint,
+            sup: InterfaceConstraint,
+        ) -> bool {
             false
         }
 
@@ -108,7 +112,11 @@ class LangFacts {
             null
         }
 
-        function associated_type_bound(self, interface_: InterfaceConstraint, assoc: string) -> InterfaceConstraint[] {
+        function associated_type_bound(
+            self,
+            interface_: InterfaceConstraint,
+            assoc: string,
+        ) -> InterfaceConstraint[] {
             []
         }
 
@@ -129,7 +137,8 @@ class LangFacts {
 // namespace of the installed `reflect` package, or null when it is not
 // installed. Rust goes through `DeclName::of_lang_item(lang, head.item())`.
 function well_known_decl(lang: root.base.LangRoots, head: WellKnownHead) -> DeclName? throws never {
-    let reflect = lang.get(root.base.LangPackage.Reflect) ?? return null;
+    let reflect = lang.get(root.base.LangPackage.Reflect)
+        ?? return null;
     DeclName { pkg: reflect, namespace: [], name: well_known_head_name(head) }
 }
 
@@ -189,21 +198,33 @@ interface TypeContext {
 
     // Whether the non-interface, non-type-variable `concrete` implements
     // `interface_`, generic arguments and associated-type bindings included.
-    function implements_interface(self, concrete: Ty, interface_: InterfaceConstraint) -> bool throws never;
+    function implements_interface(
+        self,
+        concrete: Ty,
+        interface_: InterfaceConstraint,
+    ) -> bool throws never;
 
     // The declared bound of a type variable (a conjunction of interfaces);
     // empty if unbounded or unknown.
     function type_var_bound(self, param: ParamTy) -> InterfaceConstraint[] throws never;
 
     // Whether `sub` properly (transitively, not reflexively) requires `sup`.
-    function interface_requires(self, sub: InterfaceConstraint, sup: InterfaceConstraint) -> bool throws never;
+    function interface_requires(
+        self,
+        sub: InterfaceConstraint,
+        sup: InterfaceConstraint,
+    ) -> bool throws never;
 
     // An enum's complete variant names, or null if the enum is unknown.
     function enum_variants(self, name: DeclName) -> string[]? throws never;
 
     // The declared interface bounds of associated type `assoc` on
     // `interface_` (a conjunction); empty if unbounded or unknown.
-    function associated_type_bound(self, interface_: InterfaceConstraint, assoc: string) -> InterfaceConstraint[] throws never;
+    function associated_type_bound(
+        self,
+        interface_: InterfaceConstraint,
+        assoc: string,
+    ) -> InterfaceConstraint[] throws never;
 
     // Reduce `(base as interface_).member` to the type it denotes when
     // determinable; ProjectionStepOpaque otherwise. `fuel` is the remaining
@@ -541,7 +562,9 @@ function head_category(t: NormalTy) -> Category? throws never {
 // projection, an OpaqueAlias). `unknown` and `never` are determined.
 function is_ground(t: NormalTy) -> bool throws never {
     match (t) {
-        NormalTyError | NormalTyTypeVar | NormalTyAssociatedTypeProjection | NormalTyOpaqueAlias => false,
+        NormalTyError | NormalTyTypeVar | NormalTyAssociatedTypeProjection | NormalTyOpaqueAlias => {
+            false
+        },
         NormalTyInt
             | NormalTyBigint
             | NormalTyFloat
@@ -630,8 +653,7 @@ function is_disjoint_from(t: NormalTy, other: NormalTy) -> bool throws never {
         },
 
         (let a: NormalTyTuple, let b: NormalTyTuple) => {
-            a.items.length() != b.items.length()
-                || zip_any(a.items, b.items, is_disjoint_from)
+            a.items.length() != b.items.length() || zip_any(a.items, b.items, is_disjoint_from)
         },
 
         // Functions are not invariant, so not provably disjoint here.
@@ -647,7 +669,9 @@ function is_disjoint_from(t: NormalTy, other: NormalTy) -> bool throws never {
         // Primitive literals: distinct values are never equal under their
         // unoverridable equality (floats excluded: NaN, decimal aliasing).
         (let x: NormalTyLiteral, let y: NormalTyLiteral) => {
-            !(x.value is root.base.LiteralFloat) && !(y.value is root.base.LiteralFloat) && x.value != y.value
+            !(x.value is root.base.LiteralFloat)
+                && !(y.value is root.base.LiteralFloat)
+                && x.value != y.value
         },
         (let l: NormalTyLiteral, _) => literal_category_differs(l.value, other),
         (_, let l: NormalTyLiteral) => literal_category_differs(l.value, t),
@@ -666,7 +690,8 @@ function is_disjoint_from(t: NormalTy, other: NormalTy) -> bool throws never {
 // The `(Literal(lit), rhs) | (rhs, Literal(lit))` arm, shared by both
 // orientations (Rust binds both in one or-pattern).
 function literal_category_differs(lit: root.base.Literal, rhs: NormalTy) -> bool throws never {
-    let cat = head_category(rhs) ?? return false;
+    let cat = head_category(rhs)
+        ?? return false;
     cat != category_of_literal(lit)
 }
 
@@ -1103,7 +1128,9 @@ function cmp_normal_ty(a: NormalTy, b: NormalTy) -> baml.ops.Ordering throws nev
             }
             cmp_normal_ty(x.value, y.value)
         },
-        (let x: NormalTyUnion, let y: NormalTyUnion) => cmp_list(x.members, y.members, cmp_normal_ty),
+        (let x: NormalTyUnion, let y: NormalTyUnion) => {
+            cmp_list(x.members, y.members, cmp_normal_ty)
+        },
         (let x: NormalTyTuple, let y: NormalTyTuple) => cmp_list(x.items, y.items, cmp_normal_ty),
         (let x: NormalTyFunction, let y: NormalTyFunction) => {
             let o0 = cmp_list(x.params, y.params, cmp_normal_param);
@@ -1195,7 +1222,11 @@ function dedup_normal_tys(xs: NormalTy[]) -> NormalTy[] throws never {
 
 // port: Rust's `a.iter().zip(b).all(f)` (std), over the shorter length.
 function zip_all<A, B>(a: A[], b: B[], f: (A, B) -> bool) -> bool {
-    let n = if (a.length() < b.length()) { a.length() } else { b.length() };
+    let n = if (a.length() < b.length()) {
+        a.length()
+    } else {
+        b.length()
+    };
     for (let i = 0; i < n; i += 1) {
         if (!f(a[i], b[i])) {
             return false;
@@ -1206,9 +1237,17 @@ function zip_all<A, B>(a: A[], b: B[], f: (A, B) -> bool) -> bool {
 
 // port: Rust's `a.iter().zip(b).any(f)` (std), over the shorter length.
 function zip_any<A, B>(a: A[], b: B[], f: (A, B) -> bool) -> bool {
-    !zip_all(a, b, (x, y) -> {
-        !f(x, y)
-    })
+    let n = if (a.length() < b.length()) {
+        a.length()
+    } else {
+        b.length()
+    };
+    for (let i = 0; i < n; i += 1) {
+        if (f(a[i], b[i])) {
+            return true;
+        }
+    }
+    false
 }
 
 // ── conversion in: Ty to the named phase ─────────────────────────────────
@@ -1218,7 +1257,12 @@ function zip_any<A, B>(a: A[], b: B[], f: (A, B) -> bool) -> bool {
 // expansion is wrapped in a Mu when the body mentions it; an unresolvable
 // alias is opaque. A projection reduces through the context while `fuel`
 // lasts (each reduction spends one), else stays an opaque leaf.
-function from_ty(ty: Ty, ctx: TypeContext, expanding: map<DeclName, bool>, fuel: int) -> NormalTy throws never {
+function from_ty(
+    ty: Ty,
+    ctx: TypeContext,
+    expanding: map<DeclName, bool>,
+    fuel: int,
+) -> NormalTy throws never {
     let all = (tys: Ty[]) -> NormalTy[] {
         tys.map((t) -> {
             from_ty(t, ctx, expanding, fuel)
@@ -1270,7 +1314,11 @@ function from_ty(ty: Ty, ctx: TypeContext, expanding: map<DeclName, bool>, fuel:
         let f: TyFunction => {
             NormalTyFunction {
                 params: f.params.map((p) -> {
-                    NormalParam { name: p.name, ty: from_ty(p.ty, ctx, expanding, fuel), mode: p.mode }
+                    NormalParam {
+                        name: p.name,
+                        ty: from_ty(p.ty, ctx, expanding, fuel),
+                        mode: p.mode,
+                    }
                 }),
                 ret: from_ty(f.ret, ctx, expanding, fuel),
                 throws_: from_ty(f.throws_, ctx, expanding, fuel),
@@ -1313,7 +1361,8 @@ function from_ty(ty: Ty, ctx: TypeContext, expanding: map<DeclName, bool>, fuel:
                 return NormalTyRecVar { var: a.name };
             }
             // Fail-safe: an unresolvable alias is opaque.
-            let def = ctx.alias_def(a.name) ?? return NormalTyOpaqueAlias { name: a.name };
+            let def = ctx.alias_def(a.name)
+                ?? return NormalTyOpaqueAlias { name: a.name };
             expanding.set(a.name, true);
             let body = from_ty(def, ctx, expanding, fuel);
             expanding.delete(a.name);
@@ -1420,7 +1469,9 @@ function legacy_render(t: NormalTy) -> Ty throws never {
                 throws_: legacy_render(f.throws_),
             }
         },
-        let f: NormalTyFuture => TyFuture { value: legacy_render(f.value), error: legacy_render(f.error) },
+        let f: NormalTyFuture => {
+            TyFuture { value: legacy_render(f.value), error: legacy_render(f.error) }
+        },
         let p: NormalTyAssociatedTypeProjection => {
             let iface = match (p.interface_) {
                 let i: NormalTyInterface => {
@@ -1434,7 +1485,11 @@ function legacy_render(t: NormalTy) -> Ty throws never {
                 },
                 _ => baml.sys.panic("projection qualifier is an interface"),
             };
-            TyAssociatedTypeProjection { base: legacy_render(p.base), interface_: iface, member: p.member }
+            TyAssociatedTypeProjection {
+                base: legacy_render(p.base),
+                interface_: iface,
+                member: p.member,
+            }
         },
         let v: NormalTyTypeVar => TyTypeVar { param: v.param },
         // The binder has no surface syntax (its body renders in place); a
@@ -1479,7 +1534,10 @@ function resolve_binders(t: NormalTy, stack: DeclName[], saw_mu: SawMu) -> Norma
             // path, so its binder is on the stack.
             let i = stack.find_last_index((v) -> {
                 r.var == v
-            }) ?? baml.sys.panic("from_ty emits a RecVar only while its alias is on the expanding path");
+            })
+                ?? baml.sys.panic(
+                    "from_ty emits a RecVar only while its alias is on the expanding path",
+                );
             NormalTyRecVar { var: stack.length() - 1 - i }
         },
         let x: NormalTyClass => NormalTyClass { name: x.name, args: x.args.map(go) },
@@ -1507,7 +1565,11 @@ function resolve_binders(t: NormalTy, stack: DeclName[], saw_mu: SawMu) -> Norma
         },
         let x: NormalTyFuture => NormalTyFuture { value: go(x.value), error: go(x.error) },
         let x: NormalTyAssociatedTypeProjection => {
-            NormalTyAssociatedTypeProjection { base: go(x.base), interface_: go(x.interface_), member: x.member }
+            NormalTyAssociatedTypeProjection {
+                base: go(x.base),
+                interface_: go(x.interface_),
+                member: x.member,
+            }
         },
         let x: NormalTyLeaf => x,
     }
@@ -1544,7 +1606,11 @@ function canonicalize(
         let x: NormalTyMap => NormalTyMap { key: go(x.key), value: go(x.value) },
         let x: NormalTyFuture => NormalTyFuture { value: go(x.value), error: go(x.error) },
         let x: NormalTyAssociatedTypeProjection => {
-            NormalTyAssociatedTypeProjection { base: go(x.base), interface_: go(x.interface_), member: x.member }
+            NormalTyAssociatedTypeProjection {
+                base: go(x.base),
+                interface_: go(x.interface_),
+                member: x.member,
+            }
         },
         let x: NormalTyFunction => {
             // Required params are positional (names erased, order kept);
@@ -1555,15 +1621,23 @@ function canonicalize(
                 let ty = go(p.ty);
                 match (p.mode) {
                     FunctionParamMode.Required => {
-                        required.push(NormalParam { name: null, ty: ty, mode: FunctionParamMode.Required });
+                        required.push(
+                            NormalParam { name: null, ty: ty, mode: FunctionParamMode.Required },
+                        );
                     },
                     FunctionParamMode.Optional => {
-                        optional.push(NormalParam { name: p.name, ty: ty, mode: FunctionParamMode.Optional });
+                        optional.push(
+                            NormalParam { name: p.name, ty: ty, mode: FunctionParamMode.Optional },
+                        );
                     },
                 }
             }
             optional.sort_by(cmp_normal_param);
-            NormalTyFunction { params: required.concat(optional), ret: go(x.ret), throws_: go(x.throws_) }
+            NormalTyFunction {
+                params: required.concat(optional),
+                ret: go(x.ret),
+                throws_: go(x.throws_),
+            }
         },
         // A binder stays put even if an algebra step strands it; the
         // automaton's read-back emits binders only for referenced states.
@@ -1599,7 +1673,6 @@ function invariant_compatible(
     is_subtype_of(t, other, ctx, assumptions) && is_subtype_of(other, t, ctx, assumptions)
 }
 
-
 // port: baml_type/src/normalize.rs::NormalTy::pin_is_tautological @ d9be6853b
 // Whether pin `(member, value)` required of `var <: name<args, ..>` is the
 // variable's own projection of that member through that same interface,
@@ -1615,7 +1688,9 @@ function pin_is_tautological(
 ) -> bool throws never {
     let p = match (pin.ty) {
         let p: NormalTyAssociatedTypeProjection => p,
-        _ => return false,
+        _ => {
+            return false;
+        },
     };
     if (p.member != pin.name) {
         return false;
@@ -1736,7 +1811,8 @@ function is_subtype_of_inner(
         // A type variable is a subtype of `sup` if any of its bounds is (the
         // bounds are a conjunction). Tautological pins on an interface `sup`
         // are stripped first.
-        (let v: NormalTyTypeVar, let i: NormalTyInterface) if i.bindings.some((pin) -> {
+        (let v: NormalTyTypeVar, let i: NormalTyInterface)
+            if i.bindings.some((pin) -> {
             pin_is_tautological(v.param, i.name, i.args, pin, ctx, assumptions)
         }) => {
             let stripped = NormalTyInterface {
@@ -1760,7 +1836,8 @@ function is_subtype_of_inner(
         // associated type's declared bounds is. Precedes the interface arms,
         // which would ask implements_interface about a non-concrete type.
         (let p: NormalTyAssociatedTypeProjection, _) => {
-            let iface = into_interface(p.interface_) ?? return false;
+            let iface = into_interface(p.interface_)
+                ?? return false;
             ctx.associated_type_bound(iface, p.member).some((bound) -> {
                 bound_proves(bound, sup)
             })
@@ -1785,13 +1862,15 @@ function is_subtype_of_inner(
             };
             let returns = pin("Returns");
             let throws_pin = pin("Throws");
-            (returns == null || le(f.ret, returns)) && (throws_pin == null || le(f.throws_, throws_pin))
+            (returns == null || le(f.ret, returns))
+                && (throws_pin == null || le(f.throws_, throws_pin))
         },
 
         // `AnyFunction`'s pins are covariant, unlike every other interface
         // binding. A pin missing on the sub side reads as its `unknown`
         // default.
-        (let a: NormalTyInterface, let b: NormalTyInterface) if is_any_function(a.name, ctx) && is_any_function(b.name, ctx) => {
+        (let a: NormalTyInterface, let b: NormalTyInterface)
+            if is_any_function(a.name, ctx) && is_any_function(b.name, ctx) => {
             b.bindings.every((sup_pin) -> {
                 let sub_pin = a.bindings.find((x) -> {
                     x.name == sup_pin.name
@@ -1817,16 +1896,18 @@ function is_subtype_of_inner(
 
         // Generic arguments are invariant: classes, lists, maps, tuples and
         // futures relate only when every argument pair is mutual subtypes.
-        (let a: NormalTyClass, let b: NormalTyClass) if a.name == b.name && a.args.length() == b.args.length() => {
+        (let a: NormalTyClass, let b: NormalTyClass)
+            if a.name == b.name && a.args.length() == b.args.length() => {
             zip_all(a.args, b.args, inv)
         },
         (let a: NormalTyList, let b: NormalTyList) => inv(a.elem, b.elem),
         (let a: NormalTyMap, let b: NormalTyMap) => inv(a.key, b.key) && inv(a.value, b.value),
         (let a: NormalTyTuple, let b: NormalTyTuple) => {
-            a.items.length() == b.items.length()
-                && zip_all(a.items, b.items, inv)
+            a.items.length() == b.items.length() && zip_all(a.items, b.items, inv)
         },
-        (let a: NormalTyFuture, let b: NormalTyFuture) => inv(a.value, b.value) && inv(a.error, b.error),
+        (let a: NormalTyFuture, let b: NormalTyFuture) => {
+            inv(a.value, b.value) && inv(a.error, b.error)
+        },
 
         // Literal types are subtypes of their (same-representation) base only.
         (let l: NormalTyLiteral, NormalTyInt) => l.value is root.base.LiteralInt,
@@ -1904,7 +1985,8 @@ function into_ty(t: NormalTy) -> Ty throws never {
                 base: into_ty(p.base),
                 // A normalized projection's qualifier round-trips to an
                 // interface.
-                interface_: into_interface(p.interface_) ?? baml.sys.panic("projection qualifier is an interface"),
+                interface_: into_interface(p.interface_)
+                    ?? baml.sys.panic("projection qualifier is an interface"),
                 member: p.member,
             }
         },
@@ -1958,7 +2040,11 @@ function into_interface(t: NormalTy) -> InterfaceConstraint? throws never {
         let m: NormalTyMu => {
             match (mu_display(m).rendered) {
                 let i: TyInterface => {
-                    InterfaceConstraint { name: i.name, generics: i.args, associated_types: i.associated_types }
+                    InterfaceConstraint {
+                        name: i.name,
+                        generics: i.args,
+                        associated_types: i.associated_types,
+                    }
                 },
                 _ => null,
             }
@@ -2056,14 +2142,15 @@ function collapse_complete_enums(members: NormalTy[], ctx: TypeContext) -> Norma
                     present.has(v)
                 })
         ) {
-            out = out
-                .filter((m) -> {
-                    match (m) {
-                        let v: NormalTyEnumVariant => v.name != e,
-                        _ => true,
-                    }
-                })
-                .concat([NormalTyEnum { name: e }]);
+            out
+                = out
+                    .filter((m) -> {
+                        match (m) {
+                            let v: NormalTyEnumVariant => v.name != e,
+                            _ => true,
+                        }
+                    })
+                    .concat([NormalTyEnum { name: e }]);
         }
     }
     out
@@ -2097,7 +2184,9 @@ function has_unguarded_mu(t: NormalTy) -> bool throws never {
                 || has_unguarded_mu(x.ret)
                 || has_unguarded_mu(x.throws_)
         },
-        let x: NormalTyAssociatedTypeProjection => has_unguarded_mu(x.base) || has_unguarded_mu(x.interface_),
+        let x: NormalTyAssociatedTypeProjection => {
+            has_unguarded_mu(x.base) || has_unguarded_mu(x.interface_)
+        },
         NormalTyLeaf => false,
     }
 }
@@ -2259,7 +2348,9 @@ function replace_rec_var(t: NormalTy, depth: int, replacement: NormalTy) -> Norm
     };
     match (t) {
         let r: NormalTyRecVar if r.var == depth => replacement,
-        let m: NormalTyMu => NormalTyMu { binder: m.binder, body: replace_rec_var(m.body, depth + 1, replacement) },
+        let m: NormalTyMu => {
+            NormalTyMu { binder: m.binder, body: replace_rec_var(m.body, depth + 1, replacement) }
+        },
         let x: NormalTyClass => NormalTyClass { name: x.name, args: x.args.map(go) },
         let x: NormalTyInterface => {
             NormalTyInterface {
@@ -2285,7 +2376,11 @@ function replace_rec_var(t: NormalTy, depth: int, replacement: NormalTy) -> Norm
         },
         let x: NormalTyFuture => NormalTyFuture { value: go(x.value), error: go(x.error) },
         let x: NormalTyAssociatedTypeProjection => {
-            NormalTyAssociatedTypeProjection { base: go(x.base), interface_: go(x.interface_), member: x.member }
+            NormalTyAssociatedTypeProjection {
+                base: go(x.base),
+                interface_: go(x.interface_),
+                member: x.member,
+            }
         },
         // Leaves and non-matching indices are untouched.
         let x: NormalTyRecVar | NormalTyLeaf => x,
@@ -2320,10 +2415,12 @@ function normal_param_list_subtype(
         if (s.mode == FunctionParamMode.Required) {
             continue;
         }
-        let name = s.name ?? return false;
+        let name = s.name
+            ?? return false;
         let p = sub.find((p) -> {
             p.mode != FunctionParamMode.Required && p.name == name
-        }) ?? return false;
+        })
+            ?? return false;
         if (!is_subtype_of(s.ty, p.ty, ctx, assumptions)) {
             return false;
         }
@@ -2381,7 +2478,12 @@ class InternedCanonicalCache {
 
     // port: baml_type/src/normalize.rs::InternedCanonicalCache::normalize @ d9be6853b
     // The cached normalize_interned spelling.
-    function normalize(self, pool: InferPool, ty: ClosedTy, ctx: TypeContext) -> ClosedTy throws never {
+    function normalize(
+        self,
+        pool: InferPool,
+        ty: ClosedTy,
+        ctx: TypeContext,
+    ) -> ClosedTy throws never {
         let cached = self.get_normalized(ty);
         if (cached != null) {
             return cached;
@@ -2392,7 +2494,12 @@ class InternedCanonicalCache {
     }
 
     // port: baml_type/src/normalize.rs::InternedCanonicalCache::canonical @ d9be6853b
-    function canonical(self, pool: InferPool, ty: ClosedTy, ctx: TypeContext) -> NormalTy throws never {
+    function canonical(
+        self,
+        pool: InferPool,
+        ty: ClosedTy,
+        ctx: TypeContext,
+    ) -> NormalTy throws never {
         let cached = self.get_canonical(ty);
         if (cached != null) {
             return cached;
@@ -2403,7 +2510,13 @@ class InternedCanonicalCache {
     }
 
     // port: baml_type/src/normalize.rs::InternedCanonicalCache::equivalent @ d9be6853b
-    function equivalent(self, pool: InferPool, a: ClosedTy, b: ClosedTy, ctx: TypeContext) -> bool throws never {
+    function equivalent(
+        self,
+        pool: InferPool,
+        a: ClosedTy,
+        b: ClosedTy,
+        ctx: TypeContext,
+    ) -> bool throws never {
         if (a.ty == b.ty) {
             return true;
         }
@@ -2414,7 +2527,13 @@ class InternedCanonicalCache {
     }
 
     // port: baml_type/src/normalize.rs::InternedCanonicalCache::is_subtype @ d9be6853b
-    function is_subtype(self, pool: InferPool, sub: ClosedTy, sup: ClosedTy, ctx: TypeContext) -> bool throws never {
+    function is_subtype(
+        self,
+        pool: InferPool,
+        sub: ClosedTy,
+        sup: ClosedTy,
+        ctx: TypeContext,
+    ) -> bool throws never {
         if (sub.ty == sup.ty) {
             return true;
         }
@@ -2428,7 +2547,11 @@ class InternedCanonicalCache {
 
 // port: baml_type/src/normalize.rs::NormalTy::canonical_bottom_up_interned @ d9be6853b
 // canonical_bottom_up entered from an interned type.
-function canonical_bottom_up_interned(pool: InferPool, ty: ClosedTy, ctx: TypeContext) -> (NormalTy, bool) throws never {
+function canonical_bottom_up_interned(
+    pool: InferPool,
+    ty: ClosedTy,
+    ctx: TypeContext,
+) -> (NormalTy, bool) throws never {
     let named = from_interned(pool, ty.ty, ctx, {}, PROJECTION_REDUCTION_FUEL);
     let saw_mu = SawMu { value: false };
     let resolved = resolve_binders(named, [], saw_mu);
@@ -2437,7 +2560,11 @@ function canonical_bottom_up_interned(pool: InferPool, ty: ClosedTy, ctx: TypeCo
 
 // port: baml_type/src/normalize.rs::NormalTy::canonical_interned @ d9be6853b
 // canonical for the interned representation.
-function canonical_interned(pool: InferPool, ty: ClosedTy, ctx: TypeContext) -> NormalTy throws never {
+function canonical_interned(
+    pool: InferPool,
+    ty: ClosedTy,
+    ctx: TypeContext,
+) -> NormalTy throws never {
     let (let t, let saw_mu) = canonical_bottom_up_interned(pool, ty, ctx);
     if (saw_mu && contains_mu(t)) {
         root.types.normalize.canonicalize_mu(t, ctx)
@@ -2500,12 +2627,15 @@ function into_interned(pool: InferPool, t: NormalTy) -> int throws never {
             InferTyAssociatedTypeProjection {
                 base: go(p.base),
                 // Same contract as into_ty's projection arm.
-                interface_: into_infer_interface(pool, p.interface_) ?? baml.sys.panic("projection qualifier is an interface"),
+                interface_: into_infer_interface(pool, p.interface_)
+                    ?? baml.sys.panic("projection qualifier is an interface"),
                 member: p.member,
             }
         },
         let v: NormalTyTypeVar => TyTypeVar { param: v.param },
-        let m: NormalTyMu => return pool.from_plain(mu_display(m).rendered),
+        let m: NormalTyMu => {
+            return pool.from_plain(mu_display(m).rendered);
+        },
         NormalTyRecVar => {
             baml.sys.panic(
                 "into_interned on a free RecVar; canonical forms at public boundaries are closed and render recursion via their binder's display",
@@ -2519,7 +2649,10 @@ function into_interned(pool: InferPool, t: NormalTy) -> int throws never {
 // port: baml_type/src/normalize.rs::NormalTy::into_infer_interface @ d9be6853b
 // into_interface for the interned representation, with the same μ-display
 // recovery and null degradation.
-function into_infer_interface(pool: InferPool, t: NormalTy) -> InferInterfaceConstraint? throws never {
+function into_infer_interface(
+    pool: InferPool,
+    t: NormalTy,
+) -> InferInterfaceConstraint? throws never {
     match (t) {
         let i: NormalTyInterface => {
             infer_interface_new(
@@ -2621,7 +2754,11 @@ function from_interned(
             // are small. An open piece here is a compiler bug.
             let closed = (t: int) -> Ty {
                 let c = ClosedTy.try_from(pool, t) catch (e) {
-                    OpenTy => baml.sys.panic("inference variable reached type normalization inside a projection"),
+                    OpenTy => {
+                        baml.sys.panic(
+                            "inference variable reached type normalization inside a projection",
+                        )
+                    },
                 };
                 pool.to_plain_closed(c.ty)
             };
@@ -2657,7 +2794,8 @@ function from_interned(
             if (expanding.has(a.name)) {
                 return NormalTyRecVar { var: a.name };
             }
-            let def = ctx.alias_def(a.name) ?? return NormalTyOpaqueAlias { name: a.name };
+            let def = ctx.alias_def(a.name)
+                ?? return NormalTyOpaqueAlias { name: a.name };
             expanding.set(a.name, true);
             // The alias definition is a plain fact; its expansion continues
             // through the plain path.
@@ -2675,7 +2813,12 @@ function from_interned(
 // port: baml_type/src/normalize.rs::is_subtype_interned @ d9be6853b
 // TypeContext.is_subtype for interned types. Handle identity is the
 // reflexivity fast path.
-function is_subtype_interned(pool: InferPool, sub: ClosedTy, sup: ClosedTy, ctx: TypeContext) -> bool throws never {
+function is_subtype_interned(
+    pool: InferPool,
+    sub: ClosedTy,
+    sup: ClosedTy,
+    ctx: TypeContext,
+) -> bool throws never {
     if (sub.ty == sup.ty) {
         return true;
     }
@@ -2690,7 +2833,12 @@ function is_subtype_interned(pool: InferPool, sub: ClosedTy, sup: ClosedTy, ctx:
 
 // port: baml_type/src/normalize.rs::equivalent_interned @ d9be6853b
 // TypeContext.equivalent for interned types.
-function equivalent_interned(pool: InferPool, a: ClosedTy, b: ClosedTy, ctx: TypeContext) -> bool throws never {
+function equivalent_interned(
+    pool: InferPool,
+    a: ClosedTy,
+    b: ClosedTy,
+    ctx: TypeContext,
+) -> bool throws never {
     if (a.ty == b.ty) {
         return true;
     }
@@ -2717,7 +2865,11 @@ function interned_heads_definitely_differ(pool: InferPool, a: int, b: int) -> bo
 // port: baml_type/src/normalize.rs::normalize_interned @ d9be6853b
 // TypeContext.normalize for interned types, interning the canonical form
 // directly; a μ root renders as canonical_render does (root-unfold-once).
-function normalize_interned(pool: InferPool, ty: ClosedTy, ctx: TypeContext) -> ClosedTy throws never {
+function normalize_interned(
+    pool: InferPool,
+    ty: ClosedTy,
+    ctx: TypeContext,
+) -> ClosedTy throws never {
     let (let t, let saw_mu) = canonical_bottom_up_interned(pool, ty, ctx);
     if (saw_mu && contains_mu(t)) {
         ClosedTy { ty: pool.from_plain(root.types.normalize.canonicalize_mu_with_render(t, ctx).1) }
@@ -2729,7 +2881,11 @@ function normalize_interned(pool: InferPool, ty: ClosedTy, ctx: TypeContext) -> 
 // port: baml_type/src/normalize.rs::canonical_union_interned @ d9be6853b
 // The canonical union of `members`: the join for control-flow merges and
 // throws accumulation. An empty list is `never` (the join identity).
-function canonical_union_interned(pool: InferPool, members: ClosedTy[], ctx: TypeContext) -> ClosedTy throws never {
+function canonical_union_interned(
+    pool: InferPool,
+    members: ClosedTy[],
+    ctx: TypeContext,
+) -> ClosedTy throws never {
     let named = NormalTyUnion {
         members: members.map((m) -> {
             from_interned(pool, m.ty, ctx, {}, PROJECTION_REDUCTION_FUEL)

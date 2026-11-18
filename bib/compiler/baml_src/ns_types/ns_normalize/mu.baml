@@ -39,7 +39,10 @@
 // port: baml_type/src/normalize/mu.rs::canonicalize_mu @ d9be6853b
 // Canonicalize a term containing at least one μ-binder. Falls back to the
 // (sound, bottom-up-canonicalized) input when the renderer bails.
-function canonicalize_mu(term: root.types.NormalTy, ctx: root.types.TypeContext) -> root.types.NormalTy throws never {
+function canonicalize_mu(
+    term: root.types.NormalTy,
+    ctx: root.types.TypeContext,
+) -> root.types.NormalTy throws never {
     let out = Builder { binders: [] }.build(term).epsilon_close().minimize_and_absorb(ctx).read_back();
     out ?? term
 }
@@ -393,7 +396,9 @@ class Builder {
                 };
                 self.binders[self.binders.length() - 1 - i]
             },
-            let e: root.types.NormalTyEnum => auto.alloc(NodeEnum { name: auto.names.intern(e.name) }),
+            let e: root.types.NormalTyEnum => {
+                auto.alloc(NodeEnum { name: auto.names.intern(e.name) })
+            },
             let v: root.types.NormalTyEnumVariant => {
                 let qn = auto.names.intern(v.name);
                 let variant = auto.strs.intern(v.variant);
@@ -438,7 +443,11 @@ class Builder {
             let f: root.types.NormalTyFunction => {
                 let params = f.params.map((p) -> {
                     let pname = p.name;
-                    let n = if (pname != null) { auto.strs.intern(pname) } else { null };
+                    let n = if (pname != null) {
+                        auto.strs.intern(pname)
+                    } else {
+                        null
+                    };
                     (n, p.mode, go(p.ty))
                 });
                 let ret = go(f.ret);
@@ -645,10 +654,18 @@ class EpsilonTarjan {
         for (let t in eps) {
             if (!self.index.has(t)) {
                 self.visit(t);
-                let l = if (self.low[t] < self.low[s]) { self.low[t] } else { self.low[s] };
+                let l = if (self.low[t] < self.low[s]) {
+                    self.low[t]
+                } else {
+                    self.low[s]
+                };
                 self.low.set(s, l);
             } else if (self.on_stack.has(t)) {
-                let l = if (self.index[t] < self.low[s]) { self.index[t] } else { self.low[s] };
+                let l = if (self.index[t] < self.low[s]) {
+                    self.index[t]
+                } else {
+                    self.low[s]
+                };
                 self.low.set(s, l);
             }
         }
@@ -713,9 +730,11 @@ function minimize(auto: Automaton, root_state: int) -> void throws never {
             let node = auto.node(s);
             let sig = match (node) {
                 let u: NodeUnion => {
-                    id_set(u.members.map((m) -> {
-                        block[auto.resolve(m)]
-                    }))
+                    id_set(
+                        u.members.map((m) -> {
+                            block[auto.resolve(m)]
+                        }),
+                    )
                 },
                 _ => {
                     children(node).map((c) -> {
@@ -871,7 +890,11 @@ function local_key(auto: Automaton, s: int) -> LocalKey throws never {
 // checker decides. Returns whether anything changed. Pairwise absorption is
 // skipped for a cyclic unnamed union (its rendering needs a named subset
 // cover) and when a member's materialization bails.
-function algebra_pass(auto: Automaton, root_state: int, ctx: root.types.TypeContext) -> bool throws never {
+function algebra_pass(
+    auto: Automaton,
+    root_state: int,
+    ctx: root.types.TypeContext,
+) -> bool throws never {
     let cyclic = cyclic_states(auto, root_state);
     let changed = false;
     // Member read-backs, memoized while the automaton is unmutated: any node
@@ -882,9 +905,11 @@ function algebra_pass(auto: Automaton, root_state: int, ctx: root.types.TypeCont
         if (!(raw is NodeUnion)) {
             continue;
         }
-        let before = id_set(raw.members.map((m) -> {
-            auto.resolve(m)
-        }));
+        let before = id_set(
+            raw.members.map((m) -> {
+                auto.resolve(m)
+            }),
+        );
         let members = before.filter((m) -> {
             !auto.is_never(m)
         });
@@ -983,7 +1008,11 @@ function algebra_pass(auto: Automaton, root_state: int, ctx: root.types.TypeCont
 // Replace a complete set of an enum's variant states with the enum state
 // (`E.A | E.B | .. == E`), finding or allocating it. Returns the members
 // instead of editing them in place.
-function collapse_complete_enums(auto: Automaton, members: int[], ctx: root.types.TypeContext) -> int[] throws never {
+function collapse_complete_enums(
+    auto: Automaton,
+    members: int[],
+    ctx: root.types.TypeContext,
+) -> int[] throws never {
     let enums: int[] = [];
     for (let m in members) {
         if let v: NodeEnumVariant = auto.node(m) {
@@ -1023,7 +1052,8 @@ function collapse_complete_enums(auto: Automaton, members: int[], ctx: root.type
                     let x: NodeEnum => x.name == e,
                     _ => false,
                 }
-            }) ?? auto.alloc(NodeEnum { name: e });
+            })
+                ?? auto.alloc(NodeEnum { name: e });
             out = id_set(kept.concat([enum_state]));
         }
     }
@@ -1071,7 +1101,8 @@ function collapse_complete_bools(auto: Automaton, members: int[]) -> int[] throw
             let l: NodeLeaf => l.leaf == auto.bool_leaf,
             _ => false,
         }
-    }) ?? auto.alloc(NodeLeaf { leaf: auto.bool_leaf });
+    })
+        ?? auto.alloc(NodeLeaf { leaf: auto.bool_leaf });
     id_set(kept.concat([bool_state]))
 }
 
@@ -1182,7 +1213,8 @@ function read_back(auto: Automaton, root_state: int) -> root.types.NormalTy? thr
     let renderer = Renderer.new(auto, cyclic, rec.union_orders);
     let displays: map<int, root.types.Ty> = {};
     for (let s in id_set(rec.binder_states.keys())) {
-        let rendered = renderer.render(s, []) ?? return null;
+        let rendered = renderer.render(s, [])
+            ?? return null;
         displays.set(s, rendered);
     }
 
@@ -1289,7 +1321,10 @@ function convert(
         let r: RbRef => {
             let i = binders.find_last_index((b) -> {
                 b == r.state
-            }) ?? baml.sys.panic("a back-reference targets an ancestor, and every referenced ancestor emits a binder");
+            })
+                ?? baml.sys.panic(
+                    "a back-reference targets an ancestor, and every referenced ancestor emits a binder",
+                );
             root.types.NormalTyRecVar { var: binders.length() - 1 - i }
         },
         let node: RbNode => {
@@ -1301,15 +1336,24 @@ function convert(
                 let x: RbShapeLeaf => auto.leaves.get(x.leaf),
                 let x: RbShapeEnum => root.types.NormalTyEnum { name: auto.names.get(x.name) },
                 let x: RbShapeEnumVariant => {
-                    root.types.NormalTyEnumVariant { name: auto.names.get(x.name), variant: auto.strs.get(x.variant) }
+                    root.types.NormalTyEnumVariant {
+                        name: auto.names.get(x.name),
+                        variant: auto.strs.get(x.variant),
+                    }
                 },
-                let x: RbShapeClass => root.types.NormalTyClass { name: auto.names.get(x.name), args: x.args.map(go) },
+                let x: RbShapeClass => {
+                    root.types.NormalTyClass { name: auto.names.get(x.name), args: x.args.map(go) }
+                },
                 let x: RbShapeInterface => {
                     let args = x.args.map(go);
                     let bindings = x.bindings.map((b) -> {
                         root.types.NormalBinding { name: auto.strs.get(b.0), ty: go(b.1) }
                     });
-                    root.types.NormalTyInterface { name: auto.names.get(x.name), args: args, bindings: bindings }
+                    root.types.NormalTyInterface {
+                        name: auto.names.get(x.name),
+                        args: args,
+                        bindings: bindings,
+                    }
                 },
                 let x: RbShapeList => root.types.NormalTyList { elem: go(x.inner) },
                 let x: RbShapeMap => {
@@ -1367,7 +1411,11 @@ function convert(
                 let x: RbShapeFunction => {
                     let params = x.params.map((p) -> {
                         let pname = p.0;
-                        let name = if (pname != null) { auto.strs.get(pname) } else { null };
+                        let name = if (pname != null) {
+                            auto.strs.get(pname)
+                        } else {
+                            null
+                        };
                         root.types.NormalParam { name: name, ty: go(p.2), mode: p.1 }
                     });
                     let ret = go(x.ret);
@@ -1395,7 +1443,10 @@ function convert(
                 null => root.types.TyError {},
             };
             root.types.NormalTyMu {
-                binder: root.types.MuDisplay { name: auto.representative_name(node.state), rendered: rendered },
+                binder: root.types.MuDisplay {
+                    name: auto.representative_name(node.state),
+                    rendered: rendered,
+                },
                 body: body,
             }
         },
@@ -1432,10 +1483,18 @@ class CyclicTarjan {
             }
             if (!self.index.has(t)) {
                 self.visit(t);
-                let l = if (self.low[t] < self.low[s]) { self.low[t] } else { self.low[s] };
+                let l = if (self.low[t] < self.low[s]) {
+                    self.low[t]
+                } else {
+                    self.low[s]
+                };
                 self.low.set(s, l);
             } else if (self.on_stack.has(t)) {
-                let l = if (self.index[t] < self.low[s]) { self.index[t] } else { self.low[s] };
+                let l = if (self.index[t] < self.low[s]) {
+                    self.index[t]
+                } else {
+                    self.low[s]
+                };
                 self.low.set(s, l);
             }
         }
@@ -1499,12 +1558,16 @@ class Renderer {
                 continue;
             }
             if let u: NodeUnion = auto.node(s) {
-                candidates.push((
-                    s,
-                    id_set(u.members.map((m) -> {
-                        auto.resolve(m)
-                    })),
-                ));
+                candidates.push(
+                    (
+                        s,
+                        id_set(
+                            u.members.map((m) -> {
+                                auto.resolve(m)
+                            }),
+                        ),
+                    ),
+                );
             }
         }
         candidates.sort_by((a, b) -> {
@@ -1552,9 +1615,11 @@ class Renderer {
         if (!(node is NodeUnion)) {
             return ([], []);
         }
-        let members = id_set(node.members.map((m) -> {
-            self.auto.resolve(m)
-        }));
+        let members = id_set(
+            node.members.map((m) -> {
+                self.auto.resolve(m)
+            }),
+        );
         let covers: int[] = [];
         let covered: map<int, bool> = {};
         for (let candidate in self.candidates) {
@@ -1592,14 +1657,22 @@ class Renderer {
 
     // port: baml_type/src/normalize/mu.rs::Renderer::cover_union @ d9be6853b
     // A union Ty from cover names plus rendered extras.
-    function cover_union(self, covers: int[], extras: int[], path: int[]) -> root.types.Ty? throws never {
+    function cover_union(
+        self,
+        covers: int[],
+        extras: int[],
+        path: int[],
+    ) -> root.types.Ty? throws never {
         let parts: root.types.Ty[] = [];
         for (let u in covers) {
             let name = self.auto.representative_name(u) ?? baml.sys.panic("candidates are named");
             parts.push(root.types.TyTypeAlias { name: name });
         }
         for (let m in extras) {
-            parts.push(self.render(m, path) ?? return null);
+            parts.push(
+                self.render(m, path)
+                    ?? return null,
+            );
         }
         match (parts.length()) {
             0 => root.types.TyNever {},
@@ -1614,7 +1687,10 @@ class Renderer {
     function render_all(self, states: int[], path: int[]) -> root.types.Ty[]? throws never {
         let out: root.types.Ty[] = [];
         for (let s in states) {
-            out.push(self.render(s, path) ?? return null);
+            out.push(
+                self.render(s, path)
+                    ?? return null,
+            );
         }
         out
     }
@@ -1635,37 +1711,53 @@ class Renderer {
             let x: NodeLeaf => root.types.into_ty(auto.leaves.get(x.leaf)),
             let x: NodeEnum => root.types.TyEnum { name: auto.names.get(x.name) },
             let x: NodeEnumVariant => {
-                root.types.TyEnumVariant { name: auto.names.get(x.name), variant: auto.strs.get(x.variant) }
+                root.types.TyEnumVariant {
+                    name: auto.names.get(x.name),
+                    variant: auto.strs.get(x.variant),
+                }
             },
             let x: NodeClass => {
-                let args = self.render_all(x.args, path) ?? return null;
+                let args = self.render_all(x.args, path)
+                    ?? return null;
                 root.types.TyClass { name: auto.names.get(x.name), args: args }
             },
             let x: NodeInterface => {
-                let args = self.render_all(x.args, path) ?? return null;
+                let args = self.render_all(x.args, path)
+                    ?? return null;
                 let bindings: root.types.AssociatedType[] = [];
                 for (let b in x.bindings) {
-                    let ty = self.render(b.1, path) ?? return null;
+                    let ty = self.render(b.1, path)
+                        ?? return null;
                     bindings.push(root.types.AssociatedType { name: auto.strs.get(b.0), ty: ty });
                 }
-                root.types.TyInterface { name: auto.names.get(x.name), args: args, associated_types: bindings }
+                root.types.TyInterface {
+                    name: auto.names.get(x.name),
+                    args: args,
+                    associated_types: bindings,
+                }
             },
             let x: NodeList => {
-                let inner = self.render(x.inner, path) ?? return null;
+                let inner = self.render(x.inner, path)
+                    ?? return null;
                 root.types.TyList { elem: inner }
             },
             let x: NodeMap => {
-                let key = self.render(x.key, path) ?? return null;
-                let value = self.render(x.value, path) ?? return null;
+                let key = self.render(x.key, path)
+                    ?? return null;
+                let value = self.render(x.value, path)
+                    ?? return null;
                 root.types.TyMap { key: key, value: value }
             },
             let x: NodeFuture => {
-                let value = self.render(x.value, path) ?? return null;
-                let error = self.render(x.error, path) ?? return null;
+                let value = self.render(x.value, path)
+                    ?? return null;
+                let error = self.render(x.error, path)
+                    ?? return null;
                 root.types.TyFuture { value: value, error: error }
             },
             let x: NodeTuple => {
-                let items = self.render_all(x.items, path) ?? return null;
+                let items = self.render_all(x.items, path)
+                    ?? return null;
                 root.types.TyTuple { items: items }
             },
             let x: NodeUnion => {
@@ -1675,9 +1767,12 @@ class Renderer {
                 let recorded = self.orders.get(r);
                 // Defensive: a union outside the recorded expansion renders
                 // resolved, deduplicated, id-ordered.
-                let ordered = recorded ?? id_set(x.members.map((m) -> {
-                    auto.resolve(m)
-                }));
+                let ordered = recorded
+                    ?? id_set(
+                        x.members.map((m) -> {
+                            auto.resolve(m)
+                        }),
+                    );
                 if (self.cyclic.has(r) && auto.representative_name(r) == null) {
                     let (let covers, _) = self.covers_of(r);
                     let covered: map<int, bool> = {};
@@ -1694,24 +1789,33 @@ class Renderer {
                     if (covers.length() == 0) {
                         // No name and no cover: renders structurally only if no
                         // cycle re-enters this state (render bails on re-entry).
-                        let parts = self.render_all(ordered, path) ?? return null;
+                        let parts = self.render_all(ordered, path)
+                            ?? return null;
                         return union_of(parts);
                     }
                     return self.cover_union(covers, extras, path);
                 }
-                let parts = self.render_all(ordered, path) ?? return null;
+                let parts = self.render_all(ordered, path)
+                    ?? return null;
                 union_of(parts)
             },
             let x: NodeFunction => {
                 let params: root.types.FunctionParamTy[] = [];
                 for (let p in x.params) {
-                    let ty = self.render(p.2, path) ?? return null;
+                    let ty = self.render(p.2, path)
+                        ?? return null;
                     let pname = p.0;
-                    let name = if (pname != null) { auto.strs.get(pname) } else { null };
+                    let name = if (pname != null) {
+                        auto.strs.get(pname)
+                    } else {
+                        null
+                    };
                     params.push(root.types.FunctionParamTy { name: name, ty: ty, mode: p.1 });
                 }
-                let ret = self.render(x.ret, path) ?? return null;
-                let throws_ = self.render(x.throws_, path) ?? return null;
+                let ret = self.render(x.ret, path)
+                    ?? return null;
+                let throws_ = self.render(x.throws_, path)
+                    ?? return null;
                 root.types.TyFunction { params: params, ret: ret, throws_: throws_ }
             },
             let x: NodeProjection => {
@@ -1719,10 +1823,12 @@ class Renderer {
                     let i: NodeInterface => i,
                     _ => baml.sys.panic("projection qualifier is an interface"),
                 };
-                let generics = self.render_all(qualifier.args, path) ?? return null;
+                let generics = self.render_all(qualifier.args, path)
+                    ?? return null;
                 let bindings: root.types.AssociatedType[] = [];
                 for (let b in qualifier.bindings) {
-                    let ty = self.render(b.1, path) ?? return null;
+                    let ty = self.render(b.1, path)
+                        ?? return null;
                     bindings.push(root.types.AssociatedType { name: auto.strs.get(b.0), ty: ty });
                 }
                 let iface = root.types.InterfaceConstraint {
@@ -1730,8 +1836,13 @@ class Renderer {
                     generics: generics,
                     associated_types: bindings,
                 };
-                let base = self.render(x.base, path) ?? return null;
-                root.types.TyAssociatedTypeProjection { base: base, interface_: iface, member: auto.strs.get(x.member) }
+                let base = self.render(x.base, path)
+                    ?? return null;
+                root.types.TyAssociatedTypeProjection {
+                    base: base,
+                    interface_: iface,
+                    member: auto.strs.get(x.member),
+                }
             },
         }
     }
