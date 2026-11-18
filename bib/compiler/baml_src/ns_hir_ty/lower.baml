@@ -1647,9 +1647,9 @@ function builtin_structural(
     qtn: root.types.DeclName,
     arity: int,
 ) -> root.types.AliasTarget? throws never {
-    let alias = compiler_alias_by_definition(lang, qtn)
+    let alias = root.types.compiler_alias_by_definition(lang, qtn)
         ?? return null;
-    compiler_alias_class_carrier(alias, arity)
+    root.types.compiler_alias_class_carrier(alias, arity)
 }
 
 // port: baml_compiler2_hir_ty/src/lower.rs::class_lowering_ty @ d9be6853b
@@ -1690,9 +1690,9 @@ function class_ty_interned(
     qtn: root.types.DeclName,
     args: int[],
 ) -> int throws never {
-    let alias = compiler_alias_by_definition(lang, qtn);
+    let alias = root.types.compiler_alias_by_definition(lang, qtn);
     if (alias != null) {
-        let lowered = compiler_alias_lower_class(pool, alias, args);
+        let lowered = root.types.compiler_alias_lower_class(pool, alias, args);
         if (lowered != null) {
             return lowered;
         }
