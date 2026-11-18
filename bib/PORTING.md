@@ -687,3 +687,23 @@ are shared references: swap in fresh values, copy explicitly); huge
 functions (`lower_call_with_callee` 747 lines, ...) split into `_arm`
 helpers with side effects in order; `escape_summary` cycle returns null
 (fallback, not fixpoint); `component_summaries` sorts by salsa id.
+
+## Emit plan (proposal, 2026-11-18)
+
+`baml_compiler2_emit` is 15.9k lines (emit 4.4k, analysis 3.7k, stack_carry
+2.2k, lib 1.6k, items 1.2k, package/ 1.3k, refs 0.7k, pull_semantics 0.6k,
+verifier 0.2k) -> namespace `emit`, output `EmittedPackage` as borsh bytes
+written in BAML (MIGRATION.md).
+
+There is no API that takes `EmittedPackage` bytes (`reflect.Package.compile`
+compiles source). The CLI's per-package bytecode cache
+(`baml_cli/src/bytecode_cache.rs`, `bex_cache`) is the seam: an entry under
+`$BAML_HOME/build/cache` is an 80-byte header (`BEXC`, format version, key
+echo, payload length, payload sha256) then `borsh(EmittedPackage)`.
+- Oracle (no Rust of ours): `baml run` with a scratch `BAML_HOME` leaves
+  Rust's `EmittedPackage` for the user package in the cache; the gate
+  compares our borsh bytes with that payload byte for byte. Stronger than
+  behavior, and what stage1 == stage2 needs anyway.
+- Running our bytes (behavior gate, runtime suite): write our payload under
+  the same key with a fresh header (needs sha256 in BAML), drop the
+  whole-program tier entry, `DEV_BAML_BUILD_CACHE_VERIFY=off`, `baml run`.
