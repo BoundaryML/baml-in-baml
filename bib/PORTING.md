@@ -556,3 +556,23 @@ deleting each error-channel annotation (12) and adding bogus ones (23): every
 mutation detected, at exactly its fixture and line:col. Snapshot comparison
 follows insta 1.47 (trailing whitespace, CRLF, legacy leading `---`), checked
 on 2,449 single-byte and structural mutations.
+
+## Quality backlog (after the compiler works end to end)
+
+Behavior is pinned by the Type gate, type_spec and its suites, so these are
+safe mechanical passes, each re-checked against all three:
+1. One-line forwarders left by the ports (`union_of`, `check_condition`, and
+   a scan for others; `baml codequality` does not flag them).
+2. `infer.rs` is split into `infer_u1*.baml` ... `infer_u6*.baml`, named
+   after the porting units: rename to topic names that follow infer.rs.
+3. Helpers outside their Rust home: the throw-fact flatteners
+   (throw_facts.rs, package_interface.rs) in `infer.baml`; `member_owner`
+   (baml_type) in `method_resolution.baml`.
+4. TIR `// port:` headers say `@ d9be6853b` but were ported from the
+   mirrored tree (#5715, #5718): advance `BASE` and fix the headers.
+5. Dead code: `baml codequality --functions --metrics fan-in --all` lists
+   342 functions nothing calls (65 are unused generated family functions,
+   kept on purpose; others are entry points and test helpers). Review the
+   rest by hand: unused here can mean used by MIR later.
+6. The two map-order notes (`register_class_bounds`,
+   `take_solved_class_bounds`).
