@@ -411,3 +411,47 @@ seed; interface queries stubbed.
 
 Every unit that ran matches except `tuples_map_keys` (3 E0067, from the
 stubbed `map_key_is_hashable`). The stops are interface stubs (K2).
+
+## K4 plan: body inference (infer.rs 16.6k + infer/*)
+
+`InferenceContext`'s ~400 methods are spread over 7 Rust files, so in BAML
+they are free functions taking `ctx: InferenceContext` (as `LowerCtx`'s
+are). Names that collide with existing `hir_ty` free functions (`lang`,
+`viewpoint`) get an `infer_ctx_` prefix. Files: `ns_hir_ty/infer.baml`
+(split into `infer_<unit>.baml` parts, all `// port: .../infer.rs::...`) and
+`ns_hir_ty/ns_infer/<file>.baml` for infer/*.
+
+Unit 0 (first, alone, ~2.3k, mostly declarations): infer.rs 1-1807 minus
+the queries (helpers, result and resolution types, `PendingDiag`,
+`InferenceResult`), 2117-2389 (`SolveTier`, `Expectation`,
+`InferenceContext` and its fields) and `new`; the type headers of
+frames.rs, flow.rs, obligations.rs (incl. `Obligation`,
+`instantiate_interface`) and truthy.rs; plus one stub file per unit
+(`ns_hir_ty/infer_stubs_u1.baml` ... `u6`) with the exact signatures of
+that unit's functions, panicking. Each unit replaces and deletes only its
+own stub file.
+
+| Unit | Owns (infer.rs lines unless named) | ~lines |
+|---|---|---|
+| U1 expressions, statements | 2390-4803 (core, `infer_expr`, `infer_stmt`, let, assign); frames.rs, flow.rs, reachability.rs rest; 15895-16020 | 3.4k |
+| U2 subtyping, operators, obligations | 4804-6230; truthy.rs, obligations.rs rest; `operand_members` | 2.9k |
+| U3 calls, lambdas | 6231-7743, 9070-9713, 10717-11282, 12467-12582; `function_param_pairs`, `effect_only_params`, `call_bound_purpose` | 3.1k |
+| U4 paths, objects, annotations | 7744-9069, 9714-10716, 11283-11693; `generic_function_value_*`; trace_hooks.rs | 3.2k |
+| U5 patterns, effects | pat.rs; 11694-12466 | 3.3k |
+| U6 queries, finish | 1808-2116, 12583-15600 (`finish`), 15601-15894, 16067-16278, 16407-16530, tests; wires `callable_throws` to `infer_body` | 3.9k |
+
+Big functions: `infer_expr` stays the dispatcher and keeps Rust's epilogue
+last (3576-3578); large arms become `infer_expr_<variant>`. `finish` becomes
+`finish_fixpoint`, `finish_quiescence`, `finish_throws`, `finish_tables`,
+`finish_diagnostics` (its `PendingDiag` loop as `pending_diag_to_tir_<family>`
+threading `reported_units`), `finish_writeback`, called in order. Child
+inference order is significant everywhere (variable numbering, diagnostic
+push order, flow state); the final diagnostic sort must be stable and the
+dedup adjacent-only (14543-14557).
+
+Cycles: `infer_function_body` / `infer_let_body` use `get_fixpoint` with
+Rust's seeds (1808-1818, 1868-1890); the thread-local in-flight let set
+(1822-1866) is a set on `Db` with explicit enter/leave.
+
+After K4: port upstream's `type_spec` harness (173 fixtures with `//^ ty`
+annotations; baml_tests/src/type_spec/harness.rs) as BAML tests.
