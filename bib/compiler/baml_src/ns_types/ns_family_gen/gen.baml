@@ -556,6 +556,66 @@ function ordering() -> string {
         .join("\n")
 }
 
+// The key of an `Opaque` field's type (ns_types/key.baml).
+function opaque_key(of: string, x: string) -> string {
+    match (of) {
+        "root.base.Literal" => `key_literal(${x})`,
+        "root.base.MediaKind" => `key_media_kind(${x})`,
+        "Freshness" => `key_freshness(${x})`,
+        "FunctionParamMode" => `key_function_param_mode(${x})`,
+        "ParamTy" => `key_param_ty(${x})`,
+        "string?" => `key_opt_str(${x})`,
+        "string" => `key_str(${x})`,
+        _ => `\`\${${x}}\``,
+    }
+}
+
+// The key expression of field `f` of a value `e` of member `m`.
+function field_key(f: Field, m: Member, e: string) -> string {
+    let x = `${e}.${f.name}`;
+    match (f.kind) {
+        FieldKind.Child => `\`\${${x}}\``,
+        FieldKind.Children => `key_ints(${x})`,
+        FieldKind.Head => `key_${snake_case(m.head)}(${x})`,
+        FieldKind.Satellite => `key_${snake_case(satellite_class(satellite_named(f.of), m))}(${x})`,
+        FieldKind.Satellites => {
+            let sat = snake_case(satellite_class(satellite_named(f.of), m));
+            `\`\${${x}.length()}\` + ${x}.map((s) -> { key_str(key_${sat}(s)) }).join("")`
+        },
+        FieldKind.Opaque => opaque_key(f.of, x),
+    }
+}
+
+// The fields' keys, each length-prefixed: injective however they nest.
+function fields_key(fields: Field[], m: Member, e: string) -> string {
+    if (fields.length() == 0) {
+        return `""`;
+    }
+    fields.map((f) -> { `key_str(${field_key(f, m, e)})` }).join(" + ")
+}
+
+// Not a Rust item: an injective string key for the interned member, so the
+// pool's index is string-keyed (see ns_types/key.baml for why).
+function key_fn(m: Member) -> string {
+    let arms = variants_of(m)
+        .map((v) -> {
+            let index = FAMILY.variants.find_index((w) -> { w.name == v.name }) ?? 0;
+            if (v.fields.length() == 0) {
+                `        ${class_name(v, m)} => "${index}",\n`
+            } else {
+                `        let x: ${class_name(v, m)} => "${index}#" + ${fields_key(v.fields, m, "x")},\n`
+            }
+        })
+        .join("");
+    let sats = FAMILY.satellites
+        .map((s) -> {
+            let c = satellite_class(s, m);
+            `function key_${snake_case(c)}(s: ${c}) -> string throws never {\n    ${fields_key(s.fields, m, "s")}\n}\n`
+        })
+        .join("\n");
+    `// An injective string key for a ${m.name} (its index's key).\nfunction key_${m.snake}(t: ${m.name}) -> string throws never {\n    match (t) {\n${arms}    }\n}\n\n${sats}`
+}
+
 function family_source() -> string {
     let header = "// GENERATED from ns_family_gen/spec.baml by `baml run types.family_gen.main`.\n// Do not edit by hand: change the spec and regenerate.\n";
     let section = (title: string) -> string {
@@ -582,6 +642,7 @@ function family_source() -> string {
         ordering(),
         section("InferTy pool"),
         interning(),
+        key_fn(interned_member()),
     ]
         .join("\n")
 }

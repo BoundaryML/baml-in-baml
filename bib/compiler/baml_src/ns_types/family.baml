@@ -6796,3 +6796,91 @@ function resolve_ty_template(pool: InferPool, h: int) -> TyTemplate throws Narro
         TyInferVar => throw NarrowError { variant: "InferVar", into: "TyTemplate" },
     }
 }
+
+// An injective string key for a InferTy (its index's key).
+function key_infer_ty(t: InferTy) -> string throws never {
+    match (t) {
+        TyInt => "0",
+        TyBigint => "1",
+        TyFloat => "2",
+        TyString => "3",
+        TyBool => "4",
+        TyNull => "5",
+        TyUint8Array => "6",
+        let x: TyMedia => "7#" + key_str(key_media_kind(x.kind)),
+        let x: TyLiteral => {
+            "8#" + key_str(key_literal(x.value)) + key_str(key_freshness(x.freshness))
+        },
+        let x: InferTyClass => "9#" + key_str(key_decl_name(x.name)) + key_str(key_ints(x.args)),
+        let x: InferTyInterface => {
+            "10#"
+                + key_str(key_decl_name(x.name))
+                + key_str(key_ints(x.args))
+                + key_str(
+                    `${x.associated_types.length()}`
+                        + x.associated_types
+                            .map((s) -> {
+                                key_str(key_infer_associated_type(s))
+                            })
+                            .join(""),
+                )
+        },
+        let x: TyEnum => "11#" + key_str(key_decl_name(x.name)),
+        let x: TyEnumVariant => "12#" + key_str(key_decl_name(x.name)) + key_str(key_str(x.variant)),
+        let x: InferTyList => "13#" + key_str(`${x.elem}`),
+        let x: InferTyMap => "14#" + key_str(`${x.key}`) + key_str(`${x.value}`),
+        let x: InferTyUnion => "15#" + key_str(key_ints(x.members)),
+        let x: InferTyFunction => {
+            "16#"
+                + key_str(
+                    `${x.params.length()}`
+                        + x.params
+                            .map((s) -> {
+                                key_str(key_infer_function_param_ty(s))
+                            })
+                            .join(""),
+                )
+                + key_str(`${x.ret}`)
+                + key_str(`${x.throws_}`)
+        },
+        let x: InferTyFuture => "17#" + key_str(`${x.value}`) + key_str(`${x.error}`),
+        TyRustType => "18",
+        TyType => "19",
+        TyResource => "20",
+        TyPromptAst => "21",
+        let x: TyTypeAlias => "22#" + key_str(key_decl_name(x.name)),
+        let x: TyTypeVar => "23#" + key_str(key_param_ty(x.param)),
+        let x: InferTyAssociatedTypeProjection => {
+            "24#"
+                + key_str(`${x.base}`)
+                + key_str(key_infer_interface_constraint(x.interface_))
+                + key_str(key_str(x.member))
+        },
+        TyUnknown => "25",
+        TyNever => "26",
+        TyError => "27",
+        let x: TyInferVar => "30#" + key_str(`${x.var}`),
+        let x: InferTyTuple => "31#" + key_str(key_ints(x.items)),
+    }
+}
+
+function key_infer_function_param_ty(s: InferFunctionParamTy) -> string throws never {
+    key_str(key_opt_str(s.name)) + key_str(`${s.ty}`) + key_str(key_function_param_mode(s.mode))
+}
+
+function key_infer_interface_constraint(s: InferInterfaceConstraint) -> string throws never {
+    key_str(key_decl_name(s.name))
+        + key_str(key_ints(s.generics))
+        + key_str(
+            `${s.associated_types.length()}`
+                + s.associated_types
+                    .map((s) -> {
+                        key_str(key_infer_associated_type(s))
+                    })
+                    .join(""),
+        )
+}
+
+function key_infer_associated_type(s: InferAssociatedType) -> string throws never {
+    key_str(key_str(s.name)) + key_str(`${s.ty}`)
+}

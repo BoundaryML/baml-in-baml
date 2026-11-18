@@ -63,7 +63,9 @@ const HAS_UNION = 32;
 class InferPool {
     kinds: InferTy[],
     flags: int[],
-    index: map<InferTy, int>,
+    // Keyed by `key_infer_ty(kind)`, not by the kind: a class-keyed map
+    // lookup is ~3 us on the VM (ns_types/key.baml).
+    index: map<string, int>,
 
     function new() -> Self {
         InferPool { kinds: [], flags: [], index: {} }
@@ -74,14 +76,15 @@ class InferPool {
     // here; there is no other way to make a handle.
     // Restructured: named `add`, the name the generated interning calls.
     function add(self, kind: InferTy) -> int {
-        let existing = self.index.get(kind);
+        let key = key_infer_ty(kind);
+        let existing = self.index.get(key);
         if (existing != null) {
             return existing;
         }
         let ty = self.kinds.length();
         self.flags.push(self.compute_flags(kind));
         self.kinds.push(kind);
-        self.index.set(kind, ty);
+        self.index.set(key, ty);
         ty
     }
 

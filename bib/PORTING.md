@@ -603,3 +603,26 @@ profile is dropped (`cloud recording delivery: ShutdownTimeout`), and cloud
 recording roughly doubled a small check's time (16.7 s vs 6.9 s).
 `BAML_TELEMETRY` sets the detail level (off, low, medium, high), not the
 destination.
+
+### Speed log (sample: whole `baml_src` loaded, every 15th file checked)
+
+| Iteration | Sample | Quality (all functions) |
+|---|---|---|
+| baseline | 103 s | 3,166 fns, cognitive 13,518, cyclomatic 16,437 |
+| 1 impl candidates cached per package, by interface | 80 s | +1 fn, +31 cog |
+| 2 path-segment sets hoisted; namespace index; LangRoots inverted | 66 s | +2 fn, +4 cog |
+| 3 union dedup with a seen set | no gain, reverted | |
+| 4 `canonicalize_unions` cached per context; find-first bindings | 52 s | +1 fn, +2 cog |
+| 5 int-keyed seen set; string escape fast path | no gain, reverted | |
+| 6 `KindSet` as a bitset (as in Rust) | 51 s | +134 cyclomatic (the index match) |
+| 7 type interner keyed by a generated string key | 49 s | +18 generated fns |
+
+Every kept iteration: type_spec 173/173, 355/355, 5/5. Lessons:
+- The profiler's self time is inflated for tiny, hot functions
+  (instrumentation per call); only the sample's wall time decides. Phase
+  timings: `baml run bench.phase_times`.
+- VM map keys: class 2.9 us, enum 0.8 us, string (built) 0.39 us, int
+  0.09 us per lookup. Hot class- or enum-keyed maps are worth re-keying.
+- Phases on the sample: parse 6 s, AST 4 s (+ parse), semantic index 5 s,
+  type checking ~35 s. `check_file` re-parses its file for parse errors
+  (Rust reads the memoized parse): to fix.
