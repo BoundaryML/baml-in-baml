@@ -475,3 +475,8 @@ annotations; baml_tests/src/type_spec/harness.rs) as BAML tests.
 The one difference is `anyfunction` (E0153 `reflect.AnyFunction` is a
 compiler builtin and cannot be implemented by hand): see the stdlib open
 item. Each gate takes ~80 s.
+- TIR ports read the Rust in the fork's tree, which mirrors upstream past
+  `BASE` (e.g. #5715 changed infer.rs and infer/*). The oracle toolchain is
+  built from that tree, so the code and the oracle agree; the `// port: ...
+  @ d9be6853b` headers are nominal for TIR. Advance `BASE` when the TIR gate
+  passes.
