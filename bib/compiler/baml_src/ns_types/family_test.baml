@@ -55,8 +55,8 @@ test "interning shares equal subtrees and propagates flags" {
     let a = intern_ty(pool, sample(true));
     let b = intern_ty(pool, sample(true));
     assert.equal(a, b);
-    assert.is_true(pool.has(a, HAS_ERROR));
-    assert.is_true(!pool.has(a, HAS_INFER));
+    assert.is_true(pool.has_error(a));
+    assert.is_true(!pool.has_infer(a));
     assert.equal(resolve_ty(pool, a), sample(true));
 }
 

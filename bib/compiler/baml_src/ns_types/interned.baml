@@ -111,12 +111,6 @@ class InferPool {
         )
     }
 
-    // Whether `ty`'s flags contain `flag` (Rust: `ty.flags().contains(flag)`).
-    // Kept for family_test.baml; ported code uses the named predicates below.
-    function has(self, ty: int, flag: int) -> bool throws never {
-        (self.flags[ty] & flag) != 0
-    }
-
     // port: baml_type/src/interned.rs::Ty::has_infer @ d9be6853b
     // Whether this type still contains inference variables.
     function has_infer(self, ty: int) -> bool throws never {
