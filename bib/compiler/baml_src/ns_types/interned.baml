@@ -66,9 +66,13 @@ class InferPool {
     // Keyed by `key_infer_ty(kind)`, not by the kind: a class-keyed map
     // lookup is ~3 us on the VM (ns_types/key.baml).
     index: map<string, int>,
+    // Speed, not a Rust field: `to_plain_closed` results by handle. A
+    // handle's entry never changes once interned, so neither does its plain
+    // form.
+    plain_closed: map<int, Ty>,
 
     function new() -> Self {
-        InferPool { kinds: [], flags: [], index: {} }
+        InferPool { kinds: [], flags: [], index: {}, plain_closed: {} }
     }
 
     // port: baml_type/src/interned.rs::Ty::intern @ d9be6853b
@@ -246,6 +250,17 @@ class InferPool {
     // `Interface::new` (bindings sorted by name), and at an `InferVar`, which
     // panics instead of throwing.
     function to_plain_closed(self, ty: int) -> Ty throws never {
+        let cached = self.plain_closed.get(ty);
+        if (cached != null) {
+            return cached;
+        }
+        let plain = self.to_plain_closed_uncached(ty);
+        self.plain_closed[ty] = plain;
+        plain
+    }
+
+    // The body of `to_plain_closed`, before its per-pool cache.
+    function to_plain_closed_uncached(self, ty: int) -> Ty throws never {
         let plain_all = (tys: int[]) -> Ty[] {
             tys.map((t) -> {
                 self.to_plain_closed(t)
