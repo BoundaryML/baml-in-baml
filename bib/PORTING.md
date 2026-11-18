@@ -315,3 +315,58 @@ layer was marked ported) were reviewed by hand: neither needs a port.
 - One agent owns one Rust file at a time; files in the same stage run in parallel.
 - Every task ends with `baml check` clean and `baml test` no worse than before.
 - Reviews read the BAML next to the Rust it names in its header.
+
+## TIR plan (2026-11-18)
+
+Gate: our `check` equals the Rust compiler on phase `Type` too. The corpus
+holds 1,444 Type diagnostics of ~60 codes in 170 units
+(`baml run oracle.census -- --phase type`).
+
+Entry: `baml_db/src/check.rs::check_file` (infer each body owner, then the
+per-item lowering, defaults, trace-hook, `@json`, LLM-output, global-init and
+interface checks) plus the ~1.5k lines of message building in check.rs
+(959-2434), which land in `check.baml`.
+
+Namespaces: `baml_type` is `types` (`ns_types`), `baml_compiler2_hir_ty` is
+`hir_ty` (`ns_hir_ty`, with `infer/` and `interfaces/` as nested
+namespaces).
+
+Work packages (★ = depends only on what is ported):
+
+| # | Package | Rust lines | After |
+|---|---|---|---|
+| ★A | `baml_type` helpers: lib.rs (Ty methods, rendering), names, head, param, primitive, int, defs, structural_interface, accepts_null, type_kind, json_tags, throw_facts, call_layout | 3.7k | family |
+| B | interned.rs | 1.4k | A |
+| C | decl_cycles.rs | 0.7k | A |
+| D | json_inhabit.rs + the runtime_ty part llm_output reaches | 1.5k | A |
+| E | normalize.rs + normalize/mu.rs (one cycle) | 5.3k | A, B |
+| F | unify.rs, then pattern_overlap.rs | 3.3k | E |
+| G | render.rs, diagnostics.rs, check.rs message layer | 5.5k | A |
+| H | infer/unify.rs (InferenceTable) | 1.7k | B, G |
+| I | exhaustiveness.rs core | 1.8k | G |
+| J | defaults.rs | 0.6k | G |
+| K1 | lower.rs, facts.rs, layout subset, extern_loc/package_interface stubs | 4.3k | E, F, G |
+| K2 | interfaces.rs + interfaces/* | 5.5k | K1 |
+| K3 | impls.rs, coherence subset, method_resolution (no IDE), callable, ops | 6.5k | K1, K2 |
+| K4 | infer.rs + infer/* | 22k | K, H, I |
+| L | trace_hooks, globals, init_io, llm_output, json_attrs, cleanup, rest of check.rs | 3.5k | K4 |
+
+K1-K4 are one cycle in Rust (signature -> callable_throws -> infer_body ->
+signature); they land function by function behind stubs. Salsa cycles
+(`cycle_initial`/`cycle_result`) need the memo's in-progress state and
+fixpoint iteration (`Memo.get_cyclic`), converging to Rust's values.
+
+Deferred (not on the Type diagnostic path): ide.rs, template.rs,
+simplify_sap, typetag, wire_head, codegen_ty, crossing, user_facing, most of
+layout/throw_facts/coherence/method_resolution, and package_interface /
+extern_loc beyond stubs (the stdlib is compiled from source, so no root is
+served from an interface).
+
+Checkpoints: each file's `#[cfg(test)]` tests ported beside it (normalize 82,
+exhaustiveness 83, unify 38, infer/unify 30, pattern_overlap 25, ...); a
+declaration gate after K1 (Type diagnostics outside bodies); an interface
+gate after K3; upstream's 173 `type_spec` fixtures (`//^ ty` expression
+types) after K4; then the full Type gate.
+
+Port the memoized Hash-eligibility walk (impls.rs `hash_eligible`), not the
+code at `BASE`: it is 80% of check time there.

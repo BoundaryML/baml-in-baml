@@ -117,6 +117,9 @@ class Db {
   scopes: LocArena,
   namespaces: NamespaceArena,
   memo: Memos,
+  // The tracked-query stack the type checker's cyclic queries share
+  // (tracked.baml).
+  cycles: Cycles,
 
   function new() -> Db throws never {
     Db {
@@ -135,6 +138,7 @@ class Db {
       scopes: LocArena.new(),
       namespaces: NamespaceArena.new(),
       memo: Memos.new(),
+      cycles: Cycles.new(),
     }
   }
 
