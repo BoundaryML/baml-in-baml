@@ -1044,12 +1044,14 @@ function impls_for_type_candidate(
 
 // port: baml_compiler2_hir_ty/src/impls.rs::package_impl_candidates @ d9be6853b
 // Every impl block of `package` whose header resolved. Restructured: the
-// source lane only (see the file header), as an array.
+// source lane only (see the file header). Lazy, as Rust's iterator is: a
+// search that stops at its first match must not resolve the facts of the
+// blocks after it (a block's facts can depend on the search itself).
 function package_impl_candidates(
     db: root.hir.Db,
     package: int,
-) -> ResolvedImplFacts[] throws never {
-    package_impl_locs(db, package).filter_map((block) -> {
+) -> baml.iter.Iterator<Item = ResolvedImplFacts, Error = never> throws never {
+    baml.iter.ArrayIterator.new(package_impl_locs(db, package)).iter().filter_map((block) -> {
         let facts = impl_header_resolution_resolved(impl_facts(db, block));
         if (facts != null) {
             ResolvedImplFacts { block: block, facts: facts }
@@ -1501,13 +1503,18 @@ function has_potential_custom_equals(
     let closed = root.types.ClosedTy.try_from(db.ty_memo.pool, concrete) catch (e) {
         root.types.OpenTy => baml.sys.panic("eligibility receiver is closed"),
     };
-    search_roots(db, concrete, equals).some((package) -> {
-        package_impl_candidates(db, package).some((facts) -> {
-            facts.facts.interface_.reference.name == equals.name
-                && ResolvedImpl { facts: facts, bindings: {} }.provided_method(db, "eq") != null
-                && heads_may_overlap(db, package, facts.facts.for_ty_pattern, closed)
-        })
-    })
+    for (let package in search_roots(db, concrete, equals)) {
+        for (let facts in package_impl_candidates(db, package)) {
+            if (
+                facts.facts.interface_.reference.name == equals.name
+                    && ResolvedImpl { facts: facts, bindings: {} }.provided_method(db, "eq") != null
+                    && heads_may_overlap(db, package, facts.facts.for_ty_pattern, closed)
+            ) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 // port: baml_compiler2_hir_ty/src/impls.rs::implements_interface @ d9be6853b
