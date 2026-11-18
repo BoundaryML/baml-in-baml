@@ -25,6 +25,7 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | one-line forwarding helper | don't: one function with a named default parameter, or call the target directly |
 | `const FOO: KindSet = KindSet::new(&[..])` | `const FOO: KindSet = KindSet.of([..]);` |
 | field named after a BAML keyword (`throws`, `requires`) | `throws_clause`, `requires_clause` |
+| a binding, field or parameter named `root` | not allowed (`root` is the package path): `file`, `root_node`, ... |
 
 ## Types
 
@@ -40,6 +41,8 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `Any*` enum of node ids | `type AnyX = A \| B \| Bogus` (already in `nodes/`) |
 | data enum (`ParseError`) | union of classes, narrowed with `match (e) { let x: Foo => .. }` |
 | fieldless enum | `enum` |
+| data enum variant `Expr::If { .. }` (AST and later, generated) | `class ExprIf { .. }`, union `type Expr = ExprIf \| ..`; a single unnamed payload `Literal(l)` is field `value`; a unit variant is an empty class |
+| `View` lookups in the AST lowering (`view.range_of(id)`, `view.range_any(&any)`) | `view.range(node.span)`, `view.range(root.syntax.node_span(any))` |
 | `usize`/`u32` | `int` |
 | `HashSet<T>` | `map<T, bool>` |
 | map keyed by a tuple `(A, B)` | `map<A, map<B, V>>` (tuples are not `baml.Hash` yet) |

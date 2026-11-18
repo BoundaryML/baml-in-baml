@@ -5,10 +5,41 @@
 // that fit no node are a `Bogus`, and both only ever appear alongside an
 // error in `Parse.errors`.
 
+// port: baml_syntax nodes::FileTree. A parsed file's text, its tokens and
+// its root node; everything a later stage reads a tree through.
+class FileTree {
+  text: string,
+  utf8: uint8array,
+  tokens: Tokens,
+  file: SourceFile,
+
+  // The text of one token.
+  function token_text(self, token: int) -> string throws never {
+    self.tokens.text(self.utf8, token)
+  }
+
+  // port: Tokens::range
+  function token_range(self, token: int) -> TextRange throws never {
+    TextRange { start: self.tokens.starts[token], end: self.tokens.starts[token + 1] }
+  }
+
+  // port: Tokens::text_range. The text a run of tokens covers; an empty run is
+  // the empty range at its start.
+  function text_range(self, span: TokenRange) -> TextRange throws never {
+    TextRange { start: self.tokens.starts[span.start], end: self.tokens.starts[span.end] }
+  }
+
+  // The source text `range` covers.
+  function slice(self, range: TextRange) -> string throws never {
+    string.from_utf8(self.utf8.slice(range.start, range.end)) catch (e) {
+      baml.errors.InvalidArgument => baml.sys.panic("ranges split the source on character boundaries"),
+    }
+  }
+}
+
 // port: lib.rs::Parse. A parsed file.
 class Parse {
-  tree: SourceFile,
-  tokens: Tokens,
+  tree: FileTree,
   errors: ParseError[],
 }
 
@@ -16,8 +47,11 @@ class Parse {
 function parse(text: string) -> Parse throws never {
   let input = Input.new(text);
   let p = Parser.new(Cursor.new(input), Sink.new());
-  let tree = source_file(p);
-  Parse { tree: tree, tokens: input.tokens, errors: p.out.errors }
+  let file = source_file(p);
+  Parse {
+    tree: FileTree { text: text, utf8: input.utf8, tokens: input.tokens, file: file },
+    errors: p.out.errors,
+  }
 }
 
 // port: baml_compiler_diagnostics/src/to_diagnostic.rs::typed_parse_error_diagnostic.
