@@ -142,3 +142,43 @@ function collapse_self_assoc_projections(
 ) -> root.types.Ty throws never {
     baml.sys.panic("collapse_self_assoc_projections: not ported")
 }
+
+// port: baml_compiler2_hir_ty/src/interfaces.rs::normalized_alias_map @ d9be6853b
+// `package_resolved_aliases` with every body folded toward the union
+// canonical form the overlap machinery assumes.
+function normalized_alias_map(
+    db: root.hir.Db,
+    pkg_id: int,
+) -> map<root.types.DeclName, root.types.Ty> throws never {
+    baml.sys.panic("normalized_alias_map: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/interfaces.rs::ValueMemberKind @ d9be6853b
+// What a value-namespace interface member is.
+enum ValueMemberKind {
+    Field,
+    Method,
+}
+
+// port: baml_compiler2_hir_ty/src/interfaces.rs::InterfaceMemberKind @ d9be6853b
+// What an interface declares under a name, across both namespaces.
+// Restructured: `Value(ValueMemberKind)` is `InterfaceMemberKindValue`.
+type InterfaceMemberKind = InterfaceMemberKindAssociatedType | InterfaceMemberKindValue;
+
+class InterfaceMemberKindAssociatedType {
+}
+
+class InterfaceMemberKindValue {
+    value: ValueMemberKind,
+}
+
+// port: baml_compiler2_hir_ty/src/interfaces.rs::interface_declared_kind @ d9be6853b
+// What the interface `qtn` declares under `name` in namespace `ns`.
+function interface_declared_kind(
+    db: root.hir.Db,
+    qtn: root.types.DeclName,
+    name: string,
+    ns: MemberNamespace,
+) -> InterfaceMemberKind? throws never {
+    baml.sys.panic("interface_declared_kind: not ported")
+}
