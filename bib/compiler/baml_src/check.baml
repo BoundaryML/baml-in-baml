@@ -2,64 +2,49 @@
 // reflect.Package.compile: source files in, diagnostics out.
 // So far: parse diagnostics only.
 
+// Where the stdlib sources are read from (`ns_db/project.baml`), relative to
+// this project.
+const STDLIB_DIR: string = "../../baml_language/crates/baml_builtins2/baml_std";
+
 function check(files: map<string, string>) -> reflect.Diagnostic[] throws never {
-    files.keys().flat_map((file) -> {
-        check_file(file, files[file])
-    })
+  check_with(stdlib_db(), files)
+}
+
+// A Db holding only the stdlib, for `check_with`.
+function stdlib_db() -> root.hir.Db throws never {
+  root.db.project_db(STDLIB_DIR, {}) catch_all (e) {
+    _ => baml.sys.panic(`cannot read the stdlib under ${STDLIB_DIR}`),
+  }
+}
+
+// `check`, on a Db that already holds the stdlib: `files` become a new
+// workspace root. Every cache is keyed by file or root id, so one Db can
+// check many independent workspaces and compiles the stdlib once.
+function check_with(db: root.hir.Db, files: map<string, string>) -> reflect.Diagnostic[] throws never {
+  let workspace = root.db.add_root(db, "", root.base.SourceRootKind.Workspace, null, []);
+  for (let path in files.keys()) {
+    root.db.add_file(db, workspace, path, files[path]);
+  }
+  db.source_root(workspace).files.flat_map((file) -> { check_file(db, file) })
 }
 
 // port: baml_db/src/check.rs::check_file @ d9be6853b. One file's
-// diagnostics in the order its steps produce them (parse, then CST to AST
-// lowering), deduplicated. `file` is the path relative to the package root.
-function check_file(file: string, text: string) -> reflect.Diagnostic[] throws never {
-    let parsed = root.syntax.parse(text);
-    let (let _items, let lowering, let _env_refs) = root.ast.lower_file(parsed.tree, file, test_owner(file));
-    let diagnostics = parsed.errors
-        .map((error) -> {
-            root.syntax.parse_error_diagnostic(error, file)
-        })
-        .concat(
-            lowering.map((d) -> {
-                root.ast.to_diagnostic(d, file)
-            }),
-        );
-    sort_diagnostics(dedup_adjacent(diagnostics))
-}
-
-// port: baml_compiler2_hir/src/lib.rs::file_ast's test owner: `root`, or
-// `root.<ns>...` from the file's namespace.
-function test_owner(file: string) -> string throws never {
-    ["root"].concat(namespace_path(file)).join(".")
-}
-
-// port: baml_compiler2_hir/src/file_package.rs::file_package's namespace path:
-// every `ns_<identifier>` directory on the way to the file, in order.
-function namespace_path(file: string) -> string[] throws never {
-    let dirs = file.split("/");
-    dirs.pop();
-    dirs.filter_map((dir) -> {
-        ns_name(dir)
-    })
-}
-
-// port: file_package.rs::extract_ns_name. The namespace an `ns_` directory
-// names, when the rest is an identifier.
-function ns_name(dir: string) -> string? throws never {
-    if (!dir.starts_with("ns_")) {
-        return null;
-    }
-    let name = dir.slice(3, dir.length());
-    let first = name.at(0)
-        ?? return null;
-    let valid = (first.is_ascii_alphabetic() || first == "_")
-        && name.chars().every((c) -> {
-            c.is_ascii_alphanumeric() || c == "_"
-        });
-    if (valid) {
-        name
-    } else {
-        null
-    }
+// diagnostics in the order its steps produce them (parse, CST to AST
+// lowering, HIR), deduplicated and sorted.
+function check_file(db: root.hir.Db, file: int) -> reflect.Diagnostic[] throws never {
+  let source = db.file(file);
+  let parse_errors = root.syntax.parse(source.text).errors.map((error) -> {
+    root.syntax.parse_error_diagnostic(error, source.path)
+  });
+  let index = root.hir.file_semantic_index(db, file);
+  let extra = index.extra;
+  let hir = if (extra) {
+    extra.lowering_diagnostics.map((d) -> { root.ast.to_diagnostic(d, source.path) })
+      .concat(extra.diagnostics.map((d) -> { root.hir.to_diagnostic(d, source.path) }))
+  } else {
+    []
+  };
+  sort_diagnostics(dedup_adjacent(parse_errors.concat(hir)))
 }
 
 // port: baml_db/src/check.rs::sort_diagnostics. By primary span start, then

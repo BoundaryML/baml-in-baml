@@ -27,7 +27,7 @@ const KNOWN_DIFFERENCES: map<string, string> = {
 
 function parse_corpus(
     dir: string,
-    stage: "parse" | "lowering" = "parse",
+    stage: "parse" | "lowering" | "hir" = "parse",
 ) -> CorpusReport throws baml.errors.Io | baml.errors.ParseError {
     let paths = baml.glob.new("**/*.baml").scan(dir);
     let mismatches: CorpusMismatch[] = [];
@@ -61,7 +61,7 @@ function parse_corpus(
 function corpus_summary(
     dirs: string[],
     limit: int = 5,
-    stage: "parse" | "lowering" = "parse",
+    stage: "parse" | "lowering" | "hir" = "parse",
 ) -> string throws baml.errors.Io | baml.errors.ParseError {
     dirs
         .map((dir) -> {

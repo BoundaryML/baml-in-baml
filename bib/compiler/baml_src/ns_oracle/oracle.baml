@@ -57,6 +57,17 @@ function compare_parse(files: map<string, string>) -> ParseComparison throws nev
 // lowering's share of the Rust compiler's output.
 const LOWERING_CODES: string[] = ["E0001", "E0010", "E0017", "E0098", "E0108", "E0127", "E0147", "E0152", "E0171"];
 
+// Parse and HIR-phase diagnostics (lowering and HIR proper), ours vs the
+// Rust compiler's.
+function compare_hir(files: map<string, string>, db: root.hir.Db? = null) -> ParseComparison throws never {
+  let in_scope = (d: reflect.Diagnostic) -> bool { d.phase == "parse" || d.phase == "hir" };
+  let ours = if (db) { root.check_with(db, files) } else { root.check(files) };
+  ParseComparison {
+    rust: rust_diagnostics(files).filter(in_scope).map(diagnostic_key),
+    ours: ours.filter(in_scope).map(diagnostic_key),
+  }
+}
+
 // Parse and lowering diagnostics, ours vs the Rust compiler's.
 function compare_lowering(files: map<string, string>) -> ParseComparison throws never {
     let in_scope = (d: reflect.Diagnostic) -> bool {

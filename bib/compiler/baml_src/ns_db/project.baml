@@ -123,14 +123,16 @@ function add_file(db: root.hir.Db, root_id: int, path: string, text: string) -> 
   id
 }
 
-// A Db for one compile: the stdlib, then one workspace root holding `files`
+// A Db holding the stdlib, then one workspace root holding `files`
 // (path -> text), the way `reflect.Package.compile` compiles them.
 function project_db(stdlib_dir: string, files: map<string, string>) -> root.hir.Db throws baml.errors.Io | baml.errors.ParseError {
   let db = root.hir.Db.new();
   install_stdlib(db, stdlib_dir);
-  let workspace = add_root(db, "", root.base.SourceRootKind.Workspace, null, []);
-  for (let path in files.keys()) {
-    add_file(db, workspace, path, files[path]);
+  if (files) {
+    let workspace = add_root(db, "", root.base.SourceRootKind.Workspace, null, []);
+    for (let path in files.keys()) {
+      add_file(db, workspace, path, files[path]);
+    }
   }
   db
 }
