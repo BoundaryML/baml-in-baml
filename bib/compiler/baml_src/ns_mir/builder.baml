@@ -14,8 +14,9 @@
 //   `MirBuilder.new(..)` in its place and keep the old object.
 // - The `#[must_use]` tokens `OutOfLine` and `Shield` are plain classes; a
 //   token handed back twice is not caught.
-// - Rust's `call` is `call_with_type_args` with `ntypeargs = 0` (no
-//   one-line forwarder).
+// - No one-line forwarders: Rust's `call` is `call_with_type_args` with
+//   `ntypeargs = 0`, and `temp(ty)` is `declare_local(ty)` (whose `name`
+//   and `span` are named defaults, after `ty`).
 // - Every `assert!` is a panic with Rust's message; `debug_assert!`s are
 //   dropped.
 
@@ -77,7 +78,8 @@ class MirBuilder {
         }
     }
 
-    // Rust's `owner()` accessor is the field `owner`.
+    // Rust's accessors `owner()` and `unwind()` are the fields `owner` and
+    // `current_unwind`.
 
     // port: baml_compiler2_mir/src/builder.rs::MirBuilder::set_span @ d9be6853b
     // Set the source span for the function.
@@ -88,12 +90,14 @@ class MirBuilder {
     // port: baml_compiler2_mir/src/builder.rs::MirBuilder::declare_local @ d9be6853b
     // Declare a new local variable or temporary. Convention: `_0` is the
     // return place, `_1..=_n` are parameters (n = arity), `_n+1...` are user
-    // locals and temporaries.
+    // locals and temporaries. Also Rust's `temp` (a temporary is an unnamed
+    // local): `declare_local(ty)`. Restructured: `ty` comes first and `name`
+    // and `span` are named defaults.
     function declare_local(
         self,
-        name: string?,
         ty: root.types.RuntimeTy,
-        span: root.base.Span?,
+        name: string? = null,
+        span: root.base.Span? = null,
     ) -> int throws never {
         let id = self.locals.length();
         self.locals.push(
@@ -122,12 +126,6 @@ class MirBuilder {
             self.push_statement(StatementKindFreshCell { local: local, carry_value: false }, null);
         }
         local
-    }
-
-    // port: baml_compiler2_mir/src/builder.rs::MirBuilder::temp @ d9be6853b
-    // Allocate a temporary (unnamed local).
-    function temp(self, ty: root.types.RuntimeTy) -> int throws never {
-        self.declare_local(null, ty, null)
     }
 
     // port: baml_compiler2_mir/src/builder.rs::MirBuilder::local_ty @ d9be6853b
@@ -181,12 +179,6 @@ class MirBuilder {
         let id = self.current_block_id
             ?? return true;
         self.blocks[id].is_terminated()
-    }
-
-    // port: baml_compiler2_mir/src/builder.rs::MirBuilder::unwind @ d9be6853b
-    // The handler the current lowering position unwinds to.
-    function unwind(self) -> int? throws never {
-        self.current_unwind
     }
 
     // port: baml_compiler2_mir/src/builder.rs::MirBuilder::create_handler_block @ d9be6853b

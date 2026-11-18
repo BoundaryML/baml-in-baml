@@ -84,7 +84,7 @@ class LoopContext {
 class ArmedDefer {
     // The body, an inline `ExprBlock` (an expression id).
     body: int,
-    // `MirBuilder.unwind()` at arming.
+    // `MirBuilder.current_unwind` at arming.
     unwind: int?,
 }
 
