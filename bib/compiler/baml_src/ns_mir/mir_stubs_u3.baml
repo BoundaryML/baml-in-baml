@@ -18,37 +18,6 @@
 //   `int`s; `Name` is `string`; parameters named after a BAML keyword (or
 //   `root`) get `_` (`root_id`).
 
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_path_expr @ d9be6853b
-function lower_path_expr(
-    ctx: LoweringContext,
-    expr_id: int,
-    segments: string[],
-    dest: Place,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_path_expr: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_multi_segment_path_as_field_chain @ d9be6853b
-// Lower a multi-segment `Path` expression (`a.b.c`) as chained field projections.
-function lower_multi_segment_path_as_field_chain(
-    ctx: LoweringContext,
-    expr_id: int,
-    segments: string[],
-    dest: Place,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_multi_segment_path_as_field_chain: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_item_ref @ d9be6853b
-function lower_item_ref(
-    ctx: LoweringContext,
-    expr_id: int,
-    def: root.hir.Definition,
-    dest: Place,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_item_ref: not ported (U3)", span: null }
-}
-
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::convert_binop @ d9be6853b
 function convert_binop(op: root.ast.BinaryOp) -> BinOp? throws never {
     baml.sys.panic("convert_binop: not ported (U3)")
