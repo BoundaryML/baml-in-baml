@@ -80,7 +80,7 @@ class Facts {
             interface_: root.types.InterfaceConstraint,
         ) -> bool {
             let pool = self.db.ty_memo.pool;
-            let concrete_ty = interned_ty(pool, concrete);
+            let concrete_ty = pool.from_plain(concrete);
             let target = root.types.infer_interface_from_constraint(pool, interface_);
             let eligible = conditional_structural_verdict(self.db, self, concrete_ty, target);
             if (eligible != null) {
@@ -172,10 +172,10 @@ class Facts {
             }
             let pool = self.db.ty_memo.pool;
             let target = root.types.infer_interface_from_constraint(pool, interface_);
-            let eq = AliasOnlyFacts { db: self.db };
+            let eq = AliasOnlyFacts.new(self.db);
             match (base) {
                 let var: root.types.TyTypeVar => {
-                    let base_interned = interned_ty(pool, base);
+                    let base_interned = pool.from_plain(base);
                     let candidates: int[] = [];
                     for (let bound in self.type_var_bound(var.param)) {
                         let have = root.types.infer_interface_from_constraint(pool, bound);
@@ -219,12 +219,12 @@ class Facts {
                     let base_target = root.types.infer_interface_new(
                         existential.name,
                         existential.args.map((arg) -> {
-                            interned_ty(pool, arg)
+                            pool.from_plain(arg)
                         }),
                         existential.associated_types.map((binding) -> {
                             root.types.InferAssociatedType {
                                 name: binding.name,
-                                ty: interned_ty(pool, binding.ty),
+                                ty: pool.from_plain(binding.ty),
                             }
                         }),
                     );
@@ -245,7 +245,7 @@ class Facts {
                             ?.ty {
                             if (
                                 !inherited.some((have) -> {
-                                    eq_admitted(have, ty, eq)
+                                    eq_admitted(pool, have, ty, eq)
                                 })
                             ) {
                                 inherited.push(ty);

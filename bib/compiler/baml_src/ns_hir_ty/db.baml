@@ -3,7 +3,7 @@
 // One `TrackedMemo` per hir_ty query (ns_hir/tracked.baml), named after the
 // query, keyed like HIR's memos: an interned loc id (`db.function_locs`, ...)
 // or a root id. A query keyed by something else interns its key here first
-// (`assoc_members`). Reached as `db.ty_memo.<query>`.
+// (`assoc_members`, `impl_type_keys`). Reached as `db.ty_memo.<query>`.
 //
 // Restructured: Rust's interned types live in one global pool
 // (`baml_type::interned::pool()`); here the compile's pool is `pool`, so a
@@ -48,6 +48,17 @@ class TyMemos {
     // lower.rs::interface_assoc_bound (key: `assoc_members`)
     interface_assoc_bound: root.hir.TrackedMemo<AssocTypeLowering>,
     assoc_members: AssocMemberKeys,
+    // impls.rs::impl_facts (key: impl loc)
+    impl_facts: root.hir.TrackedMemo<ImplHeaderResolution>,
+    // impls.rs::package_impl_locs (key: root id)
+    package_impl_locs: root.hir.TrackedMemo<int[]>,
+    // impls.rs::impls_for_type_cached (key: `impl_type_keys`)
+    impls_for_type_cached: root.hir.TrackedMemo<CachedResolvedImpl[]>,
+    impl_type_keys: ImplTypeKeys,
+    // callable.rs::callable_throws (key: function loc)
+    callable_throws: root.hir.TrackedMemo<CallableThrows>,
+    // callable.rs::function_signature_ty (key: function loc)
+    function_signature_ty: root.hir.TrackedMemo<FunctionSignatureTy>,
     // The compile's interned-type pool (Rust's global `pool()`).
     pool: root.types.InferPool,
 
@@ -61,6 +72,12 @@ class TyMemos {
             interface_assoc_default: root.hir.TrackedMemo.new("interface_assoc_default"),
             interface_assoc_bound: root.hir.TrackedMemo.new("interface_assoc_bound"),
             assoc_members: AssocMemberKeys.new(),
+            impl_facts: root.hir.TrackedMemo.new("impl_facts"),
+            package_impl_locs: root.hir.TrackedMemo.new("package_impl_locs"),
+            impls_for_type_cached: root.hir.TrackedMemo.new("impls_for_type_cached"),
+            impl_type_keys: ImplTypeKeys.new(),
+            callable_throws: root.hir.TrackedMemo.new("callable_throws"),
+            function_signature_ty: root.hir.TrackedMemo.new("function_signature_ty"),
             pool: root.types.InferPool.new(),
         }
     }
