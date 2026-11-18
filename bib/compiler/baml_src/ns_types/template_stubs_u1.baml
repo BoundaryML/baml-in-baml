@@ -15,7 +15,10 @@ function resolved_aliases_convert(aliases: ResolvedAliases, ty: Ty) -> RuntimeTy
 // port: baml_type_runtime/src/lib.rs::erase_typevars_matching @ d9be6853b
 // Home: baml_type_runtime (no namespace yet). Replace the type variables
 // `should_erase` selects with `unknown`.
-function erase_typevars_matching(ty: Ty, should_erase: (ParamTy) -> bool throws never) -> Ty throws never {
+function erase_typevars_matching(
+    ty: Ty,
+    should_erase: (ParamTy) -> bool throws never,
+) -> Ty throws never {
     baml.sys.panic("erase_typevars_matching: not ported (U7)")
 }
 
