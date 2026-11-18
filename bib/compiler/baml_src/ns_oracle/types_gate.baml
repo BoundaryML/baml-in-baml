@@ -1,5 +1,5 @@
 // The Type gate (bib/PORTING.md, "TIR plan"): every diagnostic, Type phase
-// included, ours vs the Rust compiler's, unit by unit.
+// included, ours vs `baml check`'s (cli_oracle.baml), unit by unit.
 //
 //   baml run oracle.types_gate_summary
 //
@@ -63,7 +63,11 @@ function types_gate(dir: string, unit: CorpusUnit) -> TypesGateReport throws bam
         }
         report.units += 1;
         let unit_db = db;
-        let task: baml.future.Future<ParseComparison, never> = spawn { compare_types(files, db = unit_db) };
+        let task: baml.future.Future<ParseComparison, never> = spawn {
+            compare_cli(files, db = unit_db) catch_all (e) {
+                _ => baml.sys.panic(`oracle failed: ${e}`),
+            }
+        };
         let settled = await baml.future.all_settled([task]);
         match (settled[0]) {
             let ok: baml.future.Success<ParseComparison> => {
