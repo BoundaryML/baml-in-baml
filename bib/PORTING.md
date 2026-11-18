@@ -372,10 +372,9 @@ Port the memoized Hash-eligibility walk (impls.rs `hash_eligible`), not the
 code at `BASE`: it is 80% of check time there.
 
 Open items:
-- `hir_ty.reexport_paths` is a panicking stub (render.baml's
-  `Viewpoint::reexport_path`). It is reached whenever the viewer has no edge
-  to the declaring package. Decide its source-only answer (Rust derives a
-  package interface even for source packages) before K1's declaration gate.
+- (resolved) `hir_ty.reexport_paths`: a package compiled from source folds
+  an interface with no re-exports (`fold_package_interface`), so it is
+  always empty here.
 - `json_inhabit` `solve` and `decl_cycles` `productive_aliases` are
   quadratic in chain length, as in Rust (a 3,000-class chain: 114 s on the VM).
 - `ty_debug` (Rust's derived `Debug` of `Ty`, `family_stubs.baml`) panics.
@@ -395,3 +394,20 @@ Open items:
   normalize in.
 - normalize's test helpers (`Ctx`, `param`, `enum_ty`, `class1`, ...) are in
   `types` under their Rust names; pattern_overlap's tests reuse them.
+
+## Declaration gate (2026-11-18, after K1)
+
+`baml run oracle.decl_gate_summary`: Rust's Type-phase diagnostics from the
+lowering functions (signature, class, let, alias, interface lowering) at
+declaration positions, compared unit by unit. `callable_throws` pinned to its
+seed; interface queries stubbed.
+
+| Corpus | Match | Rust / ours | Stopped on a stub |
+|---|---|---|---|
+| `broken_syntax` | 28/28 | 5 / 5 | 0 |
+| `diagnostic_errors` | 128/136 | 49 / 46 | 7 |
+| `parser_stress` | 5/5 | 2 / 2 | 0 |
+| `baml_src` (one unit) | - | - | 1 |
+
+Every unit that ran matches except `tuples_map_keys` (3 E0067, from the
+stubbed `map_key_is_hashable`). The stops are interface stubs (K2).
