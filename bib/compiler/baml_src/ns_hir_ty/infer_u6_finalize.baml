@@ -619,7 +619,7 @@ function structurally_resolve(ctx: InferenceContext, ty: int) -> int throws neve
                 _ => restore_arm(normalized),
             };
         }
-        return expand_alias_ty(ctx, resolved);
+        return root.hir_ty.expand_alias_head(ctx.table.pool, resolved, ctx.facts);
     }
     resolved
 }
@@ -763,7 +763,7 @@ function pattern_overlap_verdict(
             vars: ctx.lower.generic_params,
             bounds: ctx.facts.bounds,
             aliases: aliases,
-            lang: infer_ctx_lang(ctx),
+            lang: root.hir.lang_roots(ctx.db),
             enum_variants: (qtn) -> {
                 ctx.facts.enum_variants(qtn)
             },

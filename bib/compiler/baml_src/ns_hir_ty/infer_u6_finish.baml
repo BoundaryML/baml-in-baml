@@ -19,8 +19,6 @@
 //   `(error, expr)` arm) is `pending_diag_at_expr`.
 // - Rust's `FxHashSet<(ExprId, DeclName)>` is `map<int, DeclName[]>` (tuples
 //   are not map keys); `std::mem::take` is a read followed by a reset.
-// - `crate::throw_facts::flatten_declared_ty_to_facts` (throw_facts.rs, not
-//   ported yet) is ported here, the one item of that file `finish` reaches.
 
 // port: baml_compiler2_hir_ty/src/infer.rs::InferenceContext::take_unresolved_infer_diagnostics @ d9be6853b
 // Reports every registered variable still unsolved at finalize, once per
@@ -805,7 +803,7 @@ function finish_diagnostics(
         // unsatisfied bound.
         let error: TirTypeError = match (expected_kind) {
             let iface: root.types.InferTyInterface
-                if infer_ctx_lang(ctx).is_(root.base.LangPackage.Baml, iface.name.pkg)
+                if root.hir.lang_roots(ctx.db).is_(root.base.LangPackage.Baml, iface.name.pkg)
                 && iface.name.namespace.length() == 1
                 && iface.name.namespace[0] == "iter"
                 && iface.name.name == "Iterable" => {
@@ -853,7 +851,7 @@ function finish_diagnostics(
         }
     }
     if (body != null) {
-        root.hir_ty.infer.add_diagnostics(body, result, ctx.loop_verdicts, diags);
+        root.hir_ty.infer.add_diagnostics(ctx.table.pool, body, result, ctx.loop_verdicts, diags);
     }
     // Stable, so diagnostics at one anchor keep their push order.
     let sort_key = (diag: TirDiagnostic) -> (int, int) {
@@ -1293,7 +1291,7 @@ function pending_diag_to_tir_unspecialized(
     if (!p.unconditional && !has_unresolved_user_arg) {
         return null;
     }
-    let vp = infer_ctx_viewpoint(ctx);
+    let vp = root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file);
     let specialization_example: string? = if (p.specialization_example_is_safe && p.specialization_syntax_available) {
         let args: string[] = [];
         let specialization_args = p.specialization_args;
@@ -1373,7 +1371,7 @@ function pending_diag_to_tir_member(
             pending_diag_at_expr(TirTypeErrorReceiverTypeMustBeKnown { member: p.member }, p.expr)
         },
         let p: PendingDiagAmbiguousMember => {
-            let receiver = ty_spell(plain_finalized(ctx, p.base), infer_ctx_viewpoint(ctx));
+            let receiver = ty_spell(plain_finalized(ctx, p.base), root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file));
             let sources = p.sources.map((iface) -> {
                 qualified_interface_display(ctx, iface)
             });
@@ -1395,7 +1393,10 @@ function pending_diag_to_tir_member(
         let p: PendingDiagFieldRequiresProjection => {
             pending_diag_at_expr(
                 TirTypeErrorInterfaceFieldRequiresProjection {
-                    class_name: ty_spell(plain_finalized(ctx, p.base), infer_ctx_viewpoint(ctx)),
+                    class_name: ty_spell(
+                        plain_finalized(ctx, p.base),
+                        root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file),
+                    ),
                     field_name: p.member,
                     interface_name: qualified_interface_display(ctx, p.interface_),
                 },
@@ -2088,7 +2089,7 @@ function required_for_notes(
     at: int,
     required_for: root.hir_ty.infer.RequiredFor[],
 ) -> RelatedNote[] throws never {
-    let vp = infer_ctx_viewpoint(ctx);
+    let vp = root.hir_ty.Viewpoint.for_file(ctx.db, ctx.owner_file);
     let notes: RelatedNote[] = [];
     for (let index = required_for.length() - 1; index >= 0; index -= 1) {
         let goal = required_for[index];
@@ -2128,52 +2129,5 @@ function with_unsolved_pins_elided(ctx: InferenceContext, interface_: int) -> in
             )
         },
         _ => resolved,
-    }
-}
-
-// port: baml_compiler2_hir_ty/src/throw_facts.rs::flatten_declared_ty_to_facts @ d9be6853b
-// A declared throws type as throw facts: union members decomposed, literals
-// widened to their primitive, `never` dropped. Rust's `BTreeSet<Ty>` is
-// sorted by `cmp_ty` and deduplicated.
-function flatten_declared_ty_to_facts(ty: root.types.Ty) -> root.types.Ty[] throws never {
-    let out: root.types.Ty[] = [];
-    collect_widened_leaf_types(ty, out);
-    out.sort_by(root.types.cmp_ty);
-    let facts: root.types.Ty[] = [];
-    for (let fact in out) {
-        if (facts.length() == 0 || facts[facts.length() - 1] != fact) {
-            facts.push(fact);
-        }
-    }
-    facts
-}
-
-// port: baml_compiler2_hir_ty/src/throw_facts.rs::collect_widened_leaf_types @ d9be6853b
-function collect_widened_leaf_types(ty: root.types.Ty, out: root.types.Ty[]) -> void throws never {
-    match (ty) {
-        // Compound types: decompose.
-        let u: root.types.TyUnion => {
-            for (let member in u.members) {
-                collect_widened_leaf_types(member, out);
-            }
-        },
-        // Literal types: widen to primitive for throw fact purposes.
-        let l: root.types.TyLiteral => {
-            out.push(
-                match (l.value) {
-                    root.base.LiteralInt => root.types.TyInt {},
-                    root.base.LiteralBigint => root.types.TyBigint {},
-                    root.base.LiteralFloat => root.types.TyFloat {},
-                    root.base.LiteralString => root.types.TyString {},
-                    root.base.LiteralBool => root.types.TyBool {},
-                },
-            );
-        },
-        // Bottom: no facts.
-        root.types.TyNever => {},
-        // Everything else: keep as-is.
-        _ => {
-            out.push(ty);
-        },
     }
 }
