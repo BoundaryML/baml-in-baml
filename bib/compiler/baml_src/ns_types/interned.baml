@@ -682,12 +682,12 @@ function cmp_infer_ty(pool: InferPool, a: InferTy, b: InferTy) -> baml.ops.Order
         return by_variant;
     }
     let tys = (x: int[], y: int[]) -> baml.ops.Ordering {
-        cmp_slices(x, y, (p, q) -> {
+        cmp_list(x, y, (p, q) -> {
             pool.cmp(p, q)
         })
     };
     let bindings = (x: InferAssociatedType[], y: InferAssociatedType[]) -> baml.ops.Ordering {
-        cmp_slices(x, y, (p, q) -> {
+        cmp_list(x, y, (p, q) -> {
             cmp_then(p.name.cmp(q.name), () -> {
                 pool.cmp(p.ty, q.ty)
             })
@@ -695,11 +695,11 @@ function cmp_infer_ty(pool: InferPool, a: InferTy, b: InferTy) -> baml.ops.Order
     };
     match (a, b) {
         (let x: TyMedia, let y: TyMedia) => {
-            media_kind_ordinal(x.kind).cmp(media_kind_ordinal(y.kind))
+            cmp_media_kind(x.kind, y.kind)
         },
         (let x: TyLiteral, let y: TyLiteral) => {
             cmp_then(cmp_literal(x.value, y.value), () -> {
-                freshness_ordinal(x.freshness).cmp(freshness_ordinal(y.freshness))
+                cmp_freshness(x.freshness, y.freshness)
             })
         },
         (let x: InferTyClass, let y: InferTyClass) => {
@@ -729,10 +729,10 @@ function cmp_infer_ty(pool: InferPool, a: InferTy, b: InferTy) -> baml.ops.Order
         (let x: InferTyUnion, let y: InferTyUnion) => tys(x.members, y.members),
         (let x: InferTyTuple, let y: InferTyTuple) => tys(x.items, y.items),
         (let x: InferTyFunction, let y: InferTyFunction) => {
-            let params = cmp_slices(x.params, y.params, (p, q) -> {
-                cmp_then(cmp_optional_name(p.name, q.name), () -> {
+            let params = cmp_list(x.params, y.params, (p, q) -> {
+                cmp_then(cmp_optional_string(p.name, q.name), () -> {
                     cmp_then(pool.cmp(p.ty, q.ty), () -> {
-                        function_param_mode_ordinal(p.mode).cmp(function_param_mode_ordinal(q.mode))
+                        cmp_function_param_mode(p.mode, q.mode)
                     })
                 })
             });
@@ -783,23 +783,6 @@ function cmp_then(first: baml.ops.Ordering, rest: () -> baml.ops.Ordering) -> ba
 }
 
 // port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// Rust's slice order: element by element, then the shorter first.
-function cmp_slices<T>(a: T[], b: T[], cmp: (T, T) -> baml.ops.Ordering) -> baml.ops.Ordering {
-    let shared = if (a.length() < b.length()) {
-        a.length()
-    } else {
-        b.length()
-    };
-    for (let i = 0; i < shared; i += 1) {
-        let by_element = cmp(a[i], b[i]);
-        if (by_element != baml.ops.Ordering.Equal) {
-            return by_element;
-        }
-    }
-    a.length().cmp(b.length())
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
 // InferTy's Rust discriminants (family.rs), which order its variants.
 function infer_ty_discriminant(kind: InferTy) -> int throws never {
     match (kind) {
@@ -833,94 +816,5 @@ function infer_ty_discriminant(kind: InferTy) -> int throws never {
         TyError => 30,
         TyInferVar => 37,
         InferTyTuple => 38,
-    }
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// The derived order of `QualifiedTypeName<SourceRoot>`: package (a salsa id,
-// here the root's int), namespace, name.
-function cmp_decl_name(a: DeclName, b: DeclName) -> baml.ops.Ordering throws never {
-    cmp_then(a.pkg.cmp(b.pkg), () -> {
-        cmp_then(
-            cmp_slices(a.namespace, b.namespace, (p, q) -> {
-                p.cmp(q)
-            }),
-            () -> {
-                a.name.cmp(b.name)
-            },
-        )
-    })
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// The derived order of `Option<Name>`: None first.
-function cmp_optional_name(a: string?, b: string?) -> baml.ops.Ordering throws never {
-    match (a) {
-        null => {
-            if (b == null) {
-                baml.ops.Ordering.Equal
-            } else {
-                baml.ops.Ordering.Less
-            }
-        },
-        let x: string => {
-            match (b) {
-                null => baml.ops.Ordering.Greater,
-                let y: string => x.cmp(y),
-            }
-        },
-    }
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// The derived order of `Literal`: Int, Bigint, Float (by source text),
-// String, Bool, then the value.
-function cmp_literal(a: root.base.Literal, b: root.base.Literal) -> baml.ops.Ordering throws never {
-    let ordinal = (l: root.base.Literal) -> int {
-        match (l) {
-            root.base.LiteralInt => 0,
-            root.base.LiteralBigint => 1,
-            root.base.LiteralFloat => 2,
-            root.base.LiteralString => 3,
-            root.base.LiteralBool => 4,
-        }
-    };
-    match (a, b) {
-        (let x: root.base.LiteralInt, let y: root.base.LiteralInt) => x.value.cmp(y.value),
-        (let x: root.base.LiteralBigint, let y: root.base.LiteralBigint) => x.value.cmp(y.value),
-        (let x: root.base.LiteralFloat, let y: root.base.LiteralFloat) => x.value.cmp(y.value),
-        (let x: root.base.LiteralString, let y: root.base.LiteralString) => x.value.cmp(y.value),
-        (let x: root.base.LiteralBool, let y: root.base.LiteralBool) => x.value.cmp(y.value),
-        _ => ordinal(a).cmp(ordinal(b)),
-    }
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// MediaKind's declaration order.
-function media_kind_ordinal(kind: root.base.MediaKind) -> int throws never {
-    match (kind) {
-        root.base.MediaKind.Image => 0,
-        root.base.MediaKind.Audio => 1,
-        root.base.MediaKind.Video => 2,
-        root.base.MediaKind.Pdf => 3,
-        root.base.MediaKind.Generic => 4,
-    }
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// Freshness's declaration order.
-function freshness_ordinal(freshness: Freshness) -> int throws never {
-    match (freshness) {
-        Freshness.Fresh => 0,
-        Freshness.Regular => 1,
-    }
-}
-
-// port: baml_type/src/interned.rs::Ty::cmp @ d9be6853b
-// FunctionParamMode's declaration order.
-function function_param_mode_ordinal(mode: FunctionParamMode) -> int throws never {
-    match (mode) {
-        FunctionParamMode.Required => 0,
-        FunctionParamMode.Optional => 1,
     }
 }
