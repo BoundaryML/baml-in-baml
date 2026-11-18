@@ -9,8 +9,9 @@ class CorpusMismatch {
 
 class CorpusReport {
     files: int,
-    matched: int,
-    // Mismatches listed in KNOWN_DIFFERENCES, by path.
+    // Compilation units compared (files, projects, or 1 for the whole).
+    units: int,
+    // Units whose only differences are in files listed in KNOWN_DIFFERENCES.
     known: string[],
     mismatches: CorpusMismatch[],
 }
@@ -25,37 +26,74 @@ const KNOWN_DIFFERENCES: map<string, string> = {
     "ns_match_optimization/match_optimization.baml": "63-bit int: lowering rejects an i64-only literal that Rust rejects during type checking",
 };
 
+// How a corpus directory is compiled: each file alone, each top-level
+// directory as one project (`projects/*`), or the whole directory as one
+// project (`baml_src`, as upstream's corpus test compiles it).
+type CorpusUnit = "file" | "project" | "whole"
+
 function parse_corpus(
     dir: string,
     stage: "parse" | "lowering" | "hir" = "parse",
+    unit: CorpusUnit = "file",
 ) -> CorpusReport throws baml.errors.Io | baml.errors.ParseError {
     let paths = baml.glob.new("**/*.baml").scan(dir);
     let mismatches: CorpusMismatch[] = [];
     let known: string[] = [];
-    // One stdlib compile for the whole corpus; each file is its own workspace.
+    // One stdlib compile for the whole corpus; each unit is its own workspace.
     let db = if (stage == "hir") { root.stdlib_db() } else { null };
-    for (let path in paths) {
-        let files = { path: baml.fs.read(`${dir}/${path}`) };
+    let units = corpus_units(paths, unit);
+    for (let group in units) {
+        // Paths inside a unit are relative to it, as a project sees them.
+        let files: map<string, string> = {};
+        for (let path in group.paths) {
+            files[path.slice(group.prefix.length(), path.length())] = baml.fs.read(`${dir}/${path}`);
+        }
         let comparison = match (stage) {
             "lowering" => compare_lowering(files),
             "hir" => compare_hir(files, db = db),
             "parse" => compare_parse(files),
         };
-        if (comparison.ours != comparison.rust) {
-            if (KNOWN_DIFFERENCES.has(path)) {
-                known.push(path);
-            } else {
-                mismatches.push(
-                    CorpusMismatch { path: path, rust: comparison.rust, ours: comparison.ours },
-                );
-            }
+        // Diagnostics in a file with a known difference are compared apart.
+        let is_known = (key: string) -> bool {
+            group.paths.some((path) -> {
+                KNOWN_DIFFERENCES.has(path) && key.includes(` ${path.slice(group.prefix.length(), path.length())}:`)
+            })
+        };
+        let rust = comparison.rust.filter((key) -> { !is_known(key) });
+        let ours = comparison.ours.filter((key) -> { !is_known(key) });
+        if (comparison.rust != comparison.ours && rust == ours) {
+            known.push(group.name);
+        } else if (rust != ours) {
+            mismatches.push(CorpusMismatch { path: group.name, rust: rust, ours: ours });
         }
     }
     CorpusReport {
         files: paths.length(),
-        matched: paths.length() - mismatches.length() - known.length(),
+        units: units.length(),
         known: known,
         mismatches: mismatches,
+    }
+}
+
+// A compilation unit of a corpus: its name, the prefix its paths share, and
+// its files (relative to the corpus directory).
+class CorpusGroup {
+    name: string,
+    prefix: string,
+    paths: string[],
+}
+
+function corpus_units(paths: string[], unit: CorpusUnit) -> CorpusGroup[] throws never {
+    match (unit) {
+        "file" => paths.map((path) -> { CorpusGroup { name: path, prefix: "", paths: [path] } }),
+        "whole" => [CorpusGroup { name: "(whole project)", prefix: "", paths: paths }],
+        "project" => {
+            let groups: map<string, string[]> = {};
+            for (let path in paths) {
+                groups.get_or_insert(path.split("/")[0], []).push(path);
+            }
+            groups.keys().map((name) -> { CorpusGroup { name: name, prefix: `${name}/`, paths: groups[name] } })
+        },
     }
 }
 
@@ -64,11 +102,12 @@ function corpus_summary(
     dirs: string[],
     limit: int = 5,
     stage: "parse" | "lowering" | "hir" = "parse",
+    unit: CorpusUnit = "file",
 ) -> string throws baml.errors.Io | baml.errors.ParseError {
     dirs
         .map((dir) -> {
-            let report = parse_corpus(dir, stage = stage);
-            let head = `${dir}: ${report.matched}/${report.files} files match, ${report.known.length()} known differences, ${report.mismatches.length()} mismatches`;
+            let report = parse_corpus(dir, stage = stage, unit = unit);
+            let head = `${dir}: ${report.units} ${unit} units (${report.files} files), ${report.known.length()} with known differences, ${report.mismatches.length()} mismatches`;
             let shown = report.mismatches.slice(0, limit).map((m) -> {
                 `  ${m.path}\n    rust: ${m.rust.join("\n          ")}\n    ours: ${m.ours.join("\n          ")}`
             });

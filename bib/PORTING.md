@@ -287,17 +287,24 @@ valid oracle for these two stages.
 ## HIR gate (2026-11-18)
 
 `check()` builds a `Db` (stdlib from source plus a workspace root) and reports
-parse, lowering and HIR diagnostics. Compared with the Rust compiler's phase
-`parse` + `hir` diagnostics:
+parse, lowering, HIR and package-level validation diagnostics (cross-file
+name conflicts, namespace shadows), sorted by file then position as
+`collect_compiler2_diagnostics` does. Compared with the Rust compiler's
+phase `parse` + `hir` + `validation` diagnostics, on the compilation units
+upstream's own tests use:
 
-| Corpus | Match |
-|---|---|
-| `projects/broken_syntax` | 43/43 |
-| `projects/diagnostic_errors` | 177/178 |
-| `projects/parser_stress` | 5/5 |
-| `baml_tests/baml_src` | 615/619 |
+| Corpus | Unit | Units | Mismatches |
+|---|---|---|---|
+| `projects/broken_syntax` | each project | 28 (43 files) | 0 |
+| `projects/diagnostic_errors` | each project | 135 (178 files) | 0 (1 known) |
+| `projects/parser_stress` | each project | 5 | 0 |
+| `baml_tests/baml_src` | the whole directory as one project | 1 (619 files) | 0 (1 known) |
 
-The 5 differences are the accepted 63-bit `int` limit (`KNOWN_DIFFERENCES`).
+Known differences are the accepted 63-bit `int` limit (`KNOWN_DIFFERENCES`;
+diagnostics in those files are set aside, the rest of the unit still
+compared). A crafted cross-file duplicate (E0011) matches too. Full run:
+about 4 minutes.
+
 `ported_layers` is now `parse`, `ast`, `hir`, `diag`: upstream changes to
 these queue as port tasks. #5634 and #5715 (mirrored after `BASE`, while no
 layer was marked ported) were reviewed by hand: neither needs a port.

@@ -331,4 +331,51 @@ class ValidationDiagnostic {
         self.annotations.push(SpanAnnotation { span: span, message: message, is_primary: false });
         self
     }
+
+    // The `reflect.Diagnostic`, as `Diagnostic.finish` builds it, with each
+    // annotation in its own file: the first primary annotation is the span and
+    // label and is left out of `annotations`.
+    function finish(self, db: Db) -> reflect.Diagnostic throws never {
+        let count = self.annotations.length();
+        let primary_index = self.annotations.find_index((a) -> { a.is_primary }) ?? count;
+        let primary = self.annotations.at(primary_index);
+        let label = primary?.message;
+        let message = if (label != null && label != self.message) {
+            `${self.message}: ${label}`
+        } else {
+            self.message
+        };
+        let reflect_span = (span: root.base.Span) -> reflect.Span {
+            reflect.Span { file: db.file(span.file_id).path, start: span.range.start, end: span.range.end }
+        };
+        let others = self.annotations.slice(0, primary_index).concat(self.annotations.slice(primary_index + 1, count));
+        reflect.Diagnostic {
+            code: self.code,
+            span: if (primary != null) { reflect_span(primary.span) } else { null },
+            message: message,
+            severity: match (self.severity) {
+                root.base.Severity.Error => "error",
+                root.base.Severity.Warning => "warning",
+                root.base.Severity.Info => "info",
+            },
+            phase: match (self.phase) {
+                DiagnosticPhase.Parse => "parse",
+                DiagnosticPhase.Hir => "hir",
+                DiagnosticPhase.Validation => "validation",
+                DiagnosticPhase.Type => "type",
+            },
+            headline: self.message,
+            primary_label: label,
+            message_highlights: [],
+            annotations: others.map((a) -> {
+                reflect.DiagnosticAnnotation {
+                    span: reflect_span(a.span),
+                    message: a.message,
+                    message_highlights: [],
+                    is_primary: a.is_primary,
+                }
+            }),
+            related_info: [],
+        }
+    }
 }

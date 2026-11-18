@@ -25,7 +25,25 @@ function check_with(db: root.hir.Db, files: map<string, string>) -> reflect.Diag
   for (let path in files.keys()) {
     root.db.add_file(db, workspace, path, files[path]);
   }
-  db.source_root(workspace).files.flat_map((file) -> { check_file(db, file) })
+  let file_ids = db.source_root(workspace).files;
+  let diagnostics = file_ids.flat_map((file) -> { check_file(db, file) })
+    .concat(package_level_diagnostics(db, workspace));
+  // port: collect_compiler2_diagnostics's final sort: by file, then position.
+  let rank: map<string, int> = {};
+  for (let i = 0; i < file_ids.length(); i += 1) {
+    rank[db.file(file_ids[i]).path] = i;
+  }
+  sort_diagnostics(diagnostics, rank)
+}
+
+// port: baml_db/src/check.rs::package_level_diagnostics @ d9be6853b. Cross-file
+// name conflicts and namespace shadows of a package (phase "validation"),
+// computed outside `check_file`. Rust runs it over every package with files;
+// the stdlib packages have none, so only the workspace is checked here.
+function package_level_diagnostics(db: root.hir.Db, package: int) -> reflect.Diagnostic[] throws never {
+  let items = root.hir.package_items(db, package);
+  items.conflicts().map((conflict) -> { conflict.to_diagnostic(db).finish(db) })
+    .concat(items.shadows().map((shadow) -> { shadow.to_diagnostic(db).finish(db) }))
 }
 
 // port: baml_db/src/check.rs::check_file @ d9be6853b. One file's
@@ -44,39 +62,50 @@ function check_file(db: root.hir.Db, file: int) -> reflect.Diagnostic[] throws n
   } else {
     []
   };
-  sort_diagnostics(dedup_adjacent(parse_errors.concat(hir)))
+  dedup_adjacent(parse_errors.concat(hir))
 }
 
-// port: baml_db/src/check.rs::sort_diagnostics. By primary span start, then
-// headline, then span end; stable, so equal keys keep their order.
-function sort_diagnostics(diagnostics: reflect.Diagnostic[]) -> reflect.Diagnostic[] throws never {
-    diagnostics.sort_by_key((d) -> {
-        let span = d.span;
-        DiagnosticOrder { start: span?.start ?? 0, headline: d.headline, end: span?.end ?? 0 }
-    })
-}
-
-// The order diagnostics are reported in within a file.
-class DiagnosticOrder {
-    start: int,
-    headline: string,
-    end: int,
-
-    implements baml.ops.Equals {}
-
-    implements baml.ops.Compare {
-        function cmp(self, other: Self) -> baml.ops.Ordering throws never {
-            let by_start = self.start.cmp(other.start);
-            if (by_start != baml.ops.Ordering.Equal) {
-                return by_start;
-            }
-            let by_headline = self.headline.cmp(other.headline);
-            if (by_headline != baml.ops.Ordering.Equal) {
-                return by_headline;
-            }
-            self.end.cmp(other.end)
-        }
+// port: baml_db/src/check.rs::sort_diagnostics. By file (its position in
+// `rank`), then primary span start, then headline, then span end; stable, and
+// diagnostics without a span last.
+function sort_diagnostics(diagnostics: reflect.Diagnostic[], rank: map<string, int>) -> reflect.Diagnostic[] throws never {
+  diagnostics.sort_by_key((d) -> {
+    let span = d.span;
+    DiagnosticOrder {
+      file: if (span) { rank.get(span.file ?? "") ?? 0 } else { rank.length() },
+      start: span?.start ?? 0,
+      headline: d.headline,
+      end: span?.end ?? 0,
     }
+  })
+}
+
+// The order diagnostics are reported in.
+class DiagnosticOrder {
+  file: int,
+  start: int,
+  headline: string,
+  end: int,
+
+  implements baml.ops.Equals {}
+
+  implements baml.ops.Compare {
+    function cmp(self, other: Self) -> baml.ops.Ordering throws never {
+      let by_file = self.file.cmp(other.file);
+      if (by_file != baml.ops.Ordering.Equal) {
+        return by_file;
+      }
+      let by_start = self.start.cmp(other.start);
+      if (by_start != baml.ops.Ordering.Equal) {
+        return by_start;
+      }
+      let by_headline = self.headline.cmp(other.headline);
+      if (by_headline != baml.ops.Ordering.Equal) {
+        return by_headline;
+      }
+      self.end.cmp(other.end)
+    }
+  }
 }
 
 // port: the `dedup_by` at the end of check_file. Multiple steps can produce
