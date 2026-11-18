@@ -68,6 +68,15 @@ function compare_hir(files: map<string, string>, db: root.hir.Db? = null) -> Par
   }
 }
 
+// Every diagnostic, Type phase included: the TIR gate.
+function compare_types(files: map<string, string>, db: root.hir.Db? = null) -> ParseComparison throws never {
+    let ours = if (db) { root.check_with(db, files) } else { root.check(files) };
+    ParseComparison {
+        rust: rust_diagnostics(files).map(diagnostic_key),
+        ours: ours.map(diagnostic_key),
+    }
+}
+
 // Parse and lowering diagnostics, ours vs the Rust compiler's.
 function compare_lowering(files: map<string, string>) -> ParseComparison throws never {
     let in_scope = (d: reflect.Diagnostic) -> bool {

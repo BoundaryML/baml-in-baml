@@ -33,14 +33,14 @@ type CorpusUnit = "file" | "project" | "whole"
 
 function parse_corpus(
     dir: string,
-    stage: "parse" | "lowering" | "hir" = "parse",
+    stage: "parse" | "lowering" | "hir" | "types" = "parse",
     unit: CorpusUnit = "file",
 ) -> CorpusReport throws baml.errors.Io | baml.errors.ParseError {
     let paths = baml.glob.new("**/*.baml").scan(dir);
     let mismatches: CorpusMismatch[] = [];
     let known: string[] = [];
     // One stdlib compile for the whole corpus; each unit is its own workspace.
-    let db = if (stage == "hir") { root.stdlib_db() } else { null };
+    let db = if (stage == "hir" || stage == "types") { root.stdlib_db() } else { null };
     let units = corpus_units(paths, unit);
     for (let group in units) {
         // Paths inside a unit are relative to it, as a project sees them.
@@ -51,6 +51,7 @@ function parse_corpus(
         let comparison = match (stage) {
             "lowering" => compare_lowering(files),
             "hir" => compare_hir(files, db = db),
+            "types" => compare_types(files, db = db),
             "parse" => compare_parse(files),
         };
         // Diagnostics in a file with a known difference are compared apart.
@@ -101,7 +102,7 @@ function corpus_units(paths: string[], unit: CorpusUnit) -> CorpusGroup[] throws
 function corpus_summary(
     dirs: string[],
     limit: int = 5,
-    stage: "parse" | "lowering" | "hir" = "parse",
+    stage: "parse" | "lowering" | "hir" | "types" = "parse",
     unit: CorpusUnit = "file",
 ) -> string throws baml.errors.Io | baml.errors.ParseError {
     dirs
