@@ -541,8 +541,18 @@ Upstream's inferred-type fixtures, read in place from
 |---|---|
 | fixtures | 173/173 |
 | caret annotations (inferred types, `throws`, error channel) | 355/355 |
-| `render_infer` snapshots, byte for byte | 5/5 |
+| `render_infer` snapshots, compared as insta compares them | 5/5 |
 
 Runs in ~6 s. A changed expectation is reported as
 `line:col expected=<...> ours=<...>`; `baml test` includes the
 all-fixtures test.
+
+Verified (2026-11-18): every rule of `harness.rs` / `fixtures.rs` checked
+against the port; an independent parser of Rust's annotation rules extracts
+the same 355 annotations (343 type, 33 of them `throws`; 4 `mismatch:`;
+7 `implements:`; 1 `non-exhaustive`) on the fixtures and on 18 edge-case
+files. Mutating each annotation's expected text and caret range (710),
+deleting each error-channel annotation (12) and adding bogus ones (23): every
+mutation detected, at exactly its fixture and line:col. Snapshot comparison
+follows insta 1.47 (trailing whitespace, CRLF, legacy leading `---`), checked
+on 2,449 single-byte and structural mutations.
