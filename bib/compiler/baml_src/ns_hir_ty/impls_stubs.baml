@@ -17,8 +17,7 @@ class ImplFacts {
 }
 
 // port: baml_compiler2_hir_ty/src/impls.rs::ImplHeaderResolution @ d9be6853b
-// One impl block's header resolution. Not ported: `Poisoned`'s and
-// `NotImplementor`'s diagnostic payloads.
+// One impl block's header resolution.
 type ImplHeaderResolution = ImplHeaderResolutionUnresolved
     | ImplHeaderResolutionPoisoned
     | ImplHeaderResolutionNotImplementor
@@ -32,6 +31,8 @@ class ImplHeaderResolutionPoisoned {
 }
 
 class ImplHeaderResolutionNotImplementor {
+    // The written subject, as lowered: the E0138 payload.
+    target: root.types.Ty,
     facts: ImplFacts,
 }
 
@@ -61,6 +62,106 @@ class AliasOnlyFacts {
 // port: baml_compiler2_hir_ty/src/impls.rs::ResolvedImpl @ d9be6853b
 // A selected implementation. Not ported: its fields.
 class ResolvedImpl {
+    // port: baml_compiler2_hir_ty/src/impls.rs::ResolvedImpl::implemented_view @ d9be6853b
+    function implemented_view(
+        self,
+        db: root.hir.Db,
+        self_ty: int,
+    ) -> root.types.InferInterfaceConstraint throws never {
+        baml.sys.panic("ResolvedImpl::implemented_view: not ported")
+    }
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::ResolvedImplementation @ d9be6853b
+// An explicit implementation, or the language-provided structural default.
+type ResolvedImplementation = ResolvedImplementationExplicit
+    | ResolvedImplementationStructuralDefault;
+
+class ResolvedImplementationExplicit {
+    value: ResolvedImpl,
+}
+
+class ResolvedImplementationStructuralDefault {
+    value: root.types.StructuralInterface,
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::REQUIRES_CLOSURE_FUEL @ d9be6853b
+const REQUIRES_CLOSURE_FUEL: int = 64;
+
+// port: baml_compiler2_hir_ty/src/impls.rs::resolve_implementation @ d9be6853b
+function resolve_implementation(
+    db: root.hir.Db,
+    concrete: int,
+    interface_: root.types.InferInterfaceConstraint,
+) -> ResolvedImplementation? throws never {
+    baml.sys.panic("resolve_implementation: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::structural_interface_roots @ d9be6853b
+function structural_interface_roots(
+    db: root.hir.Db,
+) -> root.types.InferInterfaceConstraint[] throws never {
+    baml.sys.panic("structural_interface_roots: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::structural_interface @ d9be6853b
+function structural_interface(
+    db: root.hir.Db,
+    name: root.types.DeclName,
+) -> root.types.StructuralInterface? throws never {
+    baml.sys.panic("structural_interface: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::is_structural_interface @ d9be6853b
+function is_structural_interface(
+    db: root.hir.Db,
+    interface_: root.types.InferInterfaceConstraint,
+) -> bool throws never {
+    baml.sys.panic("is_structural_interface: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::demote_concrete_type_member @ d9be6853b
+// Edits `declarers` in place.
+function demote_concrete_type_member<T>(
+    lang: root.base.LangRoots,
+    member: string,
+    declarers: T[],
+    interface_: (T) -> root.types.DeclName,
+) -> void {
+    baml.sys.panic("demote_concrete_type_member: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::impl_views_for_type @ d9be6853b
+function impl_views_for_type(
+    db: root.hir.Db,
+    viewer: int,
+    concrete: root.types.Ty,
+    structural: (root.types.DeclName) -> bool,
+) -> root.types.InterfaceConstraint[] {
+    baml.sys.panic("impl_views_for_type: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/impls.rs::direct_requires_closure_plain @ d9be6853b
+function direct_requires_closure_plain(
+    db: root.hir.Db,
+    root_: root.types.InterfaceConstraint,
+    self_ty: root.types.Ty,
+    fuel: int,
+) -> root.types.InterfaceConstraint[] throws never {
+    baml.sys.panic("direct_requires_closure_plain: not ported")
+}
+
+// port: baml_compiler2_hir_ty/src/method_resolution.rs::prefer_explicit_members @ d9be6853b
+// Edits `candidates` in place.
+function prefer_explicit_members<T>(
+    db: root.hir.Db,
+    viewer: int,
+    facts: Facts,
+    receiver: int,
+    candidates: T[],
+    interface_: (T) -> root.types.InferInterfaceConstraint,
+) -> void {
+    baml.sys.panic("prefer_explicit_members: not ported")
 }
 
 // port: baml_compiler2_hir_ty/src/impls.rs::impl_facts @ d9be6853b
