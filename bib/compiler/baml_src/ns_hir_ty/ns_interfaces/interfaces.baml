@@ -1956,16 +1956,18 @@ function resolve_via_roots(
             let pool = db.ty_memo.pool;
             // A bound's `requires` closure can reach `baml.Concrete`; its
             // `type` yields.
-            root.hir_ty.demote_concrete_type_member(root.hir.lang_roots(db), member, candidates, (
-                iface,
-            ) -> {
-                iface.name
-            });
-            root.hir_ty.prefer_explicit_members(db, viewer, facts, pool.from_plain(subject), candidates, (
-                iface,
-            ) -> {
-                root.types.infer_interface_from_constraint(pool, iface)
-            });
+            candidates
+                = root.hir_ty.demote_concrete_type_member(root.hir.lang_roots(db), member, candidates, (
+                    iface,
+                ) -> {
+                    iface.name
+                });
+            candidates
+                = root.hir_ty.prefer_explicit_members(db, viewer, facts, pool.from_plain(subject), candidates, (
+                    iface,
+                ) -> {
+                    root.types.infer_interface_from_constraint(pool, iface)
+                });
             if (candidates.length() == 1) {
                 DeterminationDetermined { value: candidates[0] }
             } else {
@@ -2257,12 +2259,16 @@ function determine_concrete(
     }
     // `baml.Concrete` declares `type` for every concrete type; any other
     // interface declaring the name keeps it.
-    root.hir_ty.demote_concrete_type_member(root.hir.lang_roots(db), member, declarers, (iface) -> {
-        iface.name
-    });
-    root.hir_ty.prefer_explicit_members(db, viewer, facts, interned, declarers, (iface) -> {
-        root.types.infer_interface_from_constraint(pool, iface)
-    });
+    declarers
+        = root.hir_ty.demote_concrete_type_member(root.hir.lang_roots(db), member, declarers, (
+            iface,
+        ) -> {
+            iface.name
+        });
+    declarers
+        = root.hir_ty.prefer_explicit_members(db, viewer, facts, interned, declarers, (iface) -> {
+            root.types.infer_interface_from_constraint(pool, iface)
+        });
     match (declarers.length()) {
         0 => {
             DeterminationUndeclared {

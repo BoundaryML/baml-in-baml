@@ -96,3 +96,25 @@ test "match ty pattern unions are order insensitive with bindings" {
         ?? baml.sys.panic("union members should be matched by type, not position");
     assert.equal(bindings.get(param("T")), root.types.TyInt {})
 }
+
+// `baml.Concrete` declares `type` for every concrete type; another interface
+// declaring it keeps the name, so neither call below is ambiguous (E0121).
+test "a type member another interface declares is not ambiguous with baml.Concrete" {
+    let source = `
+        interface Kind {
+            function type() -> string throws never;
+        }
+        class Leaf { v: int }
+        implement Kind for Leaf {
+            function type() -> string { "leaf" }
+        }
+        function bound<K extends Kind & baml.Concrete>() -> string { K.type() }
+        function direct() -> string { Leaf.type() }
+    `;
+    assert.equal(
+        root.check({ "a.baml": source }).map((d) -> {
+            d.code
+        }),
+        [],
+    );
+}
