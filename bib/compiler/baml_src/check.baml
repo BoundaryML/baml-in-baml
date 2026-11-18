@@ -48,10 +48,12 @@ function package_level_diagnostics(db: root.hir.Db, package: int) -> reflect.Dia
 
 // port: baml_db/src/check.rs::check_file @ d9be6853b. One file's
 // diagnostics in the order its steps produce them (parse, CST to AST
-// lowering, HIR), deduplicated and sorted.
+// lowering, HIR, then the Type-phase steps in check_file_types.baml),
+// deduplicated.
 function check_file(db: root.hir.Db, file: int) -> reflect.Diagnostic[] throws never {
   let source = db.file(file);
-  let parse_errors = root.syntax.parse(source.text).errors.map((error) -> {
+  let raw_parse_errors = root.syntax.parse(source.text).errors;
+  let parse_errors = raw_parse_errors.map((error) -> {
     root.syntax.parse_error_diagnostic(error, source.path)
   });
   let index = root.hir.file_semantic_index(db, file);
@@ -62,7 +64,8 @@ function check_file(db: root.hir.Db, file: int) -> reflect.Diagnostic[] throws n
   } else {
     []
   };
-  dedup_adjacent(parse_errors.concat(hir))
+  let types = check_file_types(db, file, raw_parse_errors).map((d) -> { owned_diagnostic(db, d) });
+  dedup_adjacent(parse_errors.concat(hir).concat(types))
 }
 
 // port: baml_db/src/check.rs::sort_diagnostics. By file (its position in
