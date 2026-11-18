@@ -503,3 +503,28 @@ Every panic is package L's `global_value_type` stub. Mismatches:
 `baml.spawn.Root` error), `init_io_reachable` (package L), `anyfunction`
 (E0154 and others). Several look like the stdlib-from-source open item.
 Full run: ~2.5 min.
+
+## TIR gate (2026-11-18)
+
+The type checker is ported (packages A-L, K4 units 0-6) and `check_file`
+runs it. `baml run oracle.types_gate_summary`, every diagnostic compared:
+parse, HIR and validation against `reflect.Package._compile`, the rest
+against `baml check` (cli_oracle.baml):
+
+| Corpus | Unit | Units | Mismatches |
+|---|---|---|---|
+| `projects/broken_syntax` | each project | 28 | 0 |
+| `projects/diagnostic_errors` | each project | 136 | 0 (1 known) |
+| `projects/parser_stress` | each project | 5 | 0 |
+| `baml_tests/baml_src` | the whole directory | 1 (619 files) | 0 (known only) |
+
+Known differences are the 63-bit `int` limit. Full run: ~8 min.
+
+Why `baml check` and not `reflect` for the Type phase: `reflect`'s compile
+loads the stdlib as precompiled interfaces, whose lane skips stdlib bodies
+for init io, hides private fields and drops some markers and impls; on
+`baml_src` it reported ~280 diagnostics `baml check` does not. Our compiler
+sees the stdlib's source, as `baml check` does.
+
+`ported_layers` now includes `tir`: upstream changes to the type checker
+queue as port tasks.
