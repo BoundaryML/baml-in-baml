@@ -222,7 +222,7 @@ Each answers one question with a number, before any tooling is built:
 | Spike | Question | Pass |
 |---|---|---|
 | lexer speed | Port the lexer (no parser), lex the whole stdlib on the VM. | within 50x of Rust |
-| big unions | Port MIR `ir.rs` types by hand. How fast does `baml check` handle a 120-variant recursive union? | < 2s |
+| check time | `baml check` on the compiler project: 75s at 34 files, ~3 min at 37. Profiled (2026-11-17, fork build with symbols): ~80% of active compiler time is `hir_ty::impls::hash_eligible_within_depth::visit`, reached from `method_resolution::lookup_impl_member` → `concrete_member_ambiguity` → `applicable_structural_interface_roots` → `hash_eligible(receiver)`. Every method call re-walks the receiver's whole type graph (fields, unions, list/map elements) with no memoization, so cost ≈ method calls × type-graph size. Upstream bug; fix is to memoize Hash eligibility per type or compute it only when the looked-up member belongs to `Hash`. |
 | salsa idiom | Port one small memoized, cyclic TIR query (throws inference) with the table above. | same result on its upstream tests |
 | oracle in BAML | A BAML test compiles one corpus file with `reflect.Package._compile` and gets the same diagnostics as `baml check` on it. | equal |
 
