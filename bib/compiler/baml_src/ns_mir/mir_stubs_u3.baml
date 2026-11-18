@@ -18,61 +18,6 @@
 //   `int`s; `Name` is `string`; parameters named after a BAML keyword (or
 //   `root`) get `_` (`root_id`).
 
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_function_body @ d9be6853b
-function lower_function_body(ctx: LoweringContext) -> MirFunction throws MirInternalError {
-    throw MirInternalError { message: "lower_function_body: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_trace_hook_prologue @ d9be6853b
-function lower_trace_hook_prologue(ctx: LoweringContext, function_: int) -> void throws never {
-    baml.sys.panic("lower_trace_hook_prologue: not ported (U3)")
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::builtin_trace_hook @ d9be6853b
-function builtin_trace_hook(
-    ctx: LoweringContext,
-    function_: int,
-) -> BuiltinTraceHook? throws never {
-    baml.sys.panic("builtin_trace_hook: not ported (U3)")
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_default_parameter_prologue @ d9be6853b
-function lower_default_parameter_prologue(
-    ctx: LoweringContext,
-    func_data: root.hir.FunctionData,
-    parameter_defaults: root.hir.FunctionParameterDefaults,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_default_parameter_prologue: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_default_expr @ d9be6853b
-function lower_default_expr(
-    ctx: LoweringContext,
-    expr_id: int,
-    defaults: root.ast.FunctionDefaults,
-    dest: Place,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_default_expr: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_let_body_inner @ d9be6853b
-// Lower a top-level let binding's initializer into a zero-arg `MirFunctionBody`.
-function lower_let_body_inner(ctx: LoweringContext) -> MirFunctionBody throws MirInternalError {
-    throw MirInternalError { message: "lower_let_body_inner: not ported (U3)", span: null }
-}
-
-// port: baml_compiler2_mir/src/lower.rs::LoweringContext::lower_lambda @ d9be6853b
-// Lower a lambda expression into a nested `MirFunction` and emit a
-// `Rvalue::MakeClosure` assignment into `dest`.
-function lower_lambda(
-    ctx: LoweringContext,
-    func_def: root.ast.LambdaDef,
-    expr_id: int,
-    dest: Place,
-) -> void throws MirInternalError {
-    throw MirInternalError { message: "lower_lambda: not ported (U3)", span: null }
-}
-
 // port: baml_compiler2_mir/src/lower.rs::LoweringContext::external_callee @ d9be6853b
 // The exported row a callee expression names, following the same
 // flat-vs-path-member precedence as the source-location helpers.
