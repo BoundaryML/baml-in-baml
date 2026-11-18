@@ -644,17 +644,24 @@ class SemanticIndexBuilder {
                     }),
                 );
             },
-            // Upstream BUG, ported as is by decision (2026-11-18): a class literal
-            // that names a field twice (`Pair { a: null, a: 1 }`) compiles without a
-            // diagnostic and the last value wins. Fixed upstream, it arrives here as
-            // a port task; it needs the check class patterns make with
-            // `DuplicatePatternField`.
+            // port: builder.rs::walk_expr_children, the `Expr::Object` arm, as of
+            // upstream #5719 (ported ahead of its merge). A field named twice
+            // explicitly is an error. A field that also comes from a `...spread`
+            // is not: explicit fields override whatever the spread supplies.
             let e: root.ast.ExprObject => {
-                walk_all(
-                    e.fields.map((field) -> {
-                        field.value
-                    }),
-                );
+                let sites_by_field: map<string, root.syntax.TextRange[]> = {};
+                for (let field in e.fields) {
+                    sites_by_field.get_or_insert(field.name, []).push(
+                        source_map.object_field_name_span(expr_id, field.value),
+                    );
+                    walk(field.value);
+                }
+                for (let name in sites_by_field.keys()) {
+                    let sites = sites_by_field[name];
+                    if (sites.length() > 1) {
+                        self.diagnostics.push(Hir2DiagnosticDuplicateObjectField { name: name, sites: sites });
+                    }
+                }
                 walk_all(
                     e.spreads.map((spread) -> {
                         spread.expr

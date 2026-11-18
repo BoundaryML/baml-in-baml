@@ -24,6 +24,7 @@ type Hir2Diagnostic = Hir2DiagnosticDuplicateDefinition
     | Hir2DiagnosticDiagnosticMessage
     | Hir2DiagnosticDuplicatePatternBinding
     | Hir2DiagnosticDuplicatePatternField
+    | Hir2DiagnosticDuplicateObjectField
     | Hir2DiagnosticDuplicateFieldAlias
     | Hir2DiagnosticDuplicateAttribute
     | Hir2DiagnosticOrPatternBindingMismatch
@@ -110,6 +111,15 @@ class Hir2DiagnosticDuplicatePatternBinding {
 
 // A class destructure names the same field more than once.
 class Hir2DiagnosticDuplicatePatternField {
+    name: string,
+    sites: root.syntax.TextRange[],
+}
+
+// port: diagnostic.rs::Hir2Diagnostic::DuplicateObjectField, as of upstream
+// #5719 (ported ahead of its merge). A class literal names the same field more
+// than once (`Pair { a: null, a: 1 }`). `sites` lists every field-name span for
+// `name` in source order; the first is the original.
+class Hir2DiagnosticDuplicateObjectField {
     name: string,
     sites: root.syntax.TextRange[],
 }
@@ -376,6 +386,11 @@ function to_diagnostic(
                     `field \`${d.name}\` first destructured here`,
                     `field \`${d.name}\` destructured again here`,
                 )
+        },
+        let d: Hir2DiagnosticDuplicateObjectField => {
+            Diagnostic
+                .error(root.diagnostics.DUPLICATE_FIELD, `duplicate field \`${d.name}\` in class literal`)
+                .with_repeats(d.sites, `field \`${d.name}\` first set here`, `field \`${d.name}\` set again here`)
         },
         let d: Hir2DiagnosticDuplicateFieldAlias => {
             duplicate_serialized_key(d.key, d.container).with_repeats(

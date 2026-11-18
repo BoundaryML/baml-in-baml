@@ -215,11 +215,19 @@ def main() -> int:
                     print("    resolve by hand: git merge --no-ff " + sha, file=sys.stderr)
                     return 2
 
-            entry["status"] = ("port-pending" if needs_port else "absorbed") if entry["port"] else "mirrored"
+            key = f"pr{entry['pr']}" if entry["pr"] else sha[:12]
+            ported_ahead = needs_port and (DONE / f"{key}.md").exists()
+            if ported_ahead:
+                # Ported before upstream merged it: the done record already exists.
+                needs_port = False
+            entry["status"] = (
+                ("port-pending" if needs_port else "ported-ahead" if ported_ahead else "absorbed")
+                if entry["port"] else "mirrored"
+            )
             with LEDGER.open("a") as f:
                 f.write(json.dumps(entry) + "\n")
             git("add", str(LEDGER))
-            if entry["port"]:
+            if entry["port"] and not ported_ahead:
                 git("add", str(write_port_task(entry, by_class, up["repo"])))
             git("commit", "--amend", "--no-edit", "--quiet")
             mirrored += 1
