@@ -462,3 +462,16 @@ Rust's seeds (1808-1818, 1868-1890); the thread-local in-flight let set
 
 After K4: port upstream's `type_spec` harness (173 fixtures with `//^ ty`
 annotations; baml_tests/src/type_spec/harness.rs) as BAML tests.
+
+## Declaration and interface gates (2026-11-18, after K2 + K3)
+
+| Corpus | Declaration gate | Interface gate |
+|---|---|---|
+| `broken_syntax` | 28/28 (5 = 5) | 28/28 |
+| `diagnostic_errors` | 136/136 (54 = 54) | 135/136 (4 / 5) |
+| `parser_stress` | 5/5 (2 = 2) | 5/5 |
+| `baml_src` (one unit) | 1/1 | 1/1 |
+
+The one difference is `anyfunction` (E0153 `reflect.AnyFunction` is a
+compiler builtin and cannot be implemented by hand): see the stdlib open
+item. Each gate takes ~80 s.
