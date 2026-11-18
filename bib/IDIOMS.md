@@ -91,3 +91,25 @@ Style rules come from the BAML skill (`bib/compiler/.agents/skills/baml-core/SKI
 | `debug_assert!`, `unreachable!` | `baml.sys.panic("..")` only where Rust would really panic; drop debug asserts |
 | several values from one `match`, Rust tuples `(a, b)` | tuples: `let (let a, let b) = match ..`; `t.0`; patterns `(let a, _)` (needs a toolchain with upstream #5030) |
 | `format!("..{x}..")` | `` `..${x}..` `` |
+
+## Salsa (HIR and later)
+
+The `Db` is `root.hir.Db` (`ns_hir/db.baml`); compile setup is `root.db.project_db`.
+
+| Rust | BAML |
+|---|---|
+| `db: &dyn Db` parameter | `db: root.hir.Db` (bare `Db` inside `ns_hir`) |
+| `#[salsa::input] SourceFile` / `SourceRoot` | `int` id; data via `db.file(id)` / `db.source_root(id)` (`root.base.SourceFile`, `root.base.SourceRoot`) |
+| `file.text(db)`, `file.path(db)`, `file.source_root(db)` | `db.file(f).text`, `.path`, `.root` |
+| `root.files(db)`, `root.kind(db)`, `root.dependencies(db)` | `db.source_root(r).files`, `.kind`, `.dependencies` |
+| `db.source_roots().roots(db)` (table order) | `db.root_order` |
+| `FunctionLoc::new(db, file, id)` (and Class/Enum/Interface/TypeAlias/Let/Impl) | `db.function_locs.intern(file, id)` → `int` (`db.class_locs`, ...) |
+| `loc.file(db)`, `loc.id(db)` | `db.function_locs.get(loc).file`, `.id` |
+| `ScopeId::new(db, file, file_scope_id)` | `db.scopes.intern(file, file_scope_id)` → `int` |
+| `NamespaceId::new(db, package, path)` | `db.namespaces.intern(package, path)` → `int`; `db.namespaces.get(ns).package`, `.path` |
+| `#[salsa::tracked] fn q(db, key) -> T { body }` | `function q(db: Db, key: int) -> T { db.memo.q.get(key, () -> { body }) }` (the `Memo<T>` field already exists on `Memos`) |
+| a tracked query with no key (`workspace_roots`) | memo key `0` |
+| `LocalItemId<Marker>` | `int` (packed `hash << 16 \| index`); `hash_name` is our own 16-bit hash (deviation: Rust's SipHash is not reproducible cheaply) |
+| `seeded_*` inputs (cache seeding) | absent: always `None` |
+| `Arc<T>` | `T` |
+
